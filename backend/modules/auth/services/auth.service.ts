@@ -1,0 +1,211 @@
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { AuthUserRepository } from '../repositories/auth-user.repository';
+import { CryptoService } from './crypto.service';
+import { PasswordService } from './password.service';
+import { TokenService } from './token.service';
+import { SessionService } from './session.service';
+import { RegisterDto } from '../dto/register.dto';
+import { LoginDto } from '../dto/login.dto';
+import { RequestContextService } from '@packages/request-context/request-context.service';
+import { ConfigService } from '@nestjs/config';
+import { AuthProvider } from '@prisma/client';
+import { OAuth2Client } from 'google-auth-library';
+import { UserService } from '@modules/user/services/user.service';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private readonly repository: AuthUserRepository,
+    private readonly crypto: CryptoService,
+    private readonly password: PasswordService,
+    private readonly token: TokenService,
+    private readonly session: SessionService,
+    private readonly requestContext: RequestContextService,
+    private readonly config: ConfigService,
+    private readonly userService: UserService,
+  ) {
+    this.googleClient = new OAuth2Client(this.config.get<string>('GOOGLE_CLIENT_ID'));
+  }
+
+  private readonly googleClient: OAuth2Client;
+
+  async register(dto: RegisterDto): Promise<void> {
+    const emailHash = this.crypto.hashLookup(dto.email);
+    const existing = await this.repository.findByEmailHash(emailHash);
+    
+    if (existing) {
+      // In a strict environment we might return a success message here to prevent enumeration
+      throw new BadRequestException('Email already in use'); 
+    }
+
+    const emailEncrypted = this.crypto.encrypt(dto.email);
+    const passwordHash = await this.password.hash(dto.password);
+
+    const context = this.requestContext.get();
+    
+    await this.repository.createUser(
+      {
+        emailHash,
+        emailEncrypted,
+        passwordHash,
+      },
+      {
+        eventType: 'UserRegistered',
+        emailHash,
+        occurredAt: new Date().toISOString(),
+        requestId: context?.requestId,
+        correlationId: context?.correlationId,
+      },
+      context?.correlationId
+    );
+  }
+
+  async login(dto: LoginDto): Promise<{ accessToken: string, refreshToken: string }> {
+    const emailHash = this.crypto.hashLookup(dto.email);
+    const user = await this.repository.findByEmailHash(emailHash);
+
+    if (!user || user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.passwordHash) {
+      throw new UnauthorizedException('Please sign in with Google');
+    }
+
+    const valid = await this.password.verify(user.passwordHash, dto.password);
+    if (!valid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const refreshToken = this.token.generateRefreshToken();
+    const session = await this.session.createSession(user.id, refreshToken);
+    const accessToken = this.token.signAccessToken(user.id, session.id);
+
+    return { accessToken, refreshToken };
+  }
+
+  async googleLogin(idToken: string): Promise<{ accessToken: string, refreshToken: string }> {
+    let payload: { email?: string; sub?: string; email_verified?: boolean; name?: string; picture?: string } | null = null;
+
+    if (this.isDevGoogleTokenAllowed(idToken)) {
+      const email = idToken.split(':')[1];
+      payload = {
+        email,
+        sub: `dev-${email}`,
+        email_verified: true,
+        name: email.split('@')[0],
+      };
+    } else {
+      let ticket;
+      try {
+        ticket = await this.googleClient.verifyIdToken({
+          idToken,
+          audience: this.config.get<string>('GOOGLE_CLIENT_ID'),
+        });
+      } catch (e) {
+        throw new UnauthorizedException('Invalid Google token');
+      }
+
+      payload = ticket.getPayload() ?? null;
+    }
+
+    if (!payload || !payload.email || !payload.sub || payload.email_verified !== true) {
+      throw new UnauthorizedException('Invalid Google token payload');
+    }
+
+    const providerUserId = payload.sub;
+    const email = payload.email;
+    const emailHash = this.crypto.hashLookup(email);
+    const profile = {
+      name: payload.name ?? email.split('@')[0],
+      avatarUrl: payload.picture ?? null,
+    };
+
+    let user = await this.repository.findByProviderIdentity(AuthProvider.GOOGLE, providerUserId);
+
+    if (!user) {
+      // Check if user exists by email (manual registration before)
+      user = await this.repository.findByEmailHash(emailHash);
+
+      if (!user) {
+        // Create entirely new user
+        const emailEncrypted = this.crypto.encrypt(email);
+        const context = this.requestContext.get();
+
+        user = await this.repository.createUser(
+          {
+            emailHash,
+            emailEncrypted,
+            identities: {
+              create: {
+                provider: AuthProvider.GOOGLE,
+                providerUserId,
+                emailHash,
+              },
+            },
+          },
+          {
+            eventType: 'UserRegistered',
+            emailHash,
+            provider: 'google',
+            occurredAt: new Date().toISOString(),
+            requestId: context?.requestId,
+            correlationId: context?.correlationId,
+          },
+          context?.correlationId
+        );
+      } else {
+        const context = this.requestContext.get();
+        user = await this.repository.linkProviderIdentity(
+          user.id,
+          AuthProvider.GOOGLE,
+          providerUserId,
+          emailHash,
+          {
+            eventType: 'AuthProviderLinked',
+            authUserId: user.id,
+            emailHash,
+            provider: 'google',
+            occurredAt: new Date().toISOString(),
+            requestId: context?.requestId,
+            correlationId: context?.correlationId,
+          },
+          context?.correlationId
+        );
+      }
+    }
+
+    if (user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Account disabled');
+    }
+
+    // Synchronously provision the User profile if it doesn't exist yet.
+    // This avoids a race condition where the frontend calls createAgency
+    // before the async RabbitMQ consumer has had time to create the User row.
+    await this.userService.provisionUser(user.id, profile);
+
+    const refreshToken = this.token.generateRefreshToken();
+    const session = await this.session.createSession(user.id, refreshToken);
+    const accessToken = this.token.signAccessToken(user.id, session.id);
+
+    return { accessToken, refreshToken };
+  }
+
+  private isDevGoogleTokenAllowed(idToken: string): boolean {
+    const clientId = this.config.get<string>('GOOGLE_CLIENT_ID') ?? '';
+    const isDev = this.config.get<string>('NODE_ENV') !== 'production';
+    const isPlaceholderClient = !clientId || clientId.includes('replace');
+    return isDev && isPlaceholderClient && idToken.startsWith('dev-google-token:');
+  }
+
+  async refresh(refreshToken: string): Promise<{ accessToken: string, refreshToken: string }> {
+    const { session, newRefreshTokenStr } = await this.session.rotateSession(refreshToken);
+    const accessToken = this.token.signAccessToken(session.authUserId, session.id);
+    
+    return { accessToken, refreshToken: newRefreshTokenStr };
+  }
+
+  async logout(refreshToken: string): Promise<void> {
+    await this.session.revokeSession(refreshToken);
+  }
+}
