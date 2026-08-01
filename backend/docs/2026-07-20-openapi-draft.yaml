@@ -1,0 +1,159 @@
+openapi: 3.1.0
+info:
+  title: Agency OS API
+  version: 0.1.0
+  description: Draft API specification for the first backend vertical slice.
+servers:
+  - url: http://localhost:4000/api/v1
+security:
+  - bearerAuth: []
+paths:
+  /auth/register:
+    post:
+      security: []
+      summary: Register auth identity
+      responses:
+        "201":
+          description: Registered
+  /auth/login:
+    post:
+      security: []
+      summary: Login and set refresh cookie
+      responses:
+        "200":
+          description: Logged in
+  /organizations/agencies:
+    post:
+      summary: Create agency
+      responses:
+        "201":
+          description: Agency created
+  /clients:
+    post:
+      summary: Create client
+      responses:
+        "201":
+          description: Client created
+  /clients/{id}:
+    get:
+      summary: Get client
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Client found
+  /campaigns:
+    post:
+      summary: Create campaign
+      responses:
+        "201":
+          description: Campaign created
+  /content-assets:
+    post:
+      summary: Create content asset and initial workflow instance
+      responses:
+        "201":
+          description: Content asset created
+  /content-assets/{id}:
+    get:
+      summary: Get content asset with workflow execution data
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Content asset found
+    patch:
+      summary: Update domain content brief
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200":
+          description: Content asset updated
+  /content-assets/{id}/assign:
+    post:
+      summary: Create a workflow task and assign it
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "201":
+          description: Workflow task assigned
+  /content-assets/{id}/submit:
+    post:
+      summary: Submit work for a workflow task
+      parameters:
+        - $ref: "#/components/parameters/id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [actorId, workflowTaskId, submissionType]
+              properties:
+                actorId:
+                  type: string
+                  format: uuid
+                workflowTaskId:
+                  type: string
+                  format: uuid
+                submissionType:
+                  $ref: "#/components/schemas/SubmissionType"
+                body:
+                  type: string
+                externalLink:
+                  type: string
+                  format: uri
+      responses:
+        "201":
+          description: Submission created
+  /content-assets/{id}/approve:
+    post:
+      summary: Approve a workflow task
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "201":
+          description: Approval created
+  /content-assets/{id}/request-changes:
+    post:
+      summary: Request changes and create return task
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "201":
+          description: Changes requested
+  /content-assets/{id}/block:
+    post:
+      summary: Raise blocker on workflow task
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "201":
+          description: Blocker raised
+  /content-assets/{id}/unblock:
+    post:
+      summary: Resolve active blockers on current task
+      parameters:
+        - $ref: "#/components/parameters/id"
+      responses:
+        "201":
+          description: Blockers resolved
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    SubmissionType:
+      type: string
+      enum: [SCRIPT, RAW_FOOTAGE, FINAL_CUT, THUMBNAIL, CAPTION, PUBLISHED_LINK, OTHER]
+

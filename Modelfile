@@ -1,0 +1,4 @@
+FROM sarvam-105b
+TEMPLATE "{{ .System }}\nUser: {{ .Prompt }}\nAssistant: "
+PARAMETER num_ctx 131072
+

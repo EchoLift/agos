@@ -1,0 +1,1009 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AuthUser {
+  id             String         @id @default(uuid())
+  emailEncrypted String
+  emailHash      String         @unique
+  passwordHash   String?
+  status         AuthUserStatus @default(ACTIVE)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  deletedAt      DateTime?
+  version        Int            @default(1)
+  identities     AuthIdentity[]
+  sessions       Session[]
+  user           User?
+
+  @@map("auth_users")
+}
+
+model AuthIdentity {
+  id             String       @id @default(uuid())
+  authUserId     String
+  provider       AuthProvider
+  providerUserId String
+  emailHash      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  authUser       AuthUser     @relation(fields: [authUserId], references: [id])
+
+  @@unique([provider, providerUserId])
+  @@unique([authUserId, provider])
+  @@index([emailHash])
+  @@map("auth_identities")
+}
+
+model Session {
+  id                   String        @id @default(uuid())
+  authUserId           String
+  activeAgencyId       String?
+  refreshTokenHash     String        @unique
+  refreshTokenFamilyId String
+  deviceLabel          String?
+  userAgent            String?
+  ipAddressEncrypted   String?
+  status               SessionStatus @default(ACTIVE)
+  lastUsedAt           DateTime?
+  expiresAt            DateTime
+  revokedAt            DateTime?
+  createdAt            DateTime      @default(now())
+  authUser             AuthUser      @relation(fields: [authUserId], references: [id])
+
+  @@index([authUserId, status])
+  @@index([refreshTokenFamilyId])
+  @@map("sessions")
+}
+
+model Agency {
+  id            String         @id @default(uuid())
+  name          String
+  displayName   String         @default("")
+  slug          String         @unique
+  status        AgencyStatus   @default(ACTIVE)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+  version       Int            @default(1)
+  auditEvents   AuditEvent[]
+  campaigns     Campaign[]
+  clients       Client[]
+  contentAssets ContentAsset[]
+  invitations   Invitation[]
+  memberships   Membership[]
+  roles         Role[]
+
+  @@map("agencies")
+}
+
+model User {
+  id                    String          @id @default(uuid())
+  authUserId            String          @unique
+  name                  String?
+  avatarUrl             String?
+  mobileNumberEncrypted String?
+  mobileNumberHash      String?
+  timezone              String?
+  language              String?
+  jobTitle              String?
+  bio                   String?
+  presenceStatus        PresenceStatus?
+  workLocation          WorkLocation?
+  statusMessage         String?
+  statusExpiresAt       DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  deletedAt             DateTime?
+  version               Int             @default(1)
+  memberships           Membership[]
+  authUser              AuthUser        @relation(fields: [authUserId], references: [id])
+
+  @@map("users")
+}
+
+model Membership {
+  id                         String               @id @default(uuid())
+  agencyId                   String
+  userId                     String
+  roleId                     String
+  managerMembershipId        String?
+  status                     MembershipStatus     @default(ACTIVE)
+  joinedAt                   DateTime             @default(now())
+  deletedAt                  DateTime?
+  version                    Int                  @default(1)
+  assignmentHistoryChanged   AssignmentHistory[]  @relation("AssignmentChangedBy")
+  assignmentHistoryAssigned  AssignmentHistory[]  @relation("AssignmentAssignee")
+  managedClients             Client[]             @relation("ClientManager")
+  sentInvitations            Invitation[]         @relation("InvitedByMembership")
+  agency                     Agency               @relation(fields: [agencyId], references: [id])
+  manager                    Membership?          @relation("MembershipManager", fields: [managerMembershipId], references: [id])
+  directReports              Membership[]         @relation("MembershipManager")
+  role                       Role                 @relation(fields: [roleId], references: [id])
+  roles                      MembershipRole[]
+  user                       User                 @relation(fields: [userId], references: [id])
+  managedWorkflowInstances   WorkflowInstance[]   @relation("WorkflowInstanceManager")
+  ownedWorkflowTasks         WorkflowTask[]       @relation("TaskOwner")
+  workflowTransitionsChanged WorkflowTransition[] @relation("TransitionChangedBy")
+  assignedCampaigns          Campaign[]           @relation("CampaignMembers")
+  campaignApprovals          Campaign[]           @relation("CampaignAgencyApprover")
+  campaignTeamAssignments    CampaignTeamAssignment[]
+
+  @@unique([agencyId, userId])
+  @@index([agencyId, roleId])
+  @@index([agencyId, managerMembershipId])
+  @@map("memberships")
+}
+
+model MembershipRole {
+  membershipId String
+  roleId       String
+  assignedAt   DateTime   @default(now())
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id])
+
+  @@id([membershipId, roleId])
+  @@index([roleId])
+  @@map("membership_roles")
+}
+
+model SystemRole {
+  id          String                 @id @default(uuid())
+  key         String                 @unique
+  displayName String
+  description String?
+  isSystem    Boolean                @default(true)
+  roles       Role[]
+  permissions SystemRolePermission[]
+
+  @@map("system_roles")
+}
+
+model Role {
+  id           String       @id @default(uuid())
+  agencyId     String
+  systemRoleId String
+  displayName  String
+  description  String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
+  version      Int          @default(1)
+  invitations  Invitation[]
+  invitationRoles InvitationRole[]
+  memberships  Membership[]
+  membershipRoles MembershipRole[]
+  agency       Agency       @relation(fields: [agencyId], references: [id])
+  systemRole   SystemRole   @relation(fields: [systemRoleId], references: [id])
+
+  @@unique([agencyId, displayName])
+  @@map("roles")
+}
+
+model Invitation {
+  id                    String           @id @default(uuid())
+  agencyId              String
+  emailHash             String
+  roleId                String
+  invitedByMembershipId String
+  mobileNumber          String?
+  status                InvitationStatus @default(PENDING)
+  token                 String           @unique
+  expiresAt             DateTime
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  agency                Agency           @relation(fields: [agencyId], references: [id])
+  invitedBy             Membership       @relation("InvitedByMembership", fields: [invitedByMembershipId], references: [id])
+  role                  Role             @relation(fields: [roleId], references: [id])
+  roles                 InvitationRole[]
+
+  @@index([agencyId, emailHash])
+  @@index([token])
+  @@map("invitations")
+}
+
+model InvitationRole {
+  invitationId String
+  roleId       String
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id])
+
+  @@id([invitationId, roleId])
+  @@index([roleId])
+  @@map("invitation_roles")
+}
+
+model Permission {
+  id          String                 @id @default(uuid())
+  key         String                 @unique
+  description String?
+  systemRoles SystemRolePermission[]
+
+  @@map("permissions")
+}
+
+model SystemRolePermission {
+  systemRoleId String
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  systemRole   SystemRole @relation(fields: [systemRoleId], references: [id])
+
+  @@id([systemRoleId, permissionId])
+  @@map("system_role_permissions")
+}
+
+model Client {
+  id                          String         @id @default(uuid())
+  agencyId                    String
+  assignedManagerMembershipId String?
+  name                        String
+  displayName                 String?
+  website                     String?
+  industry                    String
+  businessDescription         String?
+  businessSize                String?
+  brandVoice                  String?
+  brandPersonality            String?
+  mission                     String?
+  vision                      String?
+  usp                         String?
+  brandStory                  String?
+  tagline                     String?
+  dos                         String?
+  donts                       String?
+  audience                    String?
+  secondaryAudience           String?
+  audienceAge                 String?
+  audienceGender              String?
+  audienceLocations           String?
+  audienceIncome              String?
+  audienceOccupation          String?
+  audiencePainPoints          String?
+  audienceInterests           String?
+  buyingBehavior              String?
+  competitors                 String?
+  primaryContactName          String?
+  primaryContactDesignation   String?
+  primaryContactEmail         String?
+  primaryContactPhone         String?
+  primaryContactWhatsapp      String?
+  preferredContactMethod      String?
+  workingHours                String?
+  availableDays               String?
+  instagramUrl                String?
+  facebookUrl                 String?
+  linkedinUrl                 String?
+  youtubeUrl                  String?
+  twitterUrl                  String?
+  googleBusinessUrl           String?
+  whatsappBusinessNumber      String?
+  contentGoals                String?
+  contentTypes                String?
+  postingFrequency            String?
+  approvalSla                 String?
+  revisionLimit               String?
+  priority                    String?
+  engagementModel             String?
+  billingCycle                String?
+  deliverables                String?
+  aiWritingInstructions       String?
+  forbiddenWords              String?
+  preferredCta                String?
+  brandDictionary             String?
+  productKnowledge            String?
+  faqs                        String?
+  internalNotes               String?
+  startDate                   DateTime?
+  timezone                    String?
+  status                      ClientStatus   @default(ACTIVE)
+  createdAt                   DateTime       @default(now())
+  updatedAt                   DateTime       @updatedAt
+  deletedAt                   DateTime?
+  version                     Int            @default(1)
+  campaigns                   Campaign[]
+  agency                      Agency         @relation(fields: [agencyId], references: [id])
+  assignedManager             Membership?    @relation("ClientManager", fields: [assignedManagerMembershipId], references: [id])
+  contentAssets               ContentAsset[]
+
+  @@index([agencyId])
+  @@index([agencyId, assignedManagerMembershipId])
+  @@map("clients")
+}
+
+model Campaign {
+  id                              String               @id @default(uuid())
+  agencyId                        String
+  clientId                        String
+  name                            String
+  campaignCode                    String?
+  campaignType                    String?
+  priority                        String?
+  strategy                        String?
+  objectives                      String?
+  goal                            String?
+  primaryKpi                      String?
+  targetAudience                  String?
+  useClientAudience               Boolean              @default(true)
+  keyMessage                      String?
+  cta                             String?
+  tone                            String?
+  deliverables                    String?
+  reviewFrequency                 String?
+  workingDays                     String?
+  launchDate                      DateTime?
+  timezone                        String?
+  workflowTemplate                String?
+  clientApprover                  String?
+  agencyApproverMembershipId      String?
+  approvalSla                     String?
+  revisionLimit                   String?
+  references                      String?
+  moodBoardUrl                    String?
+  driveFolderUrl                  String?
+  internalNotes                   String?
+  autoGenerateCalendar            Boolean              @default(false)
+  postingDays                     String?
+  postingWindows                  String?
+  blackoutDates                   String?
+  platformMix                     String?
+  startDate                       DateTime
+  endDate                         DateTime
+  status                          CampaignStatus       @default(DRAFT)
+  createdByMembershipId           String
+  createdAt                       DateTime             @default(now())
+  updatedAt                       DateTime             @updatedAt
+  deletedAt                       DateTime?
+  version                         Int                  @default(1)
+  agency                          Agency               @relation(fields: [agencyId], references: [id])
+  client                          Client               @relation(fields: [clientId], references: [id])
+  agencyApprover                  Membership?          @relation("CampaignAgencyApprover", fields: [agencyApproverMembershipId], references: [id])
+  contentAssets                   ContentAsset[]
+  deliverablePlans                CampaignDeliverablePlan[]
+  publishingSchedules             PublishingSchedule[]
+  assignedMemberships             Membership[]         @relation("CampaignMembers")
+  teamAssignments                 CampaignTeamAssignment[]
+
+  @@index([agencyId, campaignCode])
+  @@index([agencyId, clientId])
+  @@map("campaigns")
+}
+
+model CampaignTeamAssignment {
+  id             String                 @id @default(uuid())
+  agencyId       String
+  campaignId     String
+  membershipId   String
+  assignmentRole CampaignAssignmentRole
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  version        Int                    @default(1)
+  campaign       Campaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  membership     Membership             @relation(fields: [membershipId], references: [id])
+
+  @@unique([campaignId, membershipId, assignmentRole])
+  @@index([agencyId, campaignId])
+  @@index([agencyId, membershipId])
+  @@map("campaign_team_assignments")
+}
+
+model CampaignDeliverablePlan {
+  id               String      @id @default(uuid())
+  agencyId         String
+  campaignId       String
+  contentType      ContentType
+  quantity         Int
+  frequency        String?
+  preferredDays    String?
+  preferredTime    String?
+  platform         String?
+  startDate        DateTime?
+  endDate          DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  campaign         Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId, campaignId])
+  @@map("campaign_deliverable_plans")
+}
+
+model ContentAsset {
+  id                String             @id @default(uuid())
+  agencyId          String
+  clientId          String
+  campaignId        String
+  displayCode       String
+  type              ContentType
+  title             String
+  brief             String
+  status            ContentAssetStatus @default(ACTIVE)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+  version           Int                @default(1)
+  agency            Agency             @relation(fields: [agencyId], references: [id])
+  campaign          Campaign           @relation(fields: [campaignId], references: [id])
+  client            Client             @relation(fields: [clientId], references: [id])
+  files             FileAsset[]
+  publishingSchedules PublishingSchedule[]
+  workflowInstances WorkflowInstance[]
+
+  @@unique([agencyId, displayCode])
+  @@index([agencyId, clientId])
+  @@index([agencyId, campaignId])
+  @@map("content_assets")
+}
+
+model PublishingSchedule {
+  id             String             @id @default(uuid())
+  agencyId       String
+  campaignId     String
+  contentAssetId String?
+  platform       PublishingPlatform
+  scheduledAt    DateTime
+  status         PublishingStatus   @default(PLANNED)
+  riskStatus     ContentRisk        @default(ON_TRACK)
+  timezone       String
+  caption        String?
+  note           String?
+  cancellationReason String?
+  publishedAt    DateTime?
+  publishedUrl   String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  version        Int                @default(1)
+  campaign       Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contentAsset   ContentAsset?      @relation(fields: [contentAssetId], references: [id])
+
+  @@index([agencyId, campaignId, scheduledAt])
+  @@index([agencyId, contentAssetId])
+  @@map("publishing_schedules")
+}
+
+model ContentAssetSequence {
+  agencyId     String
+  type         ContentType
+  nextSequence Int         @default(1)
+
+  @@id([agencyId, type])
+  @@map("content_asset_sequences")
+}
+
+model WorkflowTemplate {
+  id          String             @id @default(uuid())
+  agencyId    String
+  name        String
+  description String?
+  contentType ContentType
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  instances   WorkflowInstance[]
+  steps       WorkflowStep[]
+
+  @@unique([agencyId, name])
+  @@map("workflow_templates")
+}
+
+model WorkflowStep {
+  id                      String             @id @default(uuid())
+  agencyId                String
+  templateId              String
+  stage                   ContentStage
+  sortOrder               Int
+  roleId                  String?
+  requiresAcceptance      Boolean            @default(false)
+  requiresApproval        Boolean            @default(false)
+  expectedDurationMinutes Int?
+  currentForInstances     WorkflowInstance[] @relation("CurrentWorkflowStep")
+  template                WorkflowTemplate   @relation(fields: [templateId], references: [id])
+  tasks                   WorkflowTask[]
+
+  @@unique([templateId, sortOrder])
+  @@index([agencyId, templateId])
+  @@map("workflow_steps")
+}
+
+model WorkflowInstance {
+  id                  String                 @id @default(uuid())
+  agencyId            String
+  contentAssetId      String
+  templateId          String?
+  currentStepId       String?
+  currentTaskId       String?
+  managerMembershipId String
+  riskStatus          ContentRisk            @default(ON_TRACK)
+  deadlineAt          DateTime
+  status              WorkflowInstanceStatus @default(ACTIVE)
+  startedAt           DateTime               @default(now())
+  completedAt         DateTime?
+  version             Int                    @default(1)
+  assignmentHistory   AssignmentHistory[]
+  contentAsset        ContentAsset           @relation(fields: [contentAssetId], references: [id])
+  currentStep         WorkflowStep?          @relation("CurrentWorkflowStep", fields: [currentStepId], references: [id])
+  currentTask         WorkflowTask?          @relation("CurrentWorkflowTask", fields: [currentTaskId], references: [id])
+  manager             Membership             @relation("WorkflowInstanceManager", fields: [managerMembershipId], references: [id])
+  template            WorkflowTemplate?      @relation(fields: [templateId], references: [id])
+  tasks               WorkflowTask[]         @relation("WorkflowInstanceTasks")
+  transitions         WorkflowTransition[]
+
+  @@index([agencyId, contentAssetId])
+  @@index([agencyId, managerMembershipId])
+  @@index([agencyId, riskStatus])
+  @@map("workflow_instances")
+}
+
+model WorkflowTask {
+  id                         String              @id @default(uuid())
+  agencyId                   String
+  workflowInstanceId         String
+  workflowStepId             String?
+  displayName                String
+  ownerMembershipId          String?
+  status                     TaskStatus          @default(TODO)
+  deadlineAt                 DateTime
+  acceptedAt                 DateTime?
+  completedAt                DateTime?
+  createdAt                  DateTime            @default(now())
+  updatedAt                  DateTime            @updatedAt
+  version                    Int                 @default(1)
+  approvals                  Approval[]
+  assignmentHistory          AssignmentHistory[]
+  blockers                   Blocker[]
+  submissions                Submission[]
+  currentForWorkflowInstance WorkflowInstance[]  @relation("CurrentWorkflowTask")
+  owner                      Membership?         @relation("TaskOwner", fields: [ownerMembershipId], references: [id])
+  workflowInstance           WorkflowInstance    @relation("WorkflowInstanceTasks", fields: [workflowInstanceId], references: [id])
+  workflowStep               WorkflowStep?       @relation(fields: [workflowStepId], references: [id])
+
+  @@index([agencyId, ownerMembershipId, deadlineAt])
+  @@index([agencyId, workflowInstanceId])
+  @@map("workflow_tasks")
+}
+
+/// fromStage/toStage are immutable audit snapshots computed at write time.
+/// They are NOT the source of truth for current state — that lives on WorkflowInstance.currentStepId.
+model WorkflowTransition {
+  id                 String           @id @default(uuid())
+  agencyId           String
+  workflowInstanceId String
+  fromStepId         String?
+  toStepId           String?
+  fromStage          ContentStage?
+  toStage            ContentStage?
+  changedById        String
+  reason             String?
+  durationMs         Int?
+  requestId          String?
+  correlationId      String?
+  createdAt          DateTime         @default(now())
+  changedBy          Membership       @relation("TransitionChangedBy", fields: [changedById], references: [id])
+  workflowInstance   WorkflowInstance @relation(fields: [workflowInstanceId], references: [id])
+
+  @@index([agencyId, workflowInstanceId])
+  @@map("workflow_transitions")
+}
+
+model AssignmentHistory {
+  id                    String           @id @default(uuid())
+  agencyId              String
+  workflowInstanceId    String
+  workflowTaskId        String?
+  fromMembershipId      String?
+  toMembershipId        String
+  workflowStepId        String?
+  changedByMembershipId String
+  reason                String?
+  requestId             String?
+  createdAt             DateTime         @default(now())
+  changedByMembership   Membership       @relation("AssignmentChangedBy", fields: [changedByMembershipId], references: [id])
+  toMembership          Membership       @relation("AssignmentAssignee", fields: [toMembershipId], references: [id])
+  workflowInstance      WorkflowInstance @relation(fields: [workflowInstanceId], references: [id])
+  workflowTask          WorkflowTask?    @relation(fields: [workflowTaskId], references: [id])
+
+  @@index([agencyId, workflowInstanceId])
+  @@index([agencyId, workflowTaskId])
+  @@index([agencyId, toMembershipId])
+  @@map("assignment_history")
+}
+
+model Submission {
+  id             String           @id @default(uuid())
+  agencyId       String
+  workflowTaskId String
+  submittedBy    String
+  submissionType SubmissionType
+  version        Int
+  body           String?
+  externalLink   String?
+  status         SubmissionStatus @default(SUBMITTED)
+  seenAt         DateTime?
+  recalledAt     DateTime?
+  createdAt      DateTime         @default(now())
+  workflowTask   WorkflowTask     @relation(fields: [workflowTaskId], references: [id])
+
+  @@unique([workflowTaskId, submissionType, version])
+  @@index([agencyId, workflowTaskId])
+  @@map("submissions")
+}
+
+model Approval {
+  id             String         @id @default(uuid())
+  agencyId       String
+  workflowTaskId String
+  approverId     String
+  status         ApprovalStatus @default(PENDING)
+  comment        String?
+  idempotencyKey String
+  requestId      String?
+  createdAt      DateTime       @default(now())
+  workflowTask   WorkflowTask   @relation(fields: [workflowTaskId], references: [id])
+
+  @@unique([agencyId, idempotencyKey])
+  @@index([agencyId, workflowTaskId])
+  @@map("approvals")
+}
+
+model Blocker {
+  id             String        @id @default(uuid())
+  agencyId       String
+  workflowTaskId String
+  blockedBy      String
+  reason         String
+  details        String?
+  status         BlockerStatus @default(ACTIVE)
+  createdAt      DateTime      @default(now())
+  resolvedAt     DateTime?
+  workflowTask   WorkflowTask  @relation(fields: [workflowTaskId], references: [id])
+
+  @@index([agencyId, workflowTaskId, status])
+  @@map("blockers")
+}
+
+model FileAsset {
+  id              String          @id @default(uuid())
+  agencyId        String
+  contentAssetId  String
+  uploaderId      String
+  storageProvider StorageProvider @default(EXTERNAL_URL)
+  filename        String
+  externalUrl     String
+  fileType        String
+  createdAt       DateTime        @default(now())
+  contentAsset    ContentAsset    @relation(fields: [contentAssetId], references: [id])
+
+  @@index([agencyId, contentAssetId])
+  @@map("file_assets")
+}
+
+model Notification {
+  id         String                 @id @default(uuid())
+  agencyId   String
+  userId     String
+  title      String
+  body       String
+  eventType  String
+  status     NotificationStatus     @default(UNREAD)
+  readAt     DateTime?
+  createdAt  DateTime               @default(now())
+  deliveries NotificationDelivery[]
+
+  @@index([agencyId, userId, readAt])
+  @@map("notifications")
+}
+
+model NotificationDelivery {
+  id                String                      @id @default(uuid())
+  agencyId          String
+  notificationId    String
+  channel           NotificationDeliveryChannel
+  status            NotificationDeliveryStatus  @default(QUEUED)
+  provider          String?
+  providerMessageId String?
+  retryCount        Int                         @default(0)
+  lastError         String?
+  nextRetryAt       DateTime?
+  sentAt            DateTime?
+  createdAt         DateTime                    @default(now())
+  notification      Notification                @relation(fields: [notificationId], references: [id])
+
+  @@index([agencyId, status, nextRetryAt])
+  @@map("notification_deliveries")
+}
+
+model AuditEvent {
+  id            String   @id @default(uuid())
+  agencyId      String
+  actorId       String?
+  requestId     String?
+  correlationId String?
+  eventType     String
+  entityType    String
+  entityId      String
+  metadataJson  Json
+  createdAt     DateTime @default(now())
+  agency        Agency   @relation(fields: [agencyId], references: [id])
+
+  @@index([agencyId, entityType, entityId])
+  @@index([agencyId, eventType])
+  @@index([requestId])
+  @@index([correlationId])
+  @@map("audit_events")
+}
+
+model WebhookEvent {
+  id               String                  @id @default(uuid())
+  provider         String
+  eventType        String
+  signatureValid   Boolean
+  rawPayload       Json
+  processingStatus WebhookProcessingStatus @default(RECEIVED)
+  retryCount       Int                     @default(0)
+  lastError        String?
+  nextRetryAt      DateTime?
+  receivedAt       DateTime                @default(now())
+  processedAt      DateTime?
+
+  @@index([provider, eventType])
+  @@index([processingStatus, nextRetryAt])
+  @@map("webhook_events")
+}
+
+model OutboxEvent {
+  id            String       @id @default(uuid())
+  agencyId      String?
+  aggregateId   String
+  aggregateType String
+  eventType     String
+  eventVersion  Int          @default(1)
+  correlationId String?
+  payload       Json
+  status        OutboxStatus @default(PENDING)
+  retryCount    Int          @default(0)
+  lastError     String?
+  nextRetryAt   DateTime?
+  publishedAt   DateTime?
+  createdAt     DateTime     @default(now())
+
+  @@index([status, nextRetryAt])
+  @@index([aggregateType, aggregateId])
+  @@map("outbox_events")
+}
+
+enum AuthUserStatus {
+  ACTIVE
+  DISABLED
+  LOCKED
+  DELETED
+}
+
+enum AgencyStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+  DELETED
+}
+
+enum PresenceStatus {
+  AVAILABLE
+  BUSY
+  DO_NOT_DISTURB
+  AWAY
+  OFFLINE
+}
+
+enum WorkLocation {
+  WFO
+  WFH
+  REMOTE
+}
+
+enum ClientStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+  DELETED
+}
+
+enum CampaignAssignmentRole {
+  CAMPAIGN_MANAGER
+  RELATIONSHIP_MANAGER
+  WRITER
+  EDITOR
+  DESIGNER
+  DOP
+  SOCIAL_MEDIA_MANAGER
+  CLIENT_APPROVER
+  AGENCY_APPROVER
+}
+
+enum PublishingPlatform {
+  INSTAGRAM
+  FACEBOOK
+  YOUTUBE
+  LINKEDIN
+  TWITTER
+  WEBSITE
+  WHATSAPP
+  OTHER
+}
+
+enum PublishingStatus {
+  PLANNED
+  READY
+  SCHEDULED
+  PUBLISHED
+  MISSED
+  CANCELLED
+}
+
+enum ContentType {
+  REEL
+  CAROUSEL
+  STATIC
+  STORY
+  BLOG
+  YOUTUBE
+  AD
+  OTHER
+}
+
+enum ContentStage {
+  IDEA
+  WRITING
+  MANAGER_SCRIPT_REVIEW
+  SHOOT
+  EDITOR_INTAKE
+  EDITING
+  MANAGER_EDIT_REVIEW
+  CLIENT_APPROVAL
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ContentRisk {
+  ON_TRACK
+  NEEDS_ATTENTION
+  AT_RISK
+  BLOCKED
+  OVERDUE
+}
+
+enum ContentAssetStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  PUBLISHED
+  ARCHIVED
+  DELETED
+}
+
+enum WorkflowInstanceStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  WAITING_REVIEW
+  WAITING_HANDOFF_ACCEPTANCE
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  SEEN
+  ACCEPTED
+  REJECTED
+  RECALLED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+  CANCELLED
+}
+
+enum BlockerStatus {
+  ACTIVE
+  RESOLVED
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+enum NotificationDeliveryChannel {
+  IN_APP
+  EMAIL
+  PUSH
+  SMS
+  WHATSAPP
+}
+
+enum NotificationDeliveryStatus {
+  QUEUED
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum SubmissionType {
+  SCRIPT
+  RAW_FOOTAGE
+  FINAL_CUT
+  THUMBNAIL
+  CAPTION
+  PUBLISHED_LINK
+  OTHER
+}
+
+enum WebhookProcessingStatus {
+  RECEIVED
+  PROCESSING
+  PROCESSED
+  FAILED
+  DEAD_LETTERED
+}
+
+enum StorageProvider {
+  GOOGLE_DRIVE
+  S3
+  R2
+  EXTERNAL_URL
+}
+
+enum OutboxStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+  DEAD_LETTERED
+}
+
+enum SessionStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+enum AuthProvider {
+  PASSWORD
+  GOOGLE
+  GITHUB
+  MICROSOFT
+}
