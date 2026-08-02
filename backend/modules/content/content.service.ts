@@ -1,10 +1,15 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { ContentAssetStatus, ContentStage } from '@prisma/client';
-import { PrismaService } from '@packages/database/prisma.service';
-import { DomainEvents } from '@packages/events/domain-event';
-import { EventBusService } from '@packages/events/event-bus.service';
-import { CreateContentAssetDto } from './dto/create-content-asset.dto';
-import { UpdateContentAssetDto } from './dto/update-content-asset.dto';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { ContentAssetStatus, ContentStage } from "@prisma/client";
+import { PrismaService } from "@packages/database/prisma.service";
+import { DomainEvents } from "@packages/events/domain-event";
+import { EventBusService } from "@packages/events/event-bus.service";
+import { CreateContentAssetDto } from "./dto/create-content-asset.dto";
+import { UpdateContentAssetDto } from "./dto/update-content-asset.dto";
 
 @Injectable()
 export class ContentService {
@@ -13,10 +18,14 @@ export class ContentService {
     private readonly eventBus: EventBusService,
   ) {}
 
-  async create(dto: CreateContentAssetDto, agencyId?: string, actorId?: string) {
+  async create(
+    dto: CreateContentAssetDto,
+    agencyId?: string,
+    actorId?: string,
+  ) {
     const resolvedAgencyId = agencyId ?? dto.agencyId;
     if (!resolvedAgencyId) {
-      throw new BadRequestException('Agency context is required');
+      throw new BadRequestException("Agency context is required");
     }
 
     const [campaign, client] = await Promise.all([
@@ -25,18 +34,29 @@ export class ContentService {
     ]);
 
     if (!campaign || campaign.agencyId !== resolvedAgencyId) {
-      throw new ConflictException('Campaign does not belong to the current agency');
+      throw new ConflictException(
+        "Campaign does not belong to the current agency",
+      );
     }
 
-    if (!client || client.agencyId !== resolvedAgencyId || client.id !== dto.clientId) {
-      throw new ConflictException('Client does not belong to the current agency');
+    if (
+      !client ||
+      client.agencyId !== resolvedAgencyId ||
+      client.id !== dto.clientId
+    ) {
+      throw new ConflictException(
+        "Client does not belong to the current agency",
+      );
     }
 
     if (campaign.clientId !== dto.clientId) {
-      throw new ConflictException('Campaign and client do not belong to the same agency context');
+      throw new ConflictException(
+        "Campaign and client do not belong to the same agency context",
+      );
     }
 
-    const displayCode = dto.displayCode ?? this.generateDisplayCode(resolvedAgencyId, dto.type);
+    const displayCode =
+      dto.displayCode ?? this.generateDisplayCode(resolvedAgencyId, dto.type);
 
     const contentAsset = await this.prisma.contentAsset.create({
       data: {
@@ -47,23 +67,34 @@ export class ContentService {
         type: dto.type,
         title: dto.title,
         brief: dto.brief,
-        status: 'ACTIVE',
+        status: "ACTIVE",
       },
     });
 
     await this.eventBus.publish(DomainEvents.ContentAssetCreated, {
       agencyId: contentAsset.agencyId,
       actorId: actorId ?? null,
-      payload: { contentAssetId: contentAsset.id, campaignId: contentAsset.campaignId, displayCode: contentAsset.displayCode },
+      payload: {
+        contentAssetId: contentAsset.id,
+        campaignId: contentAsset.campaignId,
+        displayCode: contentAsset.displayCode,
+      },
     });
 
     return contentAsset;
   }
 
-  async update(id: string, dto: UpdateContentAssetDto, agencyId: string, actorId?: string) {
-    const existing = await this.prisma.contentAsset.findUnique({ where: { id } });
+  async update(
+    id: string,
+    dto: UpdateContentAssetDto,
+    agencyId: string,
+    actorId?: string,
+  ) {
+    const existing = await this.prisma.contentAsset.findUnique({
+      where: { id },
+    });
     if (!existing || existing.agencyId !== agencyId) {
-      throw new NotFoundException('Content asset not found');
+      throw new NotFoundException("Content asset not found");
     }
 
     const contentAsset = await this.prisma.contentAsset.update({
@@ -79,7 +110,10 @@ export class ContentService {
     await this.eventBus.publish(DomainEvents.ContentAssetUpdated, {
       agencyId,
       actorId: actorId ?? null,
-      payload: { contentAssetId: contentAsset.id, displayCode: contentAsset.displayCode },
+      payload: {
+        contentAssetId: contentAsset.id,
+        displayCode: contentAsset.displayCode,
+      },
     });
 
     return contentAsset;
@@ -92,27 +126,27 @@ export class ContentService {
         client: true,
         campaign: true,
         workflowInstances: {
-          orderBy: { startedAt: 'desc' },
+          orderBy: { startedAt: "desc" },
           take: 1,
           include: {
             currentStep: true,
             currentTask: {
               include: {
-                submissions: { orderBy: { createdAt: 'desc' }, take: 1 },
+                submissions: { orderBy: { createdAt: "desc" }, take: 1 },
               },
             },
             tasks: {
               include: {
-                submissions: { orderBy: { createdAt: 'desc' }, take: 1 },
+                submissions: { orderBy: { createdAt: "desc" }, take: 1 },
               },
             },
-            transitions: { orderBy: { createdAt: 'desc' }, take: 1 },
+            transitions: { orderBy: { createdAt: "desc" }, take: 1 },
           },
         },
       },
     });
     if (!contentAsset || contentAsset.agencyId !== agencyId) {
-      throw new NotFoundException('Content asset not found');
+      throw new NotFoundException("Content asset not found");
     }
 
     return this.withProjectedStage(contentAsset);
@@ -120,16 +154,16 @@ export class ContentService {
 
   async findMany(agencyId: string) {
     const assets = await this.prisma.contentAsset.findMany({
-      where: { agencyId, status: { not: 'DELETED' } },
+      where: { agencyId, status: { not: "DELETED" } },
       include: {
         client: true,
         campaign: true,
         workflowInstances: {
-          orderBy: { startedAt: 'desc' },
+          orderBy: { startedAt: "desc" },
           take: 1,
           include: {
             currentStep: true,
-            transitions: { orderBy: { createdAt: 'desc' }, take: 1 },
+            transitions: { orderBy: { createdAt: "desc" }, take: 1 },
           },
         },
       },
@@ -139,14 +173,16 @@ export class ContentService {
   }
 
   async archive(id: string, agencyId: string, actorId?: string) {
-    const existing = await this.prisma.contentAsset.findUnique({ where: { id } });
+    const existing = await this.prisma.contentAsset.findUnique({
+      where: { id },
+    });
     if (!existing || existing.agencyId !== agencyId) {
-      throw new NotFoundException('Content asset not found');
+      throw new NotFoundException("Content asset not found");
     }
 
     const contentAsset = await this.prisma.contentAsset.update({
       where: { id },
-      data: { status: 'ARCHIVED' },
+      data: { status: "ARCHIVED" },
     });
 
     await this.eventBus.publish(DomainEvents.ContentAssetArchived, {
@@ -159,14 +195,16 @@ export class ContentService {
   }
 
   async restore(id: string, agencyId: string, actorId?: string) {
-    const existing = await this.prisma.contentAsset.findUnique({ where: { id } });
+    const existing = await this.prisma.contentAsset.findUnique({
+      where: { id },
+    });
     if (!existing || existing.agencyId !== agencyId) {
-      throw new NotFoundException('Content asset not found');
+      throw new NotFoundException("Content asset not found");
     }
 
     const contentAsset = await this.prisma.contentAsset.update({
       where: { id },
-      data: { status: 'ACTIVE' },
+      data: { status: "ACTIVE" },
     });
 
     await this.eventBus.publish(DomainEvents.ContentAssetRestored, {
@@ -183,65 +221,72 @@ export class ContentService {
     return `${prefix}-${agencyId.slice(0, 4).toUpperCase()}-${Date.now().toString().slice(-4)}`;
   }
 
-  private withProjectedStage<T extends {
-    status: ContentAssetStatus;
-    client?: {
-      id: string;
-      name: string;
-      displayName?: string | null;
-      industry?: string | null;
-      website?: string | null;
-      businessDescription?: string | null;
-      brandVoice?: string | null;
-      brandPersonality?: string | null;
-      tagline?: string | null;
-      audience?: string | null;
-      audienceLocations?: string | null;
-      audiencePainPoints?: string | null;
-      contentGoals?: string | null;
-      instagramUrl?: string | null;
-      youtubeUrl?: string | null;
-      linkedinUrl?: string | null;
-    } | null;
-    campaign?: {
-      id: string;
-      name: string;
-      status: string;
-      campaignType?: string | null;
-      goal?: string | null;
-      keyMessage?: string | null;
-      cta?: string | null;
-    } | null;
-    workflowInstances?: Array<{
-      currentStep?: { stage: ContentStage } | null;
-      currentTask?: {
-        submissions?: Array<{
-          id: string;
-          submissionType: string;
-          version: number;
-          body?: string | null;
-          externalLink?: string | null;
-          status: string;
-          createdAt: Date;
-        }>;
+  private withProjectedStage<
+    T extends {
+      status: ContentAssetStatus;
+      client?: {
+        id: string;
+        name: string;
+        displayName?: string | null;
+        industry?: string | null;
+        website?: string | null;
+        businessDescription?: string | null;
+        brandVoice?: string | null;
+        brandPersonality?: string | null;
+        tagline?: string | null;
+        audience?: string | null;
+        audienceLocations?: string | null;
+        audiencePainPoints?: string | null;
+        contentGoals?: string | null;
+        instagramUrl?: string | null;
+        youtubeUrl?: string | null;
+        linkedinUrl?: string | null;
       } | null;
-      tasks?: Array<{
-        submissions?: Array<{
-          id: string;
-          submissionType: string;
-          version: number;
-          body?: string | null;
-          externalLink?: string | null;
-          status: string;
-          createdAt: Date;
+      campaign?: {
+        id: string;
+        name: string;
+        status: string;
+        campaignType?: string | null;
+        goal?: string | null;
+        keyMessage?: string | null;
+        cta?: string | null;
+      } | null;
+      workflowInstances?: Array<{
+        currentStep?: { stage: ContentStage } | null;
+        currentTask?: {
+          submissions?: Array<{
+            id: string;
+            submissionType: string;
+            version: number;
+            body?: string | null;
+            externalLink?: string | null;
+            status: string;
+            createdAt: Date;
+          }>;
+        } | null;
+        tasks?: Array<{
+          submissions?: Array<{
+            id: string;
+            submissionType: string;
+            version: number;
+            body?: string | null;
+            externalLink?: string | null;
+            status: string;
+            createdAt: Date;
+          }>;
         }>;
+        transitions?: Array<{ toStage: ContentStage | null }>;
       }>;
-      transitions?: Array<{ toStage: ContentStage | null }>;
-    }>;
-  }>(asset: T) {
+    },
+  >(asset: T) {
     const workflow = asset.workflowInstances?.[0];
     const latestSubmission = this.latestWorkflowSubmission(workflow);
-    const stage = this.projectContentStage(asset.status, workflow?.currentStep?.stage ?? workflow?.transitions?.[0]?.toStage ?? null);
+    const stage = this.projectContentStage(
+      asset.status,
+      workflow?.currentStep?.stage ??
+        workflow?.transitions?.[0]?.toStage ??
+        null,
+    );
     const { workflowInstances, client, campaign, ...contentAsset } = asset;
     return {
       ...contentAsset,
@@ -305,15 +350,28 @@ export class ContentService {
       ...(workflow?.tasks?.flatMap((task) => task.submissions ?? []) ?? []),
     ];
 
-    return submissions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null;
+    return (
+      submissions.sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      )[0] ?? null
+    );
   }
 
-  private projectContentStage(status: ContentAssetStatus, workflowStage: ContentStage | null) {
-    if (status === ContentAssetStatus.PUBLISHED || status === ContentAssetStatus.COMPLETED) {
+  private projectContentStage(
+    status: ContentAssetStatus,
+    workflowStage: ContentStage | null,
+  ) {
+    if (
+      status === ContentAssetStatus.PUBLISHED ||
+      status === ContentAssetStatus.COMPLETED
+    ) {
       return ContentStage.PUBLISHED;
     }
 
-    if (status === ContentAssetStatus.ARCHIVED || status === ContentAssetStatus.DELETED) {
+    if (
+      status === ContentAssetStatus.ARCHIVED ||
+      status === ContentAssetStatus.DELETED
+    ) {
       return ContentStage.ARCHIVED;
     }
 

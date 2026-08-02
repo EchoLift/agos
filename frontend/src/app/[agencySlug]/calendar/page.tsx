@@ -8,6 +8,7 @@ import { useAgency } from "@/components/AgencyProvider";
 import { CalendarEvent, CalendarScope, getCalendarEvents } from "@/lib/api/calendar";
 import { Campaign, getCampaigns } from "@/lib/api/campaigns";
 import { formatLabel, statusPillClasses } from "@/lib/status-style";
+import { agencyStorageKey } from "@/lib/workspace-cache";
 
 const scopeOptions: Array<{ value: CalendarScope; label: string }> = [
   { value: "MY_SCHEDULE", label: "My Schedule" },
@@ -56,9 +57,11 @@ export default function CalendarPage() {
 
   const requestedScope = scopeOverride || defaultScope;
   const selectedScope = allowedScopeOptions.some((option) => option.value === requestedScope) ? requestedScope : defaultScope;
+  const visibleTypesStorageKey = useMemo(() => agencyStorageKey(agencyId, "calendar.visibleTypes"), [agencyId]);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("agos.calendar.visibleTypes");
+    const legacyStored = window.localStorage.getItem("agos.calendar.visibleTypes");
+    const stored = window.localStorage.getItem(visibleTypesStorageKey) ?? legacyStored;
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
@@ -66,14 +69,15 @@ export default function CalendarPage() {
           queueMicrotask(() => setVisibleTypes(parsed));
         }
       } catch {
-        window.localStorage.removeItem("agos.calendar.visibleTypes");
+        window.localStorage.removeItem(visibleTypesStorageKey);
       }
     }
-  }, []);
+    window.localStorage.removeItem("agos.calendar.visibleTypes");
+  }, [visibleTypesStorageKey]);
 
   useEffect(() => {
-    window.localStorage.setItem("agos.calendar.visibleTypes", JSON.stringify(visibleTypes));
-  }, [visibleTypes]);
+    window.localStorage.setItem(visibleTypesStorageKey, JSON.stringify(visibleTypes));
+  }, [visibleTypes, visibleTypesStorageKey]);
 
   useEffect(() => {
     if (!agencyId) return;

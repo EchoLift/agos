@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from "@prisma/client";
 
 /**
  * Models that support soft delete via a `deletedAt` column.
@@ -6,14 +6,14 @@ import { Prisma } from '@prisma/client';
  * that has a `deletedAt DateTime?` field must appear here.
  */
 const SOFT_DELETE_MODELS: ReadonlySet<string> = new Set([
-  'AuthUser',
-  'Agency',
-  'User',
-  'Membership',
-  'Role',
-  'Client',
-  'Campaign',
-  'ContentAsset',
+  "AuthUser",
+  "Agency",
+  "User",
+  "Membership",
+  "Role",
+  "Client",
+  "Campaign",
+  "ContentAsset",
 ]);
 
 function isSoftDeleteModel(model: string | undefined): boolean {
@@ -35,7 +35,7 @@ function isSoftDeleteModel(model: string | undefined): boolean {
  * it is always enforced at the infrastructure layer.
  */
 export const softDeleteExtension = Prisma.defineExtension({
-  name: 'softDelete',
+  name: "softDelete",
   query: {
     $allModels: {
       async findFirst({ model, args, query }) {
@@ -123,14 +123,14 @@ export const softDeleteExtension = Prisma.defineExtension({
  */
 function hasDeletedAtFilter(where: Record<string, any> | undefined): boolean {
   if (!where) return false;
-  if ('deletedAt' in where) return true;
+  if ("deletedAt" in where) return true;
 
   // Check inside AND/OR/NOT combinators
-  for (const key of ['AND', 'OR', 'NOT'] as const) {
+  for (const key of ["AND", "OR", "NOT"] as const) {
     const nested = where[key];
     if (Array.isArray(nested)) {
       if (nested.some((clause: any) => hasDeletedAtFilter(clause))) return true;
-    } else if (nested && typeof nested === 'object') {
+    } else if (nested && typeof nested === "object") {
       if (hasDeletedAtFilter(nested)) return true;
     }
   }

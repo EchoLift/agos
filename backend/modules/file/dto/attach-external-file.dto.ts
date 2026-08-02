@@ -1,4 +1,4 @@
-import { IsString, IsUrl, IsUUID } from 'class-validator';
+import { IsString, IsUrl, IsUUID } from "class-validator";
 
 export class AttachExternalFileDto {
   @IsUUID()
@@ -19,4 +19,3 @@ export class AttachExternalFileDto {
   @IsString()
   fileType!: string;
 }
-

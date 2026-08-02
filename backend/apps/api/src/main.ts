@@ -1,25 +1,26 @@
-import { ValidationPipe, VersioningType } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { NestFactory } from '@nestjs/core';
-import * as cookieParser from 'cookie-parser';
-import helmet from 'helmet';
-import { Logger } from 'nestjs-pino';
-import { ApiModule } from './api.module';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ValidationPipe, VersioningType } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { NestFactory } from "@nestjs/core";
+import * as cookieParser from "cookie-parser";
+import helmet from "helmet";
+import { Logger } from "nestjs-pino";
+import { ApiModule } from "./api.module";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 async function bootstrap() {
   const app = await NestFactory.create(ApiModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
   const config = app.get(ConfigService);
-  const corsOrigin = config.get<string>('CORS_ORIGIN') ?? 'http://localhost:3000';
+  const corsOrigin =
+    config.get<string>("CORS_ORIGIN") ?? "http://localhost:3000";
 
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix("api");
   app.enableVersioning({ type: VersioningType.URI });
   app.enableCors({
     origin: corsOrigin,
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Agency-Id'],
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Agency-Id"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
   app.use(helmet());
   app.use(cookieParser());
@@ -27,22 +28,21 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
-      transform: true
-    })
+      transform: true,
+    }),
   );
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('Agency OS API')
-    .setDescription('API documentation for Agency OS')
-    .setVersion('1.0')
+    .setTitle("Agency OS API")
+    .setDescription("API documentation for Agency OS")
+    .setVersion("1.0")
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup("docs", app, document);
 
-  const port = config.get<number>('API_PORT') ?? 4000;
+  const port = config.get<number>("API_PORT") ?? 4000;
   await app.listen(port);
 }
 
 void bootstrap();
-

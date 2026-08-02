@@ -1,5 +1,5 @@
 export class UserRegisteredEventPayload {
-  public readonly eventType = 'UserRegistered';
+  public readonly eventType = "UserRegistered";
 
   constructor(
     public readonly authUserId: string,

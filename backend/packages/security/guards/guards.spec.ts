@@ -1,18 +1,22 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { Reflector } from '@nestjs/core';
-import { JwtAuthGuard } from './jwt-auth.guard';
-import { TenantGuard } from './tenant.guard';
-import { PermissionsGuard } from './permissions.guard';
-import { TokenService } from '@modules/auth/services/token.service';
-import { AuthUserRepository } from '@modules/auth/repositories/auth-user.repository';
-import { UserLookupService } from '@modules/user/services/user-lookup.service';
-import { SecurityContextService } from '../services/security-context.service';
-import { RequestContextService } from '@packages/request-context/request-context.service';
-import { OrganizationRepository } from '@modules/organization/repositories/organization.repository';
-import { UnauthorizedException, ForbiddenException, ExecutionContext } from '@nestjs/common';
-import { SecurityErrorCode } from '../constants/error-codes.enum';
+import { Test, TestingModule } from "@nestjs/testing";
+import { Reflector } from "@nestjs/core";
+import { JwtAuthGuard } from "./jwt-auth.guard";
+import { TenantGuard } from "./tenant.guard";
+import { PermissionsGuard } from "./permissions.guard";
+import { TokenService } from "@modules/auth/services/token.service";
+import { AuthUserRepository } from "@modules/auth/repositories/auth-user.repository";
+import { UserLookupService } from "@modules/user/services/user-lookup.service";
+import { SecurityContextService } from "../services/security-context.service";
+import { RequestContextService } from "@packages/request-context/request-context.service";
+import { OrganizationRepository } from "@modules/organization/repositories/organization.repository";
+import {
+  UnauthorizedException,
+  ForbiddenException,
+  ExecutionContext,
+} from "@nestjs/common";
+import { SecurityErrorCode } from "../constants/error-codes.enum";
 
-describe('Security Guards Integration', () => {
+describe("Security Guards Integration", () => {
   let jwtGuard: JwtAuthGuard;
   let tenantGuard: TenantGuard;
   let permissionsGuard: PermissionsGuard;
@@ -77,7 +81,12 @@ describe('Security Guards Integration', () => {
     organizationRepository = module.get(OrganizationRepository) as any;
   });
 
-  const createMockContext = (headers: any = {}, params: any = {}, user: any = {}, session: any = {}): ExecutionContext => {
+  const createMockContext = (
+    headers: any = {},
+    params: any = {},
+    user: any = {},
+    session: any = {},
+  ): ExecutionContext => {
     const req = { headers, params, user, session };
     return {
       getHandler: jest.fn(),
@@ -88,116 +97,223 @@ describe('Security Guards Integration', () => {
     } as any;
   };
 
-  describe('JwtAuthGuard', () => {
-    it('should bypass authentication if route is @Public()', async () => {
+  describe("JwtAuthGuard", () => {
+    it("should bypass authentication if route is @Public()", async () => {
       reflector.getAllAndOverride.mockReturnValue(true);
       const ctx = createMockContext();
       const result = await jwtGuard.canActivate(ctx);
       expect(result).toBe(true);
     });
 
-    it('should throw AUTH_TOKEN_MISSING if Authorization header is absent', async () => {
+    it("should throw AUTH_TOKEN_MISSING if Authorization header is absent", async () => {
       reflector.getAllAndOverride.mockReturnValue(false);
       const ctx = createMockContext();
-      await expect(jwtGuard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
+      await expect(jwtGuard.canActivate(ctx)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
-    it('should throw AUTH_SESSION_REVOKED if session is revoked or inactive', async () => {
+    it("should throw AUTH_SESSION_REVOKED if session is revoked or inactive", async () => {
       reflector.getAllAndOverride.mockReturnValue(false);
-      tokenService.verifyAccessToken.mockReturnValue({ sub: 'auth-1', sid: 'session-1' });
-      authUserRepository.findSessionById.mockResolvedValue({ id: 'session-1', status: 'REVOKED' } as any);
+      tokenService.verifyAccessToken.mockReturnValue({
+        sub: "auth-1",
+        sid: "session-1",
+      });
+      authUserRepository.findSessionById.mockResolvedValue({
+        id: "session-1",
+        status: "REVOKED",
+      } as any);
 
-      const ctx = createMockContext({ authorization: 'Bearer valid-jwt' });
-      await expect(jwtGuard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
+      const ctx = createMockContext({ authorization: "Bearer valid-jwt" });
+      await expect(jwtGuard.canActivate(ctx)).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
-    it('should authenticate user and set req.user if token and session are valid', async () => {
+    it("should authenticate user and set req.user if token and session are valid", async () => {
       reflector.getAllAndOverride.mockReturnValue(false);
-      tokenService.verifyAccessToken.mockReturnValue({ sub: 'auth-1', sid: 'session-1' });
-      authUserRepository.findSessionById.mockResolvedValue({ id: 'session-1', status: 'ACTIVE' } as any);
-      userLookupService.findByAuthUserId.mockResolvedValue({ id: 'user-1', authUserId: 'auth-1' } as any);
+      tokenService.verifyAccessToken.mockReturnValue({
+        sub: "auth-1",
+        sid: "session-1",
+      });
+      authUserRepository.findSessionById.mockResolvedValue({
+        id: "session-1",
+        status: "ACTIVE",
+      } as any);
+      userLookupService.findByAuthUserId.mockResolvedValue({
+        id: "user-1",
+        authUserId: "auth-1",
+      } as any);
 
-      const ctx = createMockContext({ authorization: 'Bearer valid-jwt' });
+      const ctx = createMockContext({ authorization: "Bearer valid-jwt" });
       const result = await jwtGuard.canActivate(ctx);
 
       expect(result).toBe(true);
       const req = ctx.switchToHttp().getRequest();
-      expect(req.user.userId).toBe('user-1');
-      expect(req.user.sessionId).toBe('session-1');
+      expect(req.user.userId).toBe("user-1");
+      expect(req.user.sessionId).toBe("session-1");
     });
   });
 
-  describe('TenantGuard', () => {
-    it('should resolve agencyId in priority order (Path > Header > Session)', async () => {
+  describe("TenantGuard", () => {
+    it("should resolve agencyId in priority order (Path > Header > Session)", async () => {
       reflector.getAllAndOverride.mockReturnValue(false);
       organizationRepository.findMembership.mockResolvedValue({
-        id: 'mem-1',
-        status: 'ACTIVE',
-        role: { name: 'MANAGER' },
+        id: "mem-1",
+        status: "ACTIVE",
+        role: { name: "MANAGER" },
       } as any);
 
       // Path param priority check
       const ctxPath = createMockContext(
-        { 'x-agency-id': 'header-agency' },
-        { agencyId: 'path-agency' },
-        { userId: 'user-1' },
-        { activeAgencyId: 'session-agency' }
+        { "x-agency-id": "header-agency" },
+        { agencyId: "path-agency" },
+        { userId: "user-1" },
+        { activeAgencyId: "session-agency" },
       );
       await tenantGuard.canActivate(ctxPath);
-      expect(organizationRepository.findMembership).toHaveBeenCalledWith('path-agency', 'user-1');
+      expect(organizationRepository.findMembership).toHaveBeenCalledWith(
+        "path-agency",
+        "user-1",
+      );
 
       // Header should beat stale active session agency for workspace APIs.
       const ctxHeader = createMockContext(
-        { 'x-agency-id': 'header-agency' },
+        { "x-agency-id": "header-agency" },
         {},
-        { userId: 'user-1' },
-        { activeAgencyId: 'session-agency' }
+        { userId: "user-1" },
+        { activeAgencyId: "session-agency" },
       );
       await tenantGuard.canActivate(ctxHeader);
-      expect(organizationRepository.findMembership).toHaveBeenCalledWith('header-agency', 'user-1');
+      expect(organizationRepository.findMembership).toHaveBeenCalledWith(
+        "header-agency",
+        "user-1",
+      );
 
       // Session remains the fallback when no path/header agency is present.
       const ctxSession = createMockContext(
         {},
         {},
-        { userId: 'user-1' },
-        { activeAgencyId: 'session-agency' }
+        { userId: "user-1" },
+        { activeAgencyId: "session-agency" },
       );
       await tenantGuard.canActivate(ctxSession);
-      expect(organizationRepository.findMembership).toHaveBeenCalledWith('session-agency', 'user-1');
+      expect(organizationRepository.findMembership).toHaveBeenCalledWith(
+        "session-agency",
+        "user-1",
+      );
     });
 
-    it('should throw TENANT_MEMBERSHIP_MISSING if user has no active membership in target agency', async () => {
+    it("should throw TENANT_MEMBERSHIP_MISSING if user has no active membership in target agency", async () => {
       reflector.getAllAndOverride.mockReturnValue(false);
       organizationRepository.findMembership.mockResolvedValue(null);
 
-      const ctx = createMockContext({}, { agencyId: 'agency-forbidden' }, { userId: 'user-1' });
-      await expect(tenantGuard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
+      const ctx = createMockContext(
+        {},
+        { agencyId: "agency-forbidden" },
+        { userId: "user-1" },
+      );
+      await expect(tenantGuard.canActivate(ctx)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it("should use MembershipRole rows as the authorization source when present", async () => {
+      reflector.getAllAndOverride.mockReturnValue(false);
+      organizationRepository.findMembership.mockResolvedValue({
+        id: "mem-1",
+        status: "ACTIVE",
+        role: { systemRole: { key: "MEMBER", permissions: [] } },
+        roles: [
+          {
+            role: {
+              systemRole: {
+                key: "WRITER",
+                permissions: [{ permission: { key: "WORKFLOW_VIEW" } }],
+              },
+            },
+          },
+          {
+            role: {
+              systemRole: {
+                key: "EDITOR",
+                permissions: [{ permission: { key: "WORKFLOW_SUBMIT" } }],
+              },
+            },
+          },
+        ],
+      } as any);
+
+      const ctx = createMockContext(
+        {},
+        { agencyId: "agency-1" },
+        { userId: "user-1" },
+      );
+      await tenantGuard.canActivate(ctx);
+
+      const req = ctx.switchToHttp().getRequest();
+      expect(req.user.roles).toEqual(["WRITER", "EDITOR"]);
+      expect(req.user.permissions).toEqual([
+        "WORKFLOW_VIEW",
+        "WORKFLOW_SUBMIT",
+      ]);
+    });
+
+    it("should fall back to legacy Membership.role when MembershipRole rows are absent", async () => {
+      reflector.getAllAndOverride.mockReturnValue(false);
+      organizationRepository.findMembership.mockResolvedValue({
+        id: "mem-1",
+        status: "ACTIVE",
+        role: {
+          systemRole: {
+            key: "MANAGER",
+            permissions: [{ permission: { key: "CAMPAIGN_UPDATE" } }],
+          },
+        },
+        roles: [],
+      } as any);
+
+      const ctx = createMockContext(
+        {},
+        { agencyId: "agency-1" },
+        { userId: "user-1" },
+      );
+      await tenantGuard.canActivate(ctx);
+
+      const req = ctx.switchToHttp().getRequest();
+      expect(req.user.roles).toEqual(["MANAGER"]);
+      expect(req.user.permissions).toEqual(["CAMPAIGN_UPDATE"]);
     });
   });
 
-  describe('PermissionsGuard', () => {
-    it('should allow OWNER system role to bypass permission check', () => {
+  describe("PermissionsGuard", () => {
+    it("should allow OWNER system role to bypass permission check", () => {
       reflector.getAllAndOverride.mockImplementation((key) => {
-        if (key === 'isPublic') return false;
-        if (key === 'permissions') return ['CLIENT_CREATE'];
+        if (key === "isPublic") return false;
+        if (key === "permissions") return ["CLIENT_CREATE"];
         return undefined;
       });
 
-      const ctx = createMockContext({}, {}, { role: 'OWNER', permissions: [] });
+      const ctx = createMockContext({}, {}, { role: "OWNER", permissions: [] });
       const result = permissionsGuard.canActivate(ctx);
       expect(result).toBe(true);
     });
 
-    it('should throw PERMISSION_DENIED if required permission is missing', () => {
+    it("should throw PERMISSION_DENIED if required permission is missing", () => {
       reflector.getAllAndOverride.mockImplementation((key) => {
-        if (key === 'isPublic') return false;
-        if (key === 'permissions') return ['CLIENT_DELETE'];
+        if (key === "isPublic") return false;
+        if (key === "permissions") return ["CLIENT_DELETE"];
         return undefined;
       });
 
-      const ctx = createMockContext({}, {}, { role: 'MEMBER', permissions: ['CLIENT_READ'] });
-      expect(() => permissionsGuard.canActivate(ctx)).toThrow(ForbiddenException);
+      const ctx = createMockContext(
+        {},
+        {},
+        { role: "MEMBER", permissions: ["CLIENT_READ"] },
+      );
+      expect(() => permissionsGuard.canActivate(ctx)).toThrow(
+        ForbiddenException,
+      );
     });
   });
 });

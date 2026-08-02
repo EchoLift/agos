@@ -1,6 +1,19 @@
-import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
-import { ContentType, PublishingPlatform } from '@prisma/client';
+import { Type } from "class-transformer";
+import {
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from "class-validator";
+import { ContentType, PublishingPlatform } from "@prisma/client";
 
 export class CampaignDeliverablePlanDto {
   @IsEnum(ContentType)

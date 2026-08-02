@@ -42,8 +42,13 @@ export async function getMyMemberships(): Promise<MyMembershipsResponse> {
   });
 }
 
-export async function activateAgency(agencyId: string): Promise<{ activeAgencyId: string; agency: Agency }> {
-  return apiClient<{ activeAgencyId: string; agency: Agency }>(`/organizations/${agencyId}/activate`, {
+export interface ActivateAgencyResponse {
+  activeAgencyId: string;
+  agency: Agency;
+}
+
+export async function activateAgency(agencyId: string): Promise<ActivateAgencyResponse> {
+  return apiClient<ActivateAgencyResponse>(`/organizations/${agencyId}/activate`, {
     method: "POST",
     agencyId,
   });

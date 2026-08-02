@@ -1,5 +1,5 @@
-import { ContentStage } from '@prisma/client';
-import { IsEnum, IsString, IsUUID } from 'class-validator';
+import { ContentStage } from "@prisma/client";
+import { IsEnum, IsString, IsUUID } from "class-validator";
 
 export class RequestChangesDto {
   @IsUUID()

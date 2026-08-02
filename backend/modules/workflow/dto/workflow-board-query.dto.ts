@@ -1,5 +1,5 @@
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-import { ContentRisk } from '@prisma/client';
+import { IsEnum, IsOptional, IsString, IsUUID } from "class-validator";
+import { ContentRisk } from "@prisma/client";
 
 export class WorkflowBoardQueryDto {
   @IsOptional()

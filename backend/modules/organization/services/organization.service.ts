@@ -1,20 +1,28 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException, OnModuleInit, Logger } from '@nestjs/common';
-import { PrismaService } from '@packages/database/prisma.service';
-import { OrganizationRepository } from '../repositories/organization.repository';
-import { UserLookupService } from '../../user/services/user-lookup.service';
-import { CryptoService } from '../../auth/services/crypto.service';
-import { CreateAgencyDto } from '../dto/create-agency.dto';
-import { InviteMemberDto } from '../dto/invite-member.dto';
-import { UpdateMemberRoleDto } from '../dto/update-member-role.dto';
-import { RequestContextService } from '@packages/request-context/request-context.service';
-import { IdentityContext } from '@packages/security/interfaces/identity-context.interface';
-import { SYSTEM_ROLES } from '../repositories/organization.repository';
-import * as crypto from 'crypto';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  OnModuleInit,
+  Logger,
+} from "@nestjs/common";
+import { PrismaService } from "@packages/database/prisma.service";
+import { OrganizationRepository } from "../repositories/organization.repository";
+import { UserLookupService } from "../../user/services/user-lookup.service";
+import { CryptoService } from "../../auth/services/crypto.service";
+import { CreateAgencyDto } from "../dto/create-agency.dto";
+import { InviteMemberDto } from "../dto/invite-member.dto";
+import { UpdateMemberRoleDto } from "../dto/update-member-role.dto";
+import { RequestContextService } from "@packages/request-context/request-context.service";
+import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
+import { SYSTEM_ROLES } from "../repositories/organization.repository";
+import { ConfigService } from "@nestjs/config";
+import * as crypto from "crypto";
 
 @Injectable()
 export class OrganizationService implements OnModuleInit {
   private readonly logger = new Logger(OrganizationService.name);
-  private readonly selfRoleTestingAuthUserIds = new Set(['b5a826c1-5ecc-49b9-9965-dca890f623e2']);
 
   constructor(
     private readonly repository: OrganizationRepository,
@@ -22,6 +30,7 @@ export class OrganizationService implements OnModuleInit {
     private readonly userLookup: UserLookupService,
     private readonly cryptoService: CryptoService,
     private readonly requestContext: RequestContextService,
+    private readonly configService: ConfigService,
   ) {}
 
   async onModuleInit() {
@@ -29,16 +38,26 @@ export class OrganizationService implements OnModuleInit {
   }
 
   private async seedSystemRoles() {
-    this.logger.log('Checking and seeding SystemRoles and Permissions...');
-    
+    this.logger.log("Checking and seeding SystemRoles and Permissions...");
+
     const permissions = [
-      'CLIENT_CREATE', 'CLIENT_UPDATE', 'CLIENT_ARCHIVE',
-      'CLIENT_PLAYBOOK_VIEW', 'CLIENT_INTERNAL_VIEW', 'CLIENT_AI_CONTEXT_VIEW', 'CLIENT_APPROVAL_VIEW',
-      'CAMPAIGN_CREATE', 'CAMPAIGN_UPDATE',
-      'CONTENT_CREATE', 'CONTENT_ASSIGN', 'CONTENT_APPROVE',
-      'WORKFLOW_MANAGE',
-      'TEAM_INVITE', 'TEAM_REMOVE',
-      'BILLING_MANAGE', 'SETTINGS_MANAGE'
+      "CLIENT_CREATE",
+      "CLIENT_UPDATE",
+      "CLIENT_ARCHIVE",
+      "CLIENT_PLAYBOOK_VIEW",
+      "CLIENT_INTERNAL_VIEW",
+      "CLIENT_AI_CONTEXT_VIEW",
+      "CLIENT_APPROVAL_VIEW",
+      "CAMPAIGN_CREATE",
+      "CAMPAIGN_UPDATE",
+      "CONTENT_CREATE",
+      "CONTENT_ASSIGN",
+      "CONTENT_APPROVE",
+      "WORKFLOW_MANAGE",
+      "TEAM_INVITE",
+      "TEAM_REMOVE",
+      "BILLING_MANAGE",
+      "SETTINGS_MANAGE",
     ];
 
     for (const key of permissions) {
@@ -50,30 +69,36 @@ export class OrganizationService implements OnModuleInit {
     }
 
     const systemRoles = [
-      { key: 'OWNER', displayName: 'Owner' },
-      { key: 'ADMIN', displayName: 'Admin' },
-      { key: 'MANAGER', displayName: 'Manager' },
-      { key: 'WRITER', displayName: 'Writer' },
-      { key: 'DOP', displayName: 'DOP' },
-      { key: 'EDITOR', displayName: 'Editor' },
-      { key: 'DESIGNER', displayName: 'Designer' },
-      { key: 'CLIENT', displayName: 'Client' },
-      { key: 'FINANCE', displayName: 'Finance' },
-      { key: 'HR', displayName: 'HR' },
-      { key: 'MEMBER', displayName: 'Member' },
+      { key: "OWNER", displayName: "Owner" },
+      { key: "ADMIN", displayName: "Admin" },
+      { key: "MANAGER", displayName: "Manager" },
+      { key: "WRITER", displayName: "Writer" },
+      { key: "DOP", displayName: "DOP" },
+      { key: "EDITOR", displayName: "Editor" },
+      { key: "DESIGNER", displayName: "Designer" },
+      { key: "CLIENT", displayName: "Client" },
+      { key: "FINANCE", displayName: "Finance" },
+      { key: "HR", displayName: "HR" },
+      { key: "MEMBER", displayName: "Member" },
     ];
 
     for (const sr of systemRoles) {
       const role = await this.prisma.systemRole.upsert({
         where: { key: sr.key },
         update: { displayName: sr.displayName },
-        create: { key: sr.key, displayName: sr.displayName, description: `System ${sr.displayName} role` },
+        create: {
+          key: sr.key,
+          displayName: sr.displayName,
+          description: `System ${sr.displayName} role`,
+        },
       });
 
       // For MVP, just assign all permissions to OWNER and MANAGER to unblock features
-      if (sr.key === 'OWNER' || sr.key === 'MANAGER') {
+      if (sr.key === "OWNER" || sr.key === "MANAGER") {
         for (const pKey of permissions) {
-          const perm = await this.prisma.permission.findUnique({ where: { key: pKey } });
+          const perm = await this.prisma.permission.findUnique({
+            where: { key: pKey },
+          });
           if (perm) {
             await this.prisma.systemRolePermission.upsert({
               where: {
@@ -92,24 +117,35 @@ export class OrganizationService implements OnModuleInit {
         }
       }
     }
-    
-    this.logger.log('SystemRoles and Permissions seeded.');
+
+    this.logger.log("SystemRoles and Permissions seeded.");
   }
 
-  async createAgency(dto: CreateAgencyDto, authUserId: string, sessionId?: string) {
+  async createAgency(
+    dto: CreateAgencyDto,
+    authUserId: string,
+    sessionId?: string,
+  ) {
     const user = await this.userLookup.findByAuthUserId(authUserId);
     if (!user) {
-      throw new NotFoundException('User profile not found. Please try again.');
+      throw new NotFoundException("User profile not found. Please try again.");
     }
 
-    const slug = dto.slug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '');
+    const slug = dto.slug
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9-]/g, "");
     if (slug.length < 3) {
-      throw new BadRequestException('Subdomain must be at least 3 characters long.');
+      throw new BadRequestException(
+        "Subdomain must be at least 3 characters long.",
+      );
     }
 
     const existingSlug = await this.repository.findAgencyBySlug(slug);
     if (existingSlug) {
-      throw new ConflictException('This subdomain is already taken. Please choose another one.');
+      throw new ConflictException(
+        "This subdomain is already taken. Please choose another one.",
+      );
     }
 
     const context = this.requestContext.get();
@@ -132,8 +168,8 @@ export class OrganizationService implements OnModuleInit {
       },
       membership: {
         id: membership.id,
-        role: 'OWNER',
-        roles: ['OWNER'],
+        role: "OWNER",
+        roles: ["OWNER"],
       },
     };
   }
@@ -162,8 +198,8 @@ export class OrganizationService implements OnModuleInit {
     }));
 
     const currentAgency = activeAgencyId
-      ? agencies.find((a) => a.id === activeAgencyId) ?? agencies[0] ?? null
-      : agencies[0] ?? null;
+      ? (agencies.find((a) => a.id === activeAgencyId) ?? agencies[0] ?? null)
+      : (agencies[0] ?? null);
 
     return {
       activeAgencyId: currentAgency?.id ?? null,
@@ -174,20 +210,31 @@ export class OrganizationService implements OnModuleInit {
 
   async activateAgency(agencyId: string, actor: IdentityContext) {
     if (!actor.sessionId) {
-      throw new BadRequestException('Session context is required.');
+      throw new BadRequestException("Session context is required.");
     }
 
-    const membership = await this.repository.findMembership(agencyId, actor.userId);
-    if (!membership || membership.status !== 'ACTIVE') {
-      throw new ForbiddenException('You are not an active member of this agency.');
+    const membership = await this.repository.findMembership(
+      agencyId,
+      actor.userId,
+    );
+    if (!membership || membership.status !== "ACTIVE") {
+      throw new ForbiddenException(
+        "You are not an active member of this agency.",
+      );
     }
 
     const agency = await this.repository.findAgencyById(agencyId);
     if (!agency) {
-      throw new NotFoundException('Agency not found.');
+      throw new NotFoundException("Agency not found.");
     }
 
-    await this.repository.activateSessionAgency(actor.sessionId, agencyId);
+    const context = this.requestContext.get();
+    await this.repository.activateSessionAgency(
+      actor.sessionId,
+      agencyId,
+      membership.id,
+      context?.correlationId,
+    );
 
     return {
       activeAgencyId: agency.id,
@@ -196,36 +243,51 @@ export class OrganizationService implements OnModuleInit {
         name: agency.name,
         displayName: agency.displayName || agency.name,
         slug: agency.slug,
+        role: (membership as any).role?.systemRole?.key,
+        roles: this.mapMembershipRoles(membership),
+        membershipId: membership.id,
       },
     };
   }
 
-  async inviteMember(agencyId: string, dto: InviteMemberDto, inviterAuthUserId: string) {
+  async inviteMember(
+    agencyId: string,
+    dto: InviteMemberDto,
+    inviterAuthUserId: string,
+  ) {
     const inviter = await this.userLookup.findByAuthUserId(inviterAuthUserId);
     if (!inviter) {
-      throw new NotFoundException('Inviter user profile not found.');
+      throw new NotFoundException("Inviter user profile not found.");
     }
 
-    const inviterMembership = await this.repository.findMembership(agencyId, inviter.id);
+    const inviterMembership = await this.repository.findMembership(
+      agencyId,
+      inviter.id,
+    );
     if (!inviterMembership) {
-      throw new ForbiddenException('You are not a member of this agency.');
+      throw new ForbiddenException("You are not a member of this agency.");
     }
 
     const role = await this.repository.findRoleById(dto.roleId);
     if (!role) {
-      throw new BadRequestException('Invalid roleId provided.');
+      throw new BadRequestException("Invalid roleId provided.");
     }
 
     const roleIds = [...new Set([dto.roleId, ...(dto.roleIds ?? [])])];
     const roles = await this.repository.findRoles(agencyId);
     const validRoleIds = new Set(roles.map((item) => item.id));
-    const invalidRoleIds = roleIds.filter((roleId) => !validRoleIds.has(roleId));
+    const invalidRoleIds = roleIds.filter(
+      (roleId) => !validRoleIds.has(roleId),
+    );
     if (invalidRoleIds.length > 0) {
-      throw new BadRequestException('One or more roleIds are invalid for this agency.');
+      throw new BadRequestException(
+        "One or more roleIds are invalid for this agency.",
+      );
     }
 
-    const emailHash = this.cryptoService.hashLookup(dto.email);
-    const token = crypto.randomBytes(24).toString('hex');
+    const email = this.cryptoService.normalizeEmail(dto.email);
+    const emailHash = this.cryptoService.hashEmailLookup(email);
+    const token = crypto.randomBytes(24).toString("hex");
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
     const context = this.requestContext.get();
 
@@ -243,12 +305,14 @@ export class OrganizationService implements OnModuleInit {
 
     return {
       invitationId: invitation.id,
-      email: dto.email,
+      email,
       mobileNumber: dto.mobileNumber ?? null,
       roleId: role.id,
       roleName: role.displayName,
       roleIds,
-      roleNames: invitation.roles?.map((item: any) => item.role.displayName) ?? [role.displayName],
+      roleNames: invitation.roles?.map(
+        (item: any) => item.role.displayName,
+      ) ?? [role.displayName],
       status: invitation.status,
       expiresAt: invitation.expiresAt,
       token: invitation.token,
@@ -258,17 +322,20 @@ export class OrganizationService implements OnModuleInit {
   async acceptInvitation(token: string, authUserId: string) {
     const user = await this.userLookup.findByAuthUserId(authUserId);
     if (!user) {
-      throw new NotFoundException('User profile not found.');
+      throw new NotFoundException("User profile not found.");
     }
 
     const invitation = await this.repository.findInvitationByToken(token);
     if (!invitation) {
-      throw new BadRequestException('Invitation is invalid or has expired.');
+      throw new BadRequestException("Invitation is invalid or has expired.");
     }
 
-    const existingMembership = await this.repository.findMembership(invitation.agencyId, user.id);
+    const existingMembership = await this.repository.findMembership(
+      invitation.agencyId,
+      user.id,
+    );
     if (existingMembership) {
-      throw new ConflictException('You are already a member of this agency.');
+      throw new ConflictException("You are already a member of this agency.");
     }
 
     const context = this.requestContext.get();
@@ -316,14 +383,21 @@ export class OrganizationService implements OnModuleInit {
     }));
   }
 
-  async updateMemberRole(agencyId: string, membershipId: string, dto: UpdateMemberRoleDto, actor: IdentityContext) {
-    const requestedRoleIds = [...new Set(dto.roleIds?.length ? dto.roleIds : [dto.roleId])];
+  async updateMemberRole(
+    agencyId: string,
+    membershipId: string,
+    dto: UpdateMemberRoleDto,
+    actor: IdentityContext,
+  ) {
+    const requestedRoleIds = [
+      ...new Set(dto.roleIds?.length ? dto.roleIds : [dto.roleId]),
+    ];
     if (!requestedRoleIds.includes(dto.roleId)) {
       requestedRoleIds.unshift(dto.roleId);
     }
 
     if (requestedRoleIds.length === 0) {
-      throw new BadRequestException('At least one role is required.');
+      throw new BadRequestException("At least one role is required.");
     }
 
     const [targetMembership, targetRoles] = await Promise.all([
@@ -331,45 +405,64 @@ export class OrganizationService implements OnModuleInit {
       this.repository.findAgencyRolesByIds(agencyId, requestedRoleIds),
     ]);
 
-    if (!targetMembership || targetMembership.status !== 'ACTIVE') {
-      throw new NotFoundException('Member not found in this agency.');
+    if (!targetMembership || targetMembership.status !== "ACTIVE") {
+      throw new NotFoundException("Member not found in this agency.");
     }
 
     if (targetRoles.length !== requestedRoleIds.length) {
-      throw new BadRequestException('Roles must be predefined roles for this agency.');
+      throw new BadRequestException(
+        "Roles must be predefined roles for this agency.",
+      );
     }
 
     const hasRoleManagerAccess = this.canManageRoles(actor);
-    const hasSelfTestingOverride = this.canUseSelfRoleTestingOverride(agencyId, targetMembership, actor);
+    const hasSelfTestingOverride = this.canUseSelfRoleTestingOverride(
+      agencyId,
+      targetMembership,
+      actor,
+    );
     if (!hasRoleManagerAccess && !hasSelfTestingOverride) {
-      throw new ForbiddenException('Only owners and managers can change roles.');
+      throw new ForbiddenException(
+        "Only owners and managers can change roles.",
+      );
     }
 
     const targetRoleById = new Map(targetRoles.map((role) => [role.id, role]));
     const targetRole = targetRoleById.get(dto.roleId) ?? targetRoles[0];
-    const targetIsOwner = this.memberHasRole(targetMembership, SYSTEM_ROLES.OWNER);
-    const actorIsManager = actor.roles?.includes(SYSTEM_ROLES.MANAGER) || actor.role === SYSTEM_ROLES.MANAGER;
-    const assignsOwner = targetRoles.some((role) => role.systemRole?.key === SYSTEM_ROLES.OWNER);
+    const targetIsOwner = this.memberHasRole(
+      targetMembership,
+      SYSTEM_ROLES.OWNER,
+    );
+    const actorIsManager =
+      actor.roles?.includes(SYSTEM_ROLES.MANAGER) ||
+      actor.role === SYSTEM_ROLES.MANAGER;
+    const assignsOwner = targetRoles.some(
+      (role) => role.systemRole?.key === SYSTEM_ROLES.OWNER,
+    );
 
     if (actorIsManager && !hasSelfTestingOverride) {
-      if (targetMembership.id === actor.membershipId || targetMembership.userId === actor.userId) {
-        throw new ForbiddenException('Managers cannot change their own role.');
+      if (
+        targetMembership.id === actor.membershipId ||
+        targetMembership.userId === actor.userId
+      ) {
+        throw new ForbiddenException("Managers cannot change their own role.");
       }
 
       if (targetIsOwner) {
-        throw new ForbiddenException('Managers cannot change an owner role.');
+        throw new ForbiddenException("Managers cannot change an owner role.");
       }
 
       if (assignsOwner) {
-        throw new ForbiddenException('Managers cannot assign the owner role.');
+        throw new ForbiddenException("Managers cannot assign the owner role.");
       }
     }
 
     const demotingOwner = targetIsOwner && !assignsOwner;
     if (demotingOwner && !hasSelfTestingOverride) {
-      const activeOwnerCount = await this.repository.countActiveOwners(agencyId);
+      const activeOwnerCount =
+        await this.repository.countActiveOwners(agencyId);
       if (activeOwnerCount <= 1) {
-        throw new ConflictException('Last owner cannot be demoted.');
+        throw new ConflictException("Last owner cannot be demoted.");
       }
     }
 
@@ -385,7 +478,9 @@ export class OrganizationService implements OnModuleInit {
     );
 
     if (!updated) {
-      throw new ConflictException('Member was changed by someone else. Refresh and try again.');
+      throw new ConflictException(
+        "Member was changed by someone else. Refresh and try again.",
+      );
     }
 
     return {
@@ -404,22 +499,34 @@ export class OrganizationService implements OnModuleInit {
     };
   }
 
-  async removeMember(agencyId: string, membershipId: string, version: number, actor: IdentityContext) {
+  async removeMember(
+    agencyId: string,
+    membershipId: string,
+    version: number,
+    actor: IdentityContext,
+  ) {
     this.requireOwner(actor);
 
-    const targetMembership = await this.repository.findMembershipById(agencyId, membershipId);
-    if (!targetMembership || targetMembership.status !== 'ACTIVE') {
-      throw new NotFoundException('Member not found in this agency.');
+    const targetMembership = await this.repository.findMembershipById(
+      agencyId,
+      membershipId,
+    );
+    if (!targetMembership || targetMembership.status !== "ACTIVE") {
+      throw new NotFoundException("Member not found in this agency.");
     }
 
-    if (targetMembership.id === actor.membershipId || targetMembership.userId === actor.userId) {
-      throw new ConflictException('Owner cannot remove themselves.');
+    if (
+      targetMembership.id === actor.membershipId ||
+      targetMembership.userId === actor.userId
+    ) {
+      throw new ConflictException("Owner cannot remove themselves.");
     }
 
     if (this.memberHasRole(targetMembership, SYSTEM_ROLES.OWNER)) {
-      const activeOwnerCount = await this.repository.countActiveOwners(agencyId);
+      const activeOwnerCount =
+        await this.repository.countActiveOwners(agencyId);
       if (activeOwnerCount <= 1) {
-        throw new ConflictException('Last owner cannot be removed.');
+        throw new ConflictException("Last owner cannot be removed.");
       }
     }
 
@@ -433,7 +540,9 @@ export class OrganizationService implements OnModuleInit {
     );
 
     if (!removed) {
-      throw new ConflictException('Member was changed by someone else. Refresh and try again.');
+      throw new ConflictException(
+        "Member was changed by someone else. Refresh and try again.",
+      );
     }
 
     return { success: true };
@@ -444,37 +553,61 @@ export class OrganizationService implements OnModuleInit {
       ? membership.roles.map((item: any) => item.role)
       : [membership.role];
 
-    return assigned.map((role: any) => ({
-      id: role.id,
-      key: role.systemRole?.key,
-      name: role.displayName,
-    }));
+    return assigned
+      .map((role: any) => ({
+        id: role.id,
+        key: role.systemRole?.key,
+        name: role.displayName,
+      }))
+      .filter((role: any) => Boolean(role.id));
   }
 
   private requireOwner(actor: IdentityContext) {
-    if (!actor.roles?.includes(SYSTEM_ROLES.OWNER) && actor.role !== SYSTEM_ROLES.OWNER) {
-      throw new ForbiddenException('Only owners can manage employee roles.');
+    if (
+      !actor.roles?.includes(SYSTEM_ROLES.OWNER) &&
+      actor.role !== SYSTEM_ROLES.OWNER
+    ) {
+      throw new ForbiddenException("Only owners can manage employee roles.");
     }
   }
 
   private canManageRoles(actor: IdentityContext) {
     return (
-      actor.roles?.some((role) => [SYSTEM_ROLES.OWNER, SYSTEM_ROLES.MANAGER].includes(role)) ||
-      [SYSTEM_ROLES.OWNER, SYSTEM_ROLES.MANAGER].includes(actor.role ?? '')
+      actor.roles?.some((role) =>
+        [SYSTEM_ROLES.OWNER, SYSTEM_ROLES.MANAGER].includes(role),
+      ) || [SYSTEM_ROLES.OWNER, SYSTEM_ROLES.MANAGER].includes(actor.role ?? "")
     );
   }
 
-  private canUseSelfRoleTestingOverride(agencyId: string, membership: any, actor: IdentityContext) {
+  private canUseSelfRoleTestingOverride(
+    agencyId: string,
+    membership: any,
+    actor: IdentityContext,
+  ) {
+    const enabled =
+      this.configService.get<string>("NODE_ENV") !== "production" &&
+      this.configService.get<string>("DEV_ROLE_TESTING_OVERRIDE_ENABLED") ===
+        "true";
+    const allowedAuthUserIds = new Set(
+      (this.configService.get<string>("DEV_ROLE_TESTING_AUTH_USER_IDS") ?? "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
+    );
+
     return (
+      enabled &&
       actor.agencyId === agencyId &&
-      this.selfRoleTestingAuthUserIds.has(actor.authUserId) &&
+      allowedAuthUserIds.has(actor.authUserId) &&
       membership.id === actor.membershipId &&
       membership.userId === actor.userId
     );
   }
 
   private memberHasRole(membership: any, roleKey: string) {
-    return this.mapMembershipRoles(membership).some((role: { key?: string }) => role.key === roleKey);
+    return this.mapMembershipRoles(membership).some(
+      (role: { key?: string }) => role.key === roleKey,
+    );
   }
 
   private decryptOptional(value?: string | null) {

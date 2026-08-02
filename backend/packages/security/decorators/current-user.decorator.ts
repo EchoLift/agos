@@ -1,5 +1,5 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { IdentityContext } from '../interfaces/identity-context.interface';
+import { createParamDecorator, ExecutionContext } from "@nestjs/common";
+import { IdentityContext } from "../interfaces/identity-context.interface";
 
 export const CurrentUser = createParamDecorator(
   (data: keyof IdentityContext | undefined, ctx: ExecutionContext) => {

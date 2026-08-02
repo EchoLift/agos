@@ -1,5 +1,11 @@
-import { ContentStage } from '@prisma/client';
-import { IsDateString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { ContentStage } from "@prisma/client";
+import {
+  IsDateString,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from "class-validator";
 
 export class AssignContentDto {
   @IsUUID()

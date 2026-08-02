@@ -21,7 +21,16 @@ export const workspaceNavItems: WorkspaceNavItem[] = [
 
 const navByKey = new Map(workspaceNavItems.map((item) => [item.key, item]));
 
-const roleTestingUserIds = new Set(["012cc16c-0151-4556-9782-35890d012c13"]);
+const roleTestingUserIds = new Set(
+  (process.env.NEXT_PUBLIC_DEV_ROLE_TESTING_USER_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean),
+);
+
+const isRoleTestingOverrideEnabled =
+  process.env.NODE_ENV !== "production" &&
+  process.env.NEXT_PUBLIC_DEV_ROLE_TESTING_OVERRIDE_ENABLED === "true";
 
 const roleAccess: Record<string, WorkspaceNavKey[]> = {
   OWNER: ["dashboard", "clients", "campaigns", "content", "workflow", "calendar", "team"],
@@ -56,7 +65,7 @@ export function allowedNavKeys(agency: Agency | null, userId?: string | null) {
     roleAccess[roleKey]?.forEach((navKey) => keys.add(navKey));
   });
 
-  if (userId && roleTestingUserIds.has(userId)) {
+  if (isRoleTestingOverrideEnabled && userId && roleTestingUserIds.has(userId)) {
     keys.add("team");
   }
 
