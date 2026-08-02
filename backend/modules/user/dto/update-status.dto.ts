@@ -1,5 +1,11 @@
-import { PresenceStatus, WorkLocation } from '@prisma/client';
-import { IsDateString, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { PresenceStatus, WorkLocation } from "@prisma/client";
+import {
+  IsDateString,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from "class-validator";
 
 export class UpdateStatusDto {
   @IsEnum(PresenceStatus)

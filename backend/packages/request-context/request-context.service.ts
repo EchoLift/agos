@@ -1,5 +1,5 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
-import { Injectable } from '@nestjs/common';
+import { AsyncLocalStorage } from "node:async_hooks";
+import { Injectable } from "@nestjs/common";
 
 export interface RequestContext {
   requestId: string;
@@ -38,4 +38,3 @@ export class RequestContextService {
     return this.get()?.correlationId;
   }
 }
-

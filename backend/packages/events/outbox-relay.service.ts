@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { PrismaService } from '@packages/database/prisma.service';
-import { RabbitMQService } from './rabbitmq.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { PrismaService } from "@packages/database/prisma.service";
+import { RabbitMQService } from "./rabbitmq.service";
 
 @Injectable()
 export class OutboxRelayService {
@@ -10,7 +10,7 @@ export class OutboxRelayService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly rabbitmq: RabbitMQService
+    private readonly rabbitmq: RabbitMQService,
   ) {}
 
   @Cron(CronExpression.EVERY_5_SECONDS)
@@ -20,9 +20,9 @@ export class OutboxRelayService {
 
     try {
       const pendingEvents = await this.prisma.outboxEvent.findMany({
-        where: { status: 'PENDING' },
+        where: { status: "PENDING" },
         take: 50,
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: "asc" },
       });
 
       for (const event of pendingEvents) {
@@ -39,18 +39,18 @@ export class OutboxRelayService {
         };
 
         const routingKey = `event.${event.eventType}`;
-        
+
         const success = await this.rabbitmq.publish(routingKey, domainEvent);
 
         if (success) {
           await this.prisma.outboxEvent.update({
             where: { id: event.id },
-            data: { status: 'PUBLISHED', publishedAt: new Date() },
+            data: { status: "PUBLISHED", publishedAt: new Date() },
           });
         }
       }
     } catch (error) {
-      this.logger.error('Error processing outbox events', error);
+      this.logger.error("Error processing outbox events", error);
     } finally {
       this.isProcessing = false;
     }

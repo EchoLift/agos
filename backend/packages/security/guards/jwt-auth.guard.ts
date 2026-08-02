@@ -1,13 +1,18 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { TokenService } from '@modules/auth/services/token.service';
-import { AuthUserRepository } from '@modules/auth/repositories/auth-user.repository';
-import { UserLookupService } from '@modules/user/services/user-lookup.service';
-import { SecurityContextService } from '../services/security-context.service';
-import { RequestContextService } from '@packages/request-context/request-context.service';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { SecurityErrorCode } from '../constants/error-codes.enum';
-import { IdentityContext } from '../interfaces/identity-context.interface';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { TokenService } from "@modules/auth/services/token.service";
+import { AuthUserRepository } from "@modules/auth/repositories/auth-user.repository";
+import { UserLookupService } from "@modules/user/services/user-lookup.service";
+import { SecurityContextService } from "../services/security-context.service";
+import { RequestContextService } from "@packages/request-context/request-context.service";
+import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
+import { SecurityErrorCode } from "../constants/error-codes.enum";
+import { IdentityContext } from "../interfaces/identity-context.interface";
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -33,24 +38,25 @@ export class JwtAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       throw new UnauthorizedException({
-        message: 'Missing or invalid Authorization header',
+        message: "Missing or invalid Authorization header",
         code: SecurityErrorCode.AUTH_TOKEN_MISSING,
       });
     }
 
-    const token = authHeader.split(' ')[1];
+    const token = authHeader.split(" ")[1];
     let payload: any;
 
     try {
       payload = this.tokenService.verifyAccessToken(token);
     } catch (e: any) {
-      const code = e?.name === 'TokenExpiredError'
-        ? SecurityErrorCode.AUTH_TOKEN_EXPIRED
-        : SecurityErrorCode.AUTH_TOKEN_INVALID;
+      const code =
+        e?.name === "TokenExpiredError"
+          ? SecurityErrorCode.AUTH_TOKEN_EXPIRED
+          : SecurityErrorCode.AUTH_TOKEN_INVALID;
       throw new UnauthorizedException({
-        message: 'Token verification failed',
+        message: "Token verification failed",
         code,
       });
     }
@@ -60,7 +66,7 @@ export class JwtAuthGuard implements CanActivate {
 
     if (!authUserId || !sessionId) {
       throw new UnauthorizedException({
-        message: 'Invalid token payload format',
+        message: "Invalid token payload format",
         code: SecurityErrorCode.AUTH_TOKEN_INVALID,
       });
     }
@@ -69,9 +75,9 @@ export class JwtAuthGuard implements CanActivate {
     const session = await this.authUserRepository.findSessionById(sessionId);
 
     // If session lookup by ID fails or isn't active
-    if (!session || session.status !== 'ACTIVE') {
+    if (!session || session.status !== "ACTIVE") {
       throw new UnauthorizedException({
-        message: 'Session has been revoked or expired',
+        message: "Session has been revoked or expired",
         code: SecurityErrorCode.AUTH_SESSION_REVOKED,
       });
     }
@@ -79,7 +85,7 @@ export class JwtAuthGuard implements CanActivate {
     const user = await this.userLookupService.findByAuthUserId(authUserId);
     if (!user) {
       throw new UnauthorizedException({
-        message: 'User profile not found',
+        message: "User profile not found",
         code: SecurityErrorCode.AUTH_TOKEN_INVALID,
       });
     }

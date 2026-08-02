@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@packages/database/prisma.service';
-import { User, Prisma } from '@prisma/client';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "@packages/database/prisma.service";
+import { User, Prisma } from "@prisma/client";
 
 @Injectable()
 export class UserRepository {
@@ -12,7 +12,7 @@ export class UserRepository {
 
   async upsertByAuthUserId(
     authUserId: string,
-    data: Omit<Prisma.UserUncheckedCreateInput, 'authUserId'> = {},
+    data: Omit<Prisma.UserUncheckedCreateInput, "authUserId"> = {},
   ): Promise<User> {
     return this.prisma.user.upsert({
       where: { authUserId },

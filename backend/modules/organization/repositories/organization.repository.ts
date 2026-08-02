@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@packages/database/prisma.service';
-import { Agency, Membership, Role, Invitation, Prisma } from '@prisma/client';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "@packages/database/prisma.service";
+import { Agency, Membership, Role, Invitation, Prisma } from "@prisma/client";
 
 export const SYSTEM_ROLES = {
-  OWNER: 'OWNER',
-  MANAGER: 'MANAGER',
-  MEMBER: 'MEMBER',
+  OWNER: "OWNER",
+  MANAGER: "MANAGER",
+  MEMBER: "MEMBER",
 };
 
 @Injectable()
@@ -13,10 +13,15 @@ export class OrganizationRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   // Seeds the system roles into the agency's roles table
-  private async provisionAgencyRoles(tx: Prisma.TransactionClient, agencyId: string): Promise<Record<string, Role>> {
+  private async provisionAgencyRoles(
+    tx: Prisma.TransactionClient,
+    agencyId: string,
+  ): Promise<Record<string, Role>> {
     const systemRoles = await tx.systemRole.findMany();
     if (systemRoles.length === 0) {
-      throw new Error('SystemRoles are not seeded. Cannot provision agency roles.');
+      throw new Error(
+        "SystemRoles are not seeded. Cannot provision agency roles.",
+      );
     }
 
     const createdRoles = await Promise.all(
@@ -50,8 +55,8 @@ export class OrganizationRepository {
     return this.prisma.$transaction(async (tx) => {
       const agency = await tx.agency.create({
         data: {
-          name: slug,         // slug is used as the canonical name (subdomain identifier)
-          displayName,        // human-readable display name
+          name: slug, // slug is used as the canonical name (subdomain identifier)
+          displayName, // human-readable display name
           slug,
         },
       });
@@ -61,7 +66,7 @@ export class OrganizationRepository {
       const ownerRole = agencyRoles[SYSTEM_ROLES.OWNER];
 
       if (!ownerRole) {
-        throw new Error('OWNER SystemRole is missing');
+        throw new Error("OWNER SystemRole is missing");
       }
 
       const membership = await tx.membership.create({
@@ -69,7 +74,7 @@ export class OrganizationRepository {
           agencyId: agency.id,
           userId,
           roleId: ownerRole.id,
-          status: 'ACTIVE',
+          status: "ACTIVE",
           roles: {
             create: {
               roleId: ownerRole.id,
@@ -88,8 +93,8 @@ export class OrganizationRepository {
       await tx.outboxEvent.create({
         data: {
           aggregateId: agency.id,
-          aggregateType: 'Agency',
-          eventType: 'AgencyCreated',
+          aggregateType: "Agency",
+          eventType: "AgencyCreated",
           payload: {
             agencyId: agency.id,
             ownerMembershipId: membership.id,
@@ -109,7 +114,7 @@ export class OrganizationRepository {
 
   async findMembershipsByUserId(userId: string): Promise<any[]> {
     return this.prisma.membership.findMany({
-      where: { userId, status: 'ACTIVE' },
+      where: { userId, status: "ACTIVE" },
       include: {
         agency: true,
         role: { include: { systemRole: true } },
@@ -122,18 +127,29 @@ export class OrganizationRepository {
     return this.findMembers(agencyId);
   }
 
-  async findMembership(agencyId: string, userId: string): Promise<Membership | null> {
+  async findMembership(
+    agencyId: string,
+    userId: string,
+  ): Promise<Membership | null> {
     return this.prisma.membership.findUnique({
       where: {
         agencyId_userId: { agencyId, userId },
       },
       include: {
-        role: { include: { systemRole: { include: { permissions: { include: { permission: true } } } } } },
+        role: {
+          include: {
+            systemRole: {
+              include: { permissions: { include: { permission: true } } },
+            },
+          },
+        },
         roles: {
           include: {
             role: {
               include: {
-                systemRole: { include: { permissions: { include: { permission: true } } } },
+                systemRole: {
+                  include: { permissions: { include: { permission: true } } },
+                },
               },
             },
           },
@@ -142,7 +158,10 @@ export class OrganizationRepository {
     });
   }
 
-  async findMembershipById(agencyId: string, membershipId: string): Promise<any | null> {
+  async findMembershipById(
+    agencyId: string,
+    membershipId: string,
+  ): Promise<any | null> {
     return this.prisma.membership.findFirst({
       where: {
         id: membershipId,
@@ -176,13 +195,38 @@ export class OrganizationRepository {
     return session?.activeAgencyId ?? null;
   }
 
-  async activateSessionAgency(sessionId: string, agencyId: string) {
-    return this.prisma.session.update({
-      where: { id: sessionId },
-      data: {
-        activeAgencyId: agencyId,
-        lastUsedAt: new Date(),
-      },
+  async activateSessionAgency(
+    sessionId: string,
+    agencyId: string,
+    membershipId: string,
+    correlationId?: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const session = await tx.session.update({
+        where: { id: sessionId },
+        data: {
+          activeAgencyId: agencyId,
+          lastUsedAt: new Date(),
+        },
+      });
+
+      await tx.outboxEvent.create({
+        data: {
+          agencyId,
+          aggregateId: sessionId,
+          aggregateType: "Session",
+          eventType: "WorkspaceActivated",
+          payload: {
+            sessionId,
+            agencyId,
+            membershipId,
+            occurredAt: new Date().toISOString(),
+          },
+          correlationId,
+        },
+      });
+
+      return session;
     });
   }
 
@@ -208,7 +252,7 @@ export class OrganizationRepository {
           token,
           expiresAt,
           mobileNumber,
-          status: 'PENDING',
+          status: "PENDING",
           roles: {
             create: uniqueRoleIds.map((id) => ({ roleId: id })),
           },
@@ -218,8 +262,8 @@ export class OrganizationRepository {
       await tx.outboxEvent.create({
         data: {
           aggregateId: invitation.id,
-          aggregateType: 'Invitation',
-          eventType: 'MemberInvited',
+          aggregateType: "Invitation",
+          eventType: "MemberInvited",
           payload: {
             invitationId: invitation.id,
             agencyId,
@@ -242,7 +286,7 @@ export class OrganizationRepository {
     return this.prisma.invitation.findFirst({
       where: {
         token,
-        status: 'PENDING',
+        status: "PENDING",
         expiresAt: { gt: new Date() },
       },
       include: {
@@ -264,39 +308,53 @@ export class OrganizationRepository {
     return this.prisma.$transaction(async (tx) => {
       const uniqueRoleIds = [...new Set([roleId, ...roleIds])];
 
-      await tx.invitation.update({
-        where: { id: invitationId },
-        data: { status: 'ACCEPTED' },
+      const accepted = await tx.invitation.updateMany({
+        where: { id: invitationId, status: "PENDING" },
+        data: { status: "ACCEPTED" },
       });
 
-      const membership = await tx.membership.create({
-        data: {
+      const membership = await tx.membership.upsert({
+        where: {
+          agencyId_userId: { agencyId, userId },
+        },
+        update: {
+          status: "ACTIVE",
+          deletedAt: null,
+        },
+        create: {
           agencyId,
           userId,
           roleId,
-          status: 'ACTIVE',
-          roles: {
-            create: uniqueRoleIds.map((id) => ({ roleId: id })),
-          },
+          status: "ACTIVE",
         },
       });
 
-      await tx.outboxEvent.create({
-        data: {
-          aggregateId: membership.id,
-          aggregateType: 'Membership',
-          eventType: 'MemberJoined',
-          payload: {
-            membershipId: membership.id,
-            agencyId,
-            userId,
-            roleId,
-            roleIds: uniqueRoleIds,
-            occurredAt: new Date().toISOString(),
-          },
-          correlationId,
-        },
+      await tx.membershipRole.createMany({
+        data: uniqueRoleIds.map((id) => ({
+          membershipId: membership.id,
+          roleId: id,
+        })),
+        skipDuplicates: true,
       });
+
+      if (accepted.count > 0) {
+        await tx.outboxEvent.create({
+          data: {
+            aggregateId: membership.id,
+            aggregateType: "Membership",
+            eventType: "MemberJoined",
+            payload: {
+              membershipId: membership.id,
+              agencyId,
+              userId,
+              roleId,
+              roleIds: uniqueRoleIds,
+              occurredAt: new Date().toISOString(),
+            },
+            correlationId,
+          },
+        });
+      }
 
       return membership;
     });
@@ -308,7 +366,10 @@ export class OrganizationRepository {
     });
   }
 
-  async findAgencyRoleById(agencyId: string, roleId: string): Promise<any | null> {
+  async findAgencyRoleById(
+    agencyId: string,
+    roleId: string,
+  ): Promise<any | null> {
     return this.prisma.role.findFirst({
       where: {
         id: roleId,
@@ -319,7 +380,10 @@ export class OrganizationRepository {
     });
   }
 
-  async findAgencyRolesByIds(agencyId: string, roleIds: string[]): Promise<any[]> {
+  async findAgencyRolesByIds(
+    agencyId: string,
+    roleIds: string[],
+  ): Promise<any[]> {
     return this.prisma.role.findMany({
       where: {
         id: { in: roleIds },
@@ -346,7 +410,7 @@ export class OrganizationRepository {
           id: membershipId,
           agencyId,
           version,
-          status: 'ACTIVE',
+          status: "ACTIVE",
         },
         data: {
           roleId,
@@ -385,8 +449,8 @@ export class OrganizationRepository {
         data: {
           agencyId,
           aggregateId: membershipId,
-          aggregateType: 'Membership',
-          eventType: 'MemberRoleChanged',
+          aggregateType: "Membership",
+          eventType: "MemberRoleChanged",
           payload: {
             membershipId,
             agencyId,
@@ -417,10 +481,10 @@ export class OrganizationRepository {
           id: membershipId,
           agencyId,
           version,
-          status: 'ACTIVE',
+          status: "ACTIVE",
         },
         data: {
-          status: 'DELETED',
+          status: "DELETED",
           deletedAt: new Date(),
           version: { increment: 1 },
         },
@@ -434,8 +498,8 @@ export class OrganizationRepository {
         data: {
           agencyId,
           aggregateId: membershipId,
-          aggregateType: 'Membership',
-          eventType: 'MemberRemoved',
+          aggregateType: "Membership",
+          eventType: "MemberRemoved",
           payload: {
             membershipId,
             agencyId,
@@ -454,7 +518,7 @@ export class OrganizationRepository {
     return this.prisma.membership.count({
       where: {
         agencyId,
-        status: 'ACTIVE',
+        status: "ACTIVE",
         deletedAt: null,
         OR: [
           {
@@ -484,21 +548,25 @@ export class OrganizationRepository {
     return this.prisma.role.findMany({
       where: { agencyId },
       include: { systemRole: true },
-      orderBy: { displayName: 'asc' },
+      orderBy: { displayName: "asc" },
     });
   }
 
   async findMembers(agencyId: string): Promise<any[]> {
     return this.prisma.membership.findMany({
-      where: { agencyId, status: 'ACTIVE' },
+      where: { agencyId, status: "ACTIVE" },
       include: {
         user: {
-          select: { name: true, avatarUrl: true, authUser: { select: { emailEncrypted: true } } },
+          select: {
+            name: true,
+            avatarUrl: true,
+            authUser: { select: { emailEncrypted: true } },
+          },
         },
         role: { include: { systemRole: true } },
         roles: { include: { role: { include: { systemRole: true } } } },
       },
-      orderBy: { joinedAt: 'desc' },
+      orderBy: { joinedAt: "desc" },
     });
   }
 }

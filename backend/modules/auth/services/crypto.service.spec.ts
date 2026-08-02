@@ -1,8 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { CryptoService } from './crypto.service';
-import { ConfigService } from '@nestjs/config';
+import { Test, TestingModule } from "@nestjs/testing";
+import { CryptoService } from "./crypto.service";
+import { ConfigService } from "@nestjs/config";
 
-describe('CryptoService', () => {
+describe("CryptoService", () => {
   let service: CryptoService;
 
   beforeEach(async () => {
@@ -13,8 +13,9 @@ describe('CryptoService', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key: string) => {
-              if (key === 'ENCRYPTION_SECRET') return 'test-encryption-secret-1234567890';
-              if (key === 'FIELD_LOOKUP_SECRET') return 'test-lookup-secret';
+              if (key === "ENCRYPTION_SECRET")
+                return "test-encryption-secret-1234567890";
+              if (key === "FIELD_LOOKUP_SECRET") return "test-lookup-secret";
               return null;
             }),
           },
@@ -25,27 +26,36 @@ describe('CryptoService', () => {
     service = module.get<CryptoService>(CryptoService);
   });
 
-  it('should be defined', () => {
+  it("should be defined", () => {
     expect(service).toBeDefined();
   });
 
-  it('should encrypt and decrypt correctly', () => {
-    const plainText = 'test@example.com';
+  it("should encrypt and decrypt correctly", () => {
+    const plainText = "test@example.com";
     const encrypted = service.encrypt(plainText);
-    
+
     expect(encrypted).not.toEqual(plainText);
-    expect(encrypted.split(':').length).toBe(3); // iv:authTag:encrypted
+    expect(encrypted.split(":").length).toBe(3); // iv:authTag:encrypted
 
     const decrypted = service.decrypt(encrypted);
     expect(decrypted).toEqual(plainText);
   });
 
-  it('should produce consistent lookup hashes', () => {
-    const text = 'test@example.com';
+  it("should produce consistent lookup hashes", () => {
+    const text = "test@example.com";
     const hash1 = service.hashLookup(text);
     const hash2 = service.hashLookup(text);
 
     expect(hash1).toEqual(hash2);
     expect(hash1.length).toBe(64); // sha256 hex length
+  });
+
+  it("should normalize emails before producing email lookup hashes", () => {
+    expect(service.normalizeEmail("  Editor@Example.COM ")).toBe(
+      "editor@example.com",
+    );
+    expect(service.hashEmailLookup("  Editor@Example.COM ")).toBe(
+      service.hashEmailLookup("editor@example.com"),
+    );
   });
 });

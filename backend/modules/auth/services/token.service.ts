@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as jwt from 'jsonwebtoken';
-import * as crypto from 'crypto';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as jwt from "jsonwebtoken";
+import * as crypto from "crypto";
 
 @Injectable()
 export class TokenService {
@@ -10,15 +10,15 @@ export class TokenService {
   public readonly refreshTokenExpiresInDays = 30; // 30 days
 
   constructor(private readonly configService: ConfigService) {
-    this.jwtSecret = this.configService.get<string>('JWT_ACCESS_SECRET') || 'super-secret-jwt-key';
+    this.jwtSecret =
+      this.configService.get<string>("JWT_ACCESS_SECRET") ||
+      "super-secret-jwt-key";
   }
 
   signAccessToken(authUserId: string, sessionId: string): string {
-    return jwt.sign(
-      { sub: authUserId, sid: sessionId },
-      this.jwtSecret,
-      { expiresIn: this.accessTokenExpiresIn }
-    );
+    return jwt.sign({ sub: authUserId, sid: sessionId }, this.jwtSecret, {
+      expiresIn: this.accessTokenExpiresIn,
+    });
   }
 
   verifyAccessToken(token: string): any {
@@ -27,10 +27,10 @@ export class TokenService {
 
   generateRefreshToken(): string {
     // 256-bit random opaque string
-    return crypto.randomBytes(32).toString('hex');
+    return crypto.randomBytes(32).toString("hex");
   }
 
   hashRefreshToken(token: string): string {
-    return crypto.createHash('sha256').update(token).digest('hex');
+    return crypto.createHash("sha256").update(token).digest("hex");
   }
 }

@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   CampaignAssignmentRole,
   CampaignStatus,
@@ -10,22 +15,25 @@ import {
   PublishingSchedule,
   TaskStatus,
   WorkflowInstanceStatus,
-} from '@prisma/client';
-import { PrismaService } from '@packages/database/prisma.service';
-import { DomainEventName, DomainEvents } from '@packages/events/domain-event';
-import { EventBusService } from '@packages/events/event-bus.service';
-import { IdentityContext } from '@packages/security/interfaces/identity-context.interface';
-import { CampaignStatusActionDto } from './dto/campaign-status-action.dto';
-import { CreateCampaignTeamAssignmentDto, UpdateCampaignTeamAssignmentDto } from './dto/campaign-team-assignment.dto';
-import { CreateCampaignDto } from './dto/create-campaign.dto';
+} from "@prisma/client";
+import { PrismaService } from "@packages/database/prisma.service";
+import { DomainEventName, DomainEvents } from "@packages/events/domain-event";
+import { EventBusService } from "@packages/events/event-bus.service";
+import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
+import { CampaignStatusActionDto } from "./dto/campaign-status-action.dto";
+import {
+  CreateCampaignTeamAssignmentDto,
+  UpdateCampaignTeamAssignmentDto,
+} from "./dto/campaign-team-assignment.dto";
+import { CreateCampaignDto } from "./dto/create-campaign.dto";
 import {
   CancelPublishingScheduleDto,
   CreatePublishingScheduleDto,
   GeneratePublishingProductionDto,
   MarkPublishingSchedulePublishedDto,
   UpdatePublishingScheduleDto,
-} from './dto/publishing-schedule.dto';
-import { UpdateCampaignDto } from './dto/update-campaign.dto';
+} from "./dto/publishing-schedule.dto";
+import { UpdateCampaignDto } from "./dto/update-campaign.dto";
 
 const SINGLE_ASSIGNMENT_ROLES = new Set<CampaignAssignmentRole>([
   CampaignAssignmentRole.CAMPAIGN_MANAGER,
@@ -67,16 +75,20 @@ export class CampaignService {
   async create(dto: CreateCampaignDto, agencyId?: string, actorId?: string) {
     const resolvedAgencyId = agencyId ?? dto.agencyId;
     if (!resolvedAgencyId) {
-      throw new BadRequestException('Agency context is required');
+      throw new BadRequestException("Agency context is required");
     }
 
-    const client = await this.prisma.client.findUnique({ where: { id: dto.clientId } });
+    const client = await this.prisma.client.findUnique({
+      where: { id: dto.clientId },
+    });
     if (!client || client.agencyId !== resolvedAgencyId) {
-      throw new ConflictException('Client does not belong to the current agency');
+      throw new ConflictException(
+        "Client does not belong to the current agency",
+      );
     }
 
     if (new Date(dto.startDate) > new Date(dto.endDate)) {
-      throw new BadRequestException('startDate cannot be after endDate');
+      throw new BadRequestException("startDate cannot be after endDate");
     }
 
     const campaign = await this.prisma.campaign.create({
@@ -88,20 +100,28 @@ export class CampaignService {
         objectives: dto.objective,
         startDate: new Date(dto.startDate),
         endDate: new Date(dto.endDate),
-        status: 'DRAFT',
-        createdByMembershipId: actorId ?? dto.actorId ?? '',
+        status: "DRAFT",
+        createdByMembershipId: actorId ?? dto.actorId ?? "",
         ...this.optionalCampaignData(dto),
         ...(dto.deliverablePlans?.length
           ? {
               deliverablePlans: {
-                create: dto.deliverablePlans.map((plan) => this.toDeliverablePlanCreate(resolvedAgencyId, plan)),
+                create: dto.deliverablePlans.map((plan) =>
+                  this.toDeliverablePlanCreate(resolvedAgencyId, plan),
+                ),
               },
             }
           : {}),
         ...(dto.publishingSchedules?.length
           ? {
               publishingSchedules: {
-                create: dto.publishingSchedules.map((schedule) => this.toPublishingScheduleCreate(resolvedAgencyId, dto, schedule)),
+                create: dto.publishingSchedules.map((schedule) =>
+                  this.toPublishingScheduleCreate(
+                    resolvedAgencyId,
+                    dto,
+                    schedule,
+                  ),
+                ),
               },
             }
           : {}),
@@ -120,30 +140,47 @@ export class CampaignService {
       agencyId: campaign.agencyId,
       actorId: actorId ?? dto.actorId ?? null,
       aggregateId: campaign.id,
-      aggregateType: 'Campaign',
-      payload: { campaignId: campaign.id, clientId: campaign.clientId, name: campaign.name },
+      aggregateType: "Campaign",
+      payload: {
+        campaignId: campaign.id,
+        clientId: campaign.clientId,
+        name: campaign.name,
+      },
     });
 
     return campaign;
   }
 
-  async update(id: string, dto: UpdateCampaignDto, agencyId: string, actorId?: string) {
+  async update(
+    id: string,
+    dto: UpdateCampaignDto,
+    agencyId: string,
+    actorId?: string,
+  ) {
     const existing = await this.prisma.campaign.findUnique({ where: { id } });
     if (!existing || existing.agencyId !== agencyId) {
-      throw new NotFoundException('Campaign not found');
+      throw new NotFoundException("Campaign not found");
     }
 
-    if (dto.startDate && dto.endDate && new Date(dto.startDate) > new Date(dto.endDate)) {
-      throw new BadRequestException('startDate cannot be after endDate');
+    if (
+      dto.startDate &&
+      dto.endDate &&
+      new Date(dto.startDate) > new Date(dto.endDate)
+    ) {
+      throw new BadRequestException("startDate cannot be after endDate");
     }
 
     try {
       const campaign = await this.prisma.$transaction(async (tx) => {
         if (dto.deliverablePlans) {
-          await tx.campaignDeliverablePlan.deleteMany({ where: { campaignId: id, agencyId } });
+          await tx.campaignDeliverablePlan.deleteMany({
+            where: { campaignId: id, agencyId },
+          });
         }
         if (dto.publishingSchedules) {
-          await tx.publishingSchedule.deleteMany({ where: { campaignId: id, agencyId, contentAssetId: null } });
+          await tx.publishingSchedule.deleteMany({
+            where: { campaignId: id, agencyId, contentAssetId: null },
+          });
         }
 
         return tx.campaign.update({
@@ -153,15 +190,29 @@ export class CampaignService {
           },
           data: {
             ...(dto.name ? { name: dto.name } : {}),
-            ...(dto.objective !== undefined ? { objectives: dto.objective } : {}),
+            ...(dto.objective !== undefined
+              ? { objectives: dto.objective }
+              : {}),
             ...(dto.startDate ? { startDate: new Date(dto.startDate) } : {}),
             ...(dto.endDate ? { endDate: new Date(dto.endDate) } : {}),
             ...this.optionalCampaignData(dto),
             ...(dto.deliverablePlans
-              ? { deliverablePlans: { create: dto.deliverablePlans.map((plan) => this.toDeliverablePlanCreate(agencyId, plan)) } }
+              ? {
+                  deliverablePlans: {
+                    create: dto.deliverablePlans.map((plan) =>
+                      this.toDeliverablePlanCreate(agencyId, plan),
+                    ),
+                  },
+                }
               : {}),
             ...(dto.publishingSchedules
-              ? { publishingSchedules: { create: dto.publishingSchedules.map((schedule) => this.toPublishingScheduleCreate(agencyId, dto, schedule)) } }
+              ? {
+                  publishingSchedules: {
+                    create: dto.publishingSchedules.map((schedule) =>
+                      this.toPublishingScheduleCreate(agencyId, dto, schedule),
+                    ),
+                  },
+                }
               : {}),
             version: { increment: 1 },
           },
@@ -173,31 +224,37 @@ export class CampaignService {
         agencyId,
         actorId: actorId ?? null,
         aggregateId: campaign.id,
-        aggregateType: 'Campaign',
+        aggregateType: "Campaign",
         payload: { campaignId: campaign.id, name: campaign.name },
       });
 
       return campaign;
     } catch (error: any) {
-      if (error?.code === 'P2025') {
-        throw new ConflictException('Campaign was modified by another user');
+      if (error?.code === "P2025") {
+        throw new ConflictException("Campaign was modified by another user");
       }
       throw error;
     }
-
   }
 
   async findById(id: string, agencyId: string) {
-    const campaign = await this.prisma.campaign.findUnique({ where: { id }, include: this.campaignInclude() });
+    const campaign = await this.prisma.campaign.findUnique({
+      where: { id },
+      include: this.campaignInclude(),
+    });
     if (!campaign || campaign.agencyId !== agencyId) {
-      throw new NotFoundException('Campaign not found');
+      throw new NotFoundException("Campaign not found");
     }
 
     return campaign;
   }
 
   async findMany(agencyId: string) {
-    return this.prisma.campaign.findMany({ where: { agencyId, status: { not: 'DELETED' } }, include: this.campaignInclude(), orderBy: { updatedAt: 'desc' } });
+    return this.prisma.campaign.findMany({
+      where: { agencyId, status: { not: "DELETED" } },
+      include: this.campaignInclude(),
+      orderBy: { updatedAt: "desc" },
+    });
   }
 
   async getTeam(id: string, agencyId: string) {
@@ -206,7 +263,7 @@ export class CampaignService {
     return this.prisma.campaignTeamAssignment.findMany({
       where: { agencyId, campaignId: id },
       include: this.teamAssignmentInclude(),
-      orderBy: [{ assignmentRole: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [{ assignmentRole: "asc" }, { createdAt: "asc" }],
     });
   }
 
@@ -218,20 +275,37 @@ export class CampaignService {
         agencyId,
         eventType: { in: CAMPAIGN_ACTIVITY_EVENTS },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: 100,
     });
 
     const campaignEvents = events
       .map((event) => this.normalizeOutboxEvent(event))
-      .filter((event) => event.payload?.campaignId === id || event.aggregateId === id);
+      .filter(
+        (event) => event.payload?.campaignId === id || event.aggregateId === id,
+      );
 
-    const actorIds = [...new Set(campaignEvents.map((event) => event.actorId).filter(Boolean) as string[])];
-    const membershipIds = [...new Set(campaignEvents.map((event) => event.payload?.membershipId).filter(Boolean) as string[])];
+    const actorIds = [
+      ...new Set(
+        campaignEvents
+          .map((event) => event.actorId)
+          .filter(Boolean) as string[],
+      ),
+    ];
+    const membershipIds = [
+      ...new Set(
+        campaignEvents
+          .map((event) => event.payload?.membershipId)
+          .filter(Boolean) as string[],
+      ),
+    ];
 
     const [actors, memberships] = await Promise.all([
       actorIds.length
-        ? this.prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
+        ? this.prisma.user.findMany({
+            where: { id: { in: actorIds } },
+            select: { id: true, name: true },
+          })
         : Promise.resolve([]),
       membershipIds.length
         ? this.prisma.membership.findMany({
@@ -241,15 +315,27 @@ export class CampaignService {
         : Promise.resolve([]),
     ]);
 
-    const actorNames = new Map(actors.map((actor) => [actor.id, actor.name ?? 'Someone']));
-    const membershipNames = new Map(memberships.map((membership) => [membership.id, membership.user.name ?? membership.role.displayName ?? 'Team member']));
+    const actorNames = new Map(
+      actors.map((actor) => [actor.id, actor.name ?? "Someone"]),
+    );
+    const membershipNames = new Map(
+      memberships.map((membership) => [
+        membership.id,
+        membership.user.name ?? membership.role.displayName ?? "Team member",
+      ]),
+    );
 
     return {
       items: campaignEvents.map((event) => ({
         id: event.id,
         eventType: event.eventType,
         occurredAt: event.occurredAt,
-        actor: event.actorId ? { id: event.actorId, name: actorNames.get(event.actorId) ?? 'Someone' } : null,
+        actor: event.actorId
+          ? {
+              id: event.actorId,
+              name: actorNames.get(event.actorId) ?? "Someone",
+            }
+          : null,
         message: this.formatActivityMessage(event, membershipNames),
         metadata: event.payload,
       })),
@@ -257,14 +343,14 @@ export class CampaignService {
   }
 
   async getPublishingSchedules(id: string, actor: IdentityContext) {
-    const agencyId = actor.agencyId ?? '';
+    const agencyId = actor.agencyId ?? "";
     await this.ensureCampaign(id, agencyId);
     await this.syncMissedPublishingSlots(id, agencyId, actor.userId);
 
     const slots = await this.prisma.publishingSchedule.findMany({
       where: { agencyId, campaignId: id },
       include: this.publishingScheduleInclude(),
-      orderBy: { scheduledAt: 'asc' },
+      orderBy: { scheduledAt: "asc" },
     });
 
     return {
@@ -273,13 +359,18 @@ export class CampaignService {
     };
   }
 
-  async createPublishingSchedule(id: string, dto: CreatePublishingScheduleDto, actor: IdentityContext) {
-    const agencyId = actor.agencyId ?? '';
+  async createPublishingSchedule(
+    id: string,
+    dto: CreatePublishingScheduleDto,
+    actor: IdentityContext,
+  ) {
+    const agencyId = actor.agencyId ?? "";
     this.ensurePublishingManager(actor);
     const campaign = await this.ensureCampaign(id, agencyId);
     const scheduledAt = new Date(dto.scheduledAt);
     this.ensureWithinCampaignWindow(scheduledAt, campaign);
-    if (dto.contentAssetId) await this.ensureCampaignContentAsset(dto.contentAssetId, id, agencyId);
+    if (dto.contentAssetId)
+      await this.ensureCampaignContentAsset(dto.contentAssetId, id, agencyId);
 
     const slot = await this.prisma.publishingSchedule.create({
       data: {
@@ -288,34 +379,53 @@ export class CampaignService {
         contentAssetId: dto.contentAssetId,
         platform: dto.platform,
         scheduledAt,
-        timezone: this.nullIfBlank(dto.timezone) ?? campaign.timezone ?? 'Asia/Kolkata',
+        timezone:
+          this.nullIfBlank(dto.timezone) ?? campaign.timezone ?? "Asia/Kolkata",
         caption: this.nullIfBlank(dto.caption),
         note: this.nullIfBlank(dto.note),
-        status: 'PLANNED',
+        status: "PLANNED",
       },
       include: this.publishingScheduleInclude(),
     });
 
-    await this.publishPublishingEvent(DomainEvents.PublishingSlotCreated, agencyId, actor.userId, id, slot);
+    await this.publishPublishingEvent(
+      DomainEvents.PublishingSlotCreated,
+      agencyId,
+      actor.userId,
+      id,
+      slot,
+    );
     return this.toPublishingScheduleView(slot);
   }
 
-  async updatePublishingSchedule(id: string, scheduleId: string, dto: UpdatePublishingScheduleDto, actor: IdentityContext) {
-    const agencyId = actor.agencyId ?? '';
+  async updatePublishingSchedule(
+    id: string,
+    scheduleId: string,
+    dto: UpdatePublishingScheduleDto,
+    actor: IdentityContext,
+  ) {
+    const agencyId = actor.agencyId ?? "";
     this.ensurePublishingManager(actor);
     const campaign = await this.ensureCampaign(id, agencyId);
     const existing = await this.ensurePublishingSlot(scheduleId, id, agencyId);
 
-    if (existing.status === 'CANCELLED') {
-      throw new BadRequestException('Cancelled publishing slots cannot be edited');
+    if (existing.status === "CANCELLED") {
+      throw new BadRequestException(
+        "Cancelled publishing slots cannot be edited",
+      );
     }
-    if (existing.status === 'PUBLISHED') {
-      throw new BadRequestException('Published publishing slots cannot be edited');
+    if (existing.status === "PUBLISHED") {
+      throw new BadRequestException(
+        "Published publishing slots cannot be edited",
+      );
     }
 
-    const nextScheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : existing.scheduledAt;
+    const nextScheduledAt = dto.scheduledAt
+      ? new Date(dto.scheduledAt)
+      : existing.scheduledAt;
     this.ensureWithinCampaignWindow(nextScheduledAt, campaign);
-    if (dto.contentAssetId) await this.ensureCampaignContentAsset(dto.contentAssetId, id, agencyId);
+    if (dto.contentAssetId)
+      await this.ensureCampaignContentAsset(dto.contentAssetId, id, agencyId);
 
     try {
       const slot = await this.prisma.publishingSchedule.update({
@@ -323,17 +433,31 @@ export class CampaignService {
         data: {
           ...(dto.platform ? { platform: dto.platform } : {}),
           ...(dto.scheduledAt ? { scheduledAt: nextScheduledAt } : {}),
-          ...(dto.timezone !== undefined ? { timezone: this.nullIfBlank(dto.timezone) ?? campaign.timezone ?? 'Asia/Kolkata' } : {}),
-          ...(dto.contentAssetId !== undefined ? { contentAssetId: this.nullIfBlank(dto.contentAssetId) } : {}),
-          ...(dto.caption !== undefined ? { caption: this.nullIfBlank(dto.caption) } : {}),
-          ...(dto.note !== undefined ? { note: this.nullIfBlank(dto.note) } : {}),
+          ...(dto.timezone !== undefined
+            ? {
+                timezone:
+                  this.nullIfBlank(dto.timezone) ??
+                  campaign.timezone ??
+                  "Asia/Kolkata",
+              }
+            : {}),
+          ...(dto.contentAssetId !== undefined
+            ? { contentAssetId: this.nullIfBlank(dto.contentAssetId) }
+            : {}),
+          ...(dto.caption !== undefined
+            ? { caption: this.nullIfBlank(dto.caption) }
+            : {}),
+          ...(dto.note !== undefined
+            ? { note: this.nullIfBlank(dto.note) }
+            : {}),
           version: { increment: 1 },
         },
         include: this.publishingScheduleInclude(),
       });
 
       await this.publishPublishingEvent(
-        dto.scheduledAt && nextScheduledAt.getTime() !== existing.scheduledAt.getTime()
+        dto.scheduledAt &&
+          nextScheduledAt.getTime() !== existing.scheduledAt.getTime()
           ? DomainEvents.PublishingSlotRescheduled
           : DomainEvents.PublishingSlotUpdated,
         agencyId,
@@ -345,58 +469,85 @@ export class CampaignService {
 
       return this.toPublishingScheduleView(slot);
     } catch (error: any) {
-      if (error?.code === 'P2025') {
-        throw new ConflictException('Publishing slot was modified by another user');
+      if (error?.code === "P2025") {
+        throw new ConflictException(
+          "Publishing slot was modified by another user",
+        );
       }
       throw error;
     }
   }
 
-  async cancelPublishingSchedule(id: string, scheduleId: string, dto: CancelPublishingScheduleDto, actor: IdentityContext) {
-    const agencyId = actor.agencyId ?? '';
+  async cancelPublishingSchedule(
+    id: string,
+    scheduleId: string,
+    dto: CancelPublishingScheduleDto,
+    actor: IdentityContext,
+  ) {
+    const agencyId = actor.agencyId ?? "";
     this.ensurePublishingManager(actor);
     await this.ensureCampaign(id, agencyId);
     const existing = await this.ensurePublishingSlot(scheduleId, id, agencyId);
 
-    if (existing.status === 'PUBLISHED') {
-      throw new BadRequestException('Published publishing slots cannot be cancelled');
+    if (existing.status === "PUBLISHED") {
+      throw new BadRequestException(
+        "Published publishing slots cannot be cancelled",
+      );
     }
-    if (existing.status === 'CANCELLED') {
-      return this.toPublishingScheduleView(await this.getPublishingSlotView(scheduleId, id, agencyId));
+    if (existing.status === "CANCELLED") {
+      return this.toPublishingScheduleView(
+        await this.getPublishingSlotView(scheduleId, id, agencyId),
+      );
     }
 
     try {
       const slot = await this.prisma.publishingSchedule.update({
         where: { id: scheduleId, version: dto.version },
         data: {
-          status: 'CANCELLED',
+          status: "CANCELLED",
           cancellationReason: dto.cancellationReason,
           version: { increment: 1 },
         },
         include: this.publishingScheduleInclude(),
       });
 
-      await this.publishPublishingEvent(DomainEvents.PublishingSlotCancelled, agencyId, actor.userId, id, slot, {
-        cancellationReason: dto.cancellationReason,
-      });
+      await this.publishPublishingEvent(
+        DomainEvents.PublishingSlotCancelled,
+        agencyId,
+        actor.userId,
+        id,
+        slot,
+        {
+          cancellationReason: dto.cancellationReason,
+        },
+      );
 
       return this.toPublishingScheduleView(slot);
     } catch (error: any) {
-      if (error?.code === 'P2025') {
-        throw new ConflictException('Publishing slot was modified by another user');
+      if (error?.code === "P2025") {
+        throw new ConflictException(
+          "Publishing slot was modified by another user",
+        );
       }
       throw error;
     }
   }
 
-  async markPublishingSchedulePublished(id: string, scheduleId: string, dto: MarkPublishingSchedulePublishedDto, actor: IdentityContext) {
-    const agencyId = actor.agencyId ?? '';
+  async markPublishingSchedulePublished(
+    id: string,
+    scheduleId: string,
+    dto: MarkPublishingSchedulePublishedDto,
+    actor: IdentityContext,
+  ) {
+    const agencyId = actor.agencyId ?? "";
     this.ensurePublishingManager(actor);
     await this.ensureCampaign(id, agencyId);
     const existing = await this.ensurePublishingSlot(scheduleId, id, agencyId);
 
-    if (existing.status === 'CANCELLED') {
-      throw new BadRequestException('Cancelled publishing slots cannot be marked published');
+    if (existing.status === "CANCELLED") {
+      throw new BadRequestException(
+        "Cancelled publishing slots cannot be marked published",
+      );
     }
 
     try {
@@ -404,10 +555,12 @@ export class CampaignService {
         const publishedSlot = await tx.publishingSchedule.update({
           where: { id: scheduleId, version: dto.version },
           data: {
-            status: 'PUBLISHED',
-            riskStatus: 'ON_TRACK',
+            status: "PUBLISHED",
+            riskStatus: "ON_TRACK",
             publishedUrl: dto.publishedUrl,
-            publishedAt: dto.publishedAt ? new Date(dto.publishedAt) : new Date(),
+            publishedAt: dto.publishedAt
+              ? new Date(dto.publishedAt)
+              : new Date(),
             version: { increment: 1 },
           },
           include: this.publishingScheduleInclude(),
@@ -419,7 +572,7 @@ export class CampaignService {
           await tx.contentAsset.update({
             where: { id: publishedSlot.contentAssetId },
             data: {
-              status: 'PUBLISHED',
+              status: "PUBLISHED",
               version: { increment: 1 },
             },
           });
@@ -431,7 +584,7 @@ export class CampaignService {
               status: WorkflowInstanceStatus.ACTIVE,
             },
             include: { currentStep: true },
-            orderBy: { startedAt: 'desc' },
+            orderBy: { startedAt: "desc" },
           });
 
           if (workflowInstance) {
@@ -442,7 +595,7 @@ export class CampaignService {
               data: {
                 status: WorkflowInstanceStatus.COMPLETED,
                 completedAt: new Date(),
-                riskStatus: 'ON_TRACK',
+                riskStatus: "ON_TRACK",
                 version: { increment: 1 },
               },
             });
@@ -456,91 +609,130 @@ export class CampaignService {
                   fromStage: workflowInstance.currentStep?.stage ?? null,
                   toStage: ContentStage.PUBLISHED,
                   changedById: actor.membershipId,
-                  reason: 'Content published from campaign calendar',
+                  reason: "Content published from campaign calendar",
                 },
               });
             }
           }
 
-          await this.eventBus.publishWithinTransaction(tx, DomainEvents.ContentAssetPublished, {
-            agencyId,
-            actorId: actor.userId,
-            aggregateId: publishedSlot.contentAssetId,
-            aggregateType: 'ContentAsset',
-            payload: {
-              campaignId: id,
-              contentAssetId: publishedSlot.contentAssetId,
-              publishingScheduleId: publishedSlot.id,
-              publishedUrl: dto.publishedUrl,
+          await this.eventBus.publishWithinTransaction(
+            tx,
+            DomainEvents.ContentAssetPublished,
+            {
+              agencyId,
+              actorId: actor.userId,
+              aggregateId: publishedSlot.contentAssetId,
+              aggregateType: "ContentAsset",
+              payload: {
+                campaignId: id,
+                contentAssetId: publishedSlot.contentAssetId,
+                publishingScheduleId: publishedSlot.id,
+                publishedUrl: dto.publishedUrl,
+              },
             },
-          });
+          );
         }
 
-        await this.eventBus.publishWithinTransaction(tx, DomainEvents.PublishingSlotPublished, {
-          agencyId,
-          actorId: actor.userId,
-          aggregateId: id,
-          aggregateType: 'Campaign',
-          payload: {
-            campaignId: id,
-            publishingScheduleId: publishedSlot.id,
-            contentAssetId: publishedSlot.contentAssetId,
-            workflowInstanceId,
-            platform: publishedSlot.platform,
-            scheduledAt: publishedSlot.scheduledAt.toISOString(),
-            status: publishedSlot.status,
+        await this.eventBus.publishWithinTransaction(
+          tx,
+          DomainEvents.PublishingSlotPublished,
+          {
+            agencyId,
+            actorId: actor.userId,
+            aggregateId: id,
+            aggregateType: "Campaign",
+            payload: {
+              campaignId: id,
+              publishingScheduleId: publishedSlot.id,
+              contentAssetId: publishedSlot.contentAssetId,
+              workflowInstanceId,
+              platform: publishedSlot.platform,
+              scheduledAt: publishedSlot.scheduledAt.toISOString(),
+              status: publishedSlot.status,
+            },
           },
-        });
+        );
 
         return publishedSlot;
       });
 
       return this.toPublishingScheduleView(slot);
     } catch (error: any) {
-      if (error?.code === 'P2025') {
-        throw new ConflictException('Publishing slot was modified by another user');
+      if (error?.code === "P2025") {
+        throw new ConflictException(
+          "Publishing slot was modified by another user",
+        );
       }
       throw error;
     }
   }
 
-  async generatePublishingProduction(id: string, scheduleId: string, dto: GeneratePublishingProductionDto, actor: IdentityContext) {
-    const agencyId = actor.agencyId ?? '';
+  async generatePublishingProduction(
+    id: string,
+    scheduleId: string,
+    dto: GeneratePublishingProductionDto,
+    actor: IdentityContext,
+  ) {
+    const agencyId = actor.agencyId ?? "";
     const actorMembershipId = actor.membershipId;
     if (!actorMembershipId) {
-      throw new BadRequestException('Membership context is required');
+      throw new BadRequestException("Membership context is required");
     }
 
     this.ensureCampaignManager(actor);
     const campaign = await this.ensureCampaign(id, agencyId);
     const slot = await this.ensurePublishingSlot(scheduleId, id, agencyId);
 
-    if (slot.status === 'CANCELLED') {
-      throw new BadRequestException('Cancelled publishing slots cannot generate production work');
+    if (slot.status === "CANCELLED") {
+      throw new BadRequestException(
+        "Cancelled publishing slots cannot generate production work",
+      );
     }
     if (slot.contentAssetId) {
-      return this.toPublishingScheduleView(await this.getPublishingSlotView(scheduleId, id, agencyId));
+      return this.toPublishingScheduleView(
+        await this.getPublishingSlotView(scheduleId, id, agencyId),
+      );
     }
 
-    const managerMembershipId = dto.managerMembershipId
-      ?? await this.findCampaignAssignmentMembershipId(id, agencyId, CampaignAssignmentRole.CAMPAIGN_MANAGER)
-      ?? actorMembershipId;
-    const writerMembershipId = dto.writerMembershipId
-      ?? await this.findCampaignAssignmentMembershipId(id, agencyId, CampaignAssignmentRole.WRITER);
+    const managerMembershipId =
+      dto.managerMembershipId ??
+      (await this.findCampaignAssignmentMembershipId(
+        id,
+        agencyId,
+        CampaignAssignmentRole.CAMPAIGN_MANAGER,
+      )) ??
+      actorMembershipId;
+    const writerMembershipId =
+      dto.writerMembershipId ??
+      (await this.findCampaignAssignmentMembershipId(
+        id,
+        agencyId,
+        CampaignAssignmentRole.WRITER,
+      ));
 
     if (!writerMembershipId) {
-      throw new BadRequestException('Assign a campaign writer before generating production work');
+      throw new BadRequestException(
+        "Assign a campaign writer before generating production work",
+      );
     }
 
     await this.ensureAssignableMembership(managerMembershipId, agencyId);
     await this.ensureAssignableMembership(writerMembershipId, agencyId);
 
     const generatedSlot = await this.prisma.$transaction(async (tx) => {
-      const displayCode = await this.generateContentDisplayCode(tx, agencyId, dto.contentType);
-      const scriptDueAt = dto.scriptDueAt ? new Date(dto.scriptDueAt) : this.defaultScriptDueAt(slot.scheduledAt);
+      const displayCode = await this.generateContentDisplayCode(
+        tx,
+        agencyId,
+        dto.contentType,
+      );
+      const scriptDueAt = dto.scriptDueAt
+        ? new Date(dto.scriptDueAt)
+        : this.defaultScriptDueAt(slot.scheduledAt);
 
       if (scriptDueAt > slot.scheduledAt) {
-        throw new BadRequestException('Script due date cannot be after the publishing date');
+        throw new BadRequestException(
+          "Script due date cannot be after the publishing date",
+        );
       }
 
       const asset = await tx.contentAsset.create({
@@ -551,7 +743,10 @@ export class CampaignService {
           displayCode,
           type: dto.contentType,
           title: dto.title,
-          brief: this.nullIfBlank(dto.brief) ?? slot.note ?? `${this.formatContentType(dto.contentType)} for ${campaign.name}`,
+          brief:
+            this.nullIfBlank(dto.brief) ??
+            slot.note ??
+            `${this.formatContentType(dto.contentType)} for ${campaign.name}`,
           status: ContentAssetStatus.ACTIVE,
         },
       });
@@ -594,7 +789,7 @@ export class CampaignService {
           fromStage: null,
           toStage: ContentStage.WRITING,
           changedById: actorMembershipId,
-          reason: 'Production generated from publishing slot',
+          reason: "Production generated from publishing slot",
         },
       });
 
@@ -606,7 +801,7 @@ export class CampaignService {
           fromMembershipId: null,
           toMembershipId: writerMembershipId,
           changedByMembershipId: actorMembershipId,
-          reason: 'Writing task generated from publishing slot',
+          reason: "Writing task generated from publishing slot",
         },
       });
 
@@ -614,7 +809,7 @@ export class CampaignService {
         where: { id: scheduleId },
         data: {
           contentAssetId: asset.id,
-          status: 'PLANNED',
+          status: "PLANNED",
           version: { increment: 1 },
         },
         include: this.publishingScheduleInclude(),
@@ -626,53 +821,65 @@ export class CampaignService {
         eventType: DomainEvents.ContentAssigned,
       });
 
-      await this.eventBus.publishWithinTransaction(tx, DomainEvents.ContentAssetCreated, {
-        agencyId,
-        actorId: actor.userId,
-        aggregateId: asset.id,
-        aggregateType: 'ContentAsset',
-        payload: {
-          campaignId: id,
-          contentAssetId: asset.id,
-          publishingScheduleId: scheduleId,
-          workflowInstanceId: workflowInstance.id,
-          workflowTaskId: writingTask.id,
-          displayCode,
+      await this.eventBus.publishWithinTransaction(
+        tx,
+        DomainEvents.ContentAssetCreated,
+        {
+          agencyId,
+          actorId: actor.userId,
+          aggregateId: asset.id,
+          aggregateType: "ContentAsset",
+          payload: {
+            campaignId: id,
+            contentAssetId: asset.id,
+            publishingScheduleId: scheduleId,
+            workflowInstanceId: workflowInstance.id,
+            workflowTaskId: writingTask.id,
+            displayCode,
+          },
         },
-      });
+      );
 
-      await this.eventBus.publishWithinTransaction(tx, DomainEvents.ContentAssigned, {
-        agencyId,
-        actorId: actor.userId,
-        aggregateId: asset.id,
-        aggregateType: 'WorkflowTask',
-        payload: {
-          campaignId: id,
-          contentAssetId: asset.id,
-          publishingScheduleId: scheduleId,
-          workflowInstanceId: workflowInstance.id,
-          workflowTaskId: writingTask.id,
-          assigneeId: writerMembershipId,
-          stage: ContentStage.WRITING,
-          deadlineAt: scriptDueAt.toISOString(),
+      await this.eventBus.publishWithinTransaction(
+        tx,
+        DomainEvents.ContentAssigned,
+        {
+          agencyId,
+          actorId: actor.userId,
+          aggregateId: asset.id,
+          aggregateType: "WorkflowTask",
+          payload: {
+            campaignId: id,
+            contentAssetId: asset.id,
+            publishingScheduleId: scheduleId,
+            workflowInstanceId: workflowInstance.id,
+            workflowTaskId: writingTask.id,
+            assigneeId: writerMembershipId,
+            stage: ContentStage.WRITING,
+            deadlineAt: scriptDueAt.toISOString(),
+          },
         },
-      });
+      );
 
-      await this.eventBus.publishWithinTransaction(tx, DomainEvents.PublishingSlotProductionGenerated, {
-        agencyId,
-        actorId: actor.userId,
-        aggregateId: id,
-        aggregateType: 'Campaign',
-        payload: {
-          campaignId: id,
-          publishingScheduleId: scheduleId,
-          contentAssetId: asset.id,
-          workflowInstanceId: workflowInstance.id,
-          workflowTaskId: writingTask.id,
-          platform: updatedSlot.platform,
-          scheduledAt: updatedSlot.scheduledAt.toISOString(),
+      await this.eventBus.publishWithinTransaction(
+        tx,
+        DomainEvents.PublishingSlotProductionGenerated,
+        {
+          agencyId,
+          actorId: actor.userId,
+          aggregateId: id,
+          aggregateType: "Campaign",
+          payload: {
+            campaignId: id,
+            publishingScheduleId: scheduleId,
+            contentAssetId: asset.id,
+            workflowInstanceId: workflowInstance.id,
+            workflowTaskId: writingTask.id,
+            platform: updatedSlot.platform,
+            scheduledAt: updatedSlot.scheduledAt.toISOString(),
+          },
         },
-      });
+      );
 
       return updatedSlot;
     });
@@ -680,8 +887,12 @@ export class CampaignService {
     return this.toPublishingScheduleView(generatedSlot);
   }
 
-  async assignTeamMember(id: string, dto: CreateCampaignTeamAssignmentDto, actor: IdentityContext) {
-    const agencyId = actor.agencyId ?? '';
+  async assignTeamMember(
+    id: string,
+    dto: CreateCampaignTeamAssignmentDto,
+    actor: IdentityContext,
+  ) {
+    const agencyId = actor.agencyId ?? "";
     await this.ensureCampaign(id, agencyId);
     await this.ensureCampaignTeamManager(id, agencyId, actor);
     await this.ensureAssignableMembership(dto.membershipId, agencyId);
@@ -706,7 +917,7 @@ export class CampaignService {
           agencyId,
           actorId: actor.userId,
           aggregateId: id,
-          aggregateType: 'Campaign',
+          aggregateType: "Campaign",
           payload: {
             campaignId: id,
             assignmentId: assignment.id,
@@ -718,15 +929,22 @@ export class CampaignService {
 
       return assignment;
     } catch (error: any) {
-      if (error?.code === 'P2002') {
-        throw new ConflictException('This member already has that campaign responsibility');
+      if (error?.code === "P2002") {
+        throw new ConflictException(
+          "This member already has that campaign responsibility",
+        );
       }
       throw error;
     }
   }
 
-  async updateTeamAssignment(id: string, assignmentId: string, dto: UpdateCampaignTeamAssignmentDto, actor: IdentityContext) {
-    const agencyId = actor.agencyId ?? '';
+  async updateTeamAssignment(
+    id: string,
+    assignmentId: string,
+    dto: UpdateCampaignTeamAssignmentDto,
+    actor: IdentityContext,
+  ) {
+    const agencyId = actor.agencyId ?? "";
     await this.ensureCampaign(id, agencyId);
     await this.ensureCampaignTeamManager(id, agencyId, actor);
 
@@ -734,7 +952,7 @@ export class CampaignService {
       where: { id: assignmentId, campaignId: id, agencyId },
     });
     if (!existing) {
-      throw new NotFoundException('Campaign team assignment not found');
+      throw new NotFoundException("Campaign team assignment not found");
     }
 
     const nextRole = dto.assignmentRole ?? existing.assignmentRole;
@@ -761,7 +979,7 @@ export class CampaignService {
           agencyId,
           actorId: actor.userId,
           aggregateId: id,
-          aggregateType: 'Campaign',
+          aggregateType: "Campaign",
           payload: {
             campaignId: id,
             assignmentId: assignment.id,
@@ -773,18 +991,26 @@ export class CampaignService {
 
       return assignment;
     } catch (error: any) {
-      if (error?.code === 'P2025') {
-        throw new ConflictException('Campaign team assignment was modified by another user');
+      if (error?.code === "P2025") {
+        throw new ConflictException(
+          "Campaign team assignment was modified by another user",
+        );
       }
-      if (error?.code === 'P2002') {
-        throw new ConflictException('This member already has that campaign responsibility');
+      if (error?.code === "P2002") {
+        throw new ConflictException(
+          "This member already has that campaign responsibility",
+        );
       }
       throw error;
     }
   }
 
-  async removeTeamAssignment(id: string, assignmentId: string, actor: IdentityContext) {
-    const agencyId = actor.agencyId ?? '';
+  async removeTeamAssignment(
+    id: string,
+    assignmentId: string,
+    actor: IdentityContext,
+  ) {
+    const agencyId = actor.agencyId ?? "";
     await this.ensureCampaign(id, agencyId);
     await this.ensureCampaignTeamManager(id, agencyId, actor);
 
@@ -792,16 +1018,18 @@ export class CampaignService {
       where: { id: assignmentId, campaignId: id, agencyId },
     });
     if (!assignment) {
-      throw new NotFoundException('Campaign team assignment not found');
+      throw new NotFoundException("Campaign team assignment not found");
     }
 
-    await this.prisma.campaignTeamAssignment.delete({ where: { id: assignmentId } });
+    await this.prisma.campaignTeamAssignment.delete({
+      where: { id: assignmentId },
+    });
 
     await this.eventBus.publish(DomainEvents.CampaignTeamMemberRemoved, {
       agencyId,
       actorId: actor.userId,
       aggregateId: id,
-      aggregateType: 'Campaign',
+      aggregateType: "Campaign",
       payload: {
         campaignId: id,
         assignmentId,
@@ -813,56 +1041,80 @@ export class CampaignService {
     return { success: true };
   }
 
-  async archive(id: string, dto: CampaignStatusActionDto, actor: IdentityContext) {
-    const agencyId = actor.agencyId ?? '';
+  async archive(
+    id: string,
+    dto: CampaignStatusActionDto,
+    actor: IdentityContext,
+  ) {
+    const agencyId = actor.agencyId ?? "";
     this.ensureCampaignManager(actor);
     const existing = await this.prisma.campaign.findUnique({ where: { id } });
     if (!existing || existing.agencyId !== agencyId) {
-      throw new NotFoundException('Campaign not found');
+      throw new NotFoundException("Campaign not found");
     }
 
-    if (!['ACTIVE', 'PAUSED', 'COMPLETED'].includes(existing.status)) {
-      throw new BadRequestException(`Cannot archive campaign from ${existing.status}`);
+    if (!["ACTIVE", "PAUSED", "COMPLETED"].includes(existing.status)) {
+      throw new BadRequestException(
+        `Cannot archive campaign from ${existing.status}`,
+      );
     }
 
     try {
       const campaign = await this.prisma.campaign.update({
         where: { id, version: dto.version ?? existing.version },
-        data: { status: 'ARCHIVED', version: { increment: 1 } },
+        data: { status: "ARCHIVED", version: { increment: 1 } },
       });
 
       await this.eventBus.publish(DomainEvents.CampaignArchived, {
         agencyId,
         actorId: actor.userId,
         aggregateId: campaign.id,
-        aggregateType: 'Campaign',
-        payload: { campaignId: campaign.id, previousStatus: existing.status, status: campaign.status },
+        aggregateType: "Campaign",
+        payload: {
+          campaignId: campaign.id,
+          previousStatus: existing.status,
+          status: campaign.status,
+        },
       });
 
       return campaign;
     } catch (error: any) {
-      if (error?.code === 'P2025') {
-        throw new ConflictException('Campaign was modified by another user');
+      if (error?.code === "P2025") {
+        throw new ConflictException("Campaign was modified by another user");
       }
       throw error;
     }
   }
 
-  async activate(id: string, dto: CampaignStatusActionDto, actorOrAgencyId: IdentityContext | string, actorId?: string) {
-    const actor = typeof actorOrAgencyId === 'string' ? null : actorOrAgencyId;
-    const agencyId = typeof actorOrAgencyId === 'string' ? actorOrAgencyId : actorOrAgencyId.agencyId ?? '';
+  async activate(
+    id: string,
+    dto: CampaignStatusActionDto,
+    actorOrAgencyId: IdentityContext | string,
+    actorId?: string,
+  ) {
+    const actor = typeof actorOrAgencyId === "string" ? null : actorOrAgencyId;
+    const agencyId =
+      typeof actorOrAgencyId === "string"
+        ? actorOrAgencyId
+        : (actorOrAgencyId.agencyId ?? "");
     if (actor) this.ensureCampaignManager(actor);
     const existing = await this.prisma.campaign.findUnique({ where: { id } });
-    if (!existing || existing.agencyId !== agencyId || existing.status === 'DELETED') {
-      throw new NotFoundException('Campaign not found');
+    if (
+      !existing ||
+      existing.agencyId !== agencyId ||
+      existing.status === "DELETED"
+    ) {
+      throw new NotFoundException("Campaign not found");
     }
 
-    if (existing.status === 'ACTIVE') {
+    if (existing.status === "ACTIVE") {
       return existing;
     }
 
-    if (!['DRAFT', 'PAUSED', 'ARCHIVED'].includes(existing.status)) {
-      throw new BadRequestException(`Cannot activate campaign from ${existing.status}`);
+    if (!["DRAFT", "PAUSED", "ARCHIVED"].includes(existing.status)) {
+      throw new BadRequestException(
+        `Cannot activate campaign from ${existing.status}`,
+      );
     }
 
     try {
@@ -872,7 +1124,7 @@ export class CampaignService {
           version: dto.version ?? existing.version,
         },
         data: {
-          status: 'ACTIVE',
+          status: "ACTIVE",
           version: { increment: 1 },
         },
       });
@@ -881,76 +1133,102 @@ export class CampaignService {
         agencyId,
         actorId: actor?.userId ?? actorId ?? null,
         aggregateId: campaign.id,
-        aggregateType: 'Campaign',
-        payload: { campaignId: campaign.id, previousStatus: existing.status, status: campaign.status },
+        aggregateType: "Campaign",
+        payload: {
+          campaignId: campaign.id,
+          previousStatus: existing.status,
+          status: campaign.status,
+        },
       });
 
       return campaign;
     } catch (error: any) {
-      if (error?.code === 'P2025') {
-        throw new ConflictException('Campaign was modified by another user');
+      if (error?.code === "P2025") {
+        throw new ConflictException("Campaign was modified by another user");
       }
       throw error;
     }
   }
 
-  async pause(id: string, dto: CampaignStatusActionDto, actor: IdentityContext) {
+  async pause(
+    id: string,
+    dto: CampaignStatusActionDto,
+    actor: IdentityContext,
+  ) {
     return this.changeStatus(id, dto, actor, {
-      allowedFrom: ['ACTIVE'],
-      nextStatus: 'PAUSED',
+      allowedFrom: ["ACTIVE"],
+      nextStatus: "PAUSED",
       eventName: DomainEvents.CampaignPaused,
     });
   }
 
-  async resume(id: string, dto: CampaignStatusActionDto, actor: IdentityContext) {
+  async resume(
+    id: string,
+    dto: CampaignStatusActionDto,
+    actor: IdentityContext,
+  ) {
     return this.changeStatus(id, dto, actor, {
-      allowedFrom: ['PAUSED'],
-      nextStatus: 'ACTIVE',
+      allowedFrom: ["PAUSED"],
+      nextStatus: "ACTIVE",
       eventName: DomainEvents.CampaignResumed,
     });
   }
 
-  async complete(id: string, dto: CampaignStatusActionDto, actor: IdentityContext) {
-    const agencyId = actor.agencyId ?? '';
+  async complete(
+    id: string,
+    dto: CampaignStatusActionDto,
+    actor: IdentityContext,
+  ) {
+    const agencyId = actor.agencyId ?? "";
     await this.ensureCampaign(id, agencyId);
     await this.ensureCampaignCanComplete(id, agencyId);
     return this.changeStatus(id, dto, actor, {
-      allowedFrom: ['ACTIVE'],
-      nextStatus: 'COMPLETED',
+      allowedFrom: ["ACTIVE"],
+      nextStatus: "COMPLETED",
       eventName: DomainEvents.CampaignCompleted,
     });
   }
 
-  async restore(id: string, dto: CampaignStatusActionDto, actor: IdentityContext) {
-    const agencyId = actor.agencyId ?? '';
+  async restore(
+    id: string,
+    dto: CampaignStatusActionDto,
+    actor: IdentityContext,
+  ) {
+    const agencyId = actor.agencyId ?? "";
     this.ensureCampaignManager(actor);
     const existing = await this.prisma.campaign.findUnique({ where: { id } });
     if (!existing || existing.agencyId !== agencyId) {
-      throw new NotFoundException('Campaign not found');
+      throw new NotFoundException("Campaign not found");
     }
 
-    if (existing.status !== 'ARCHIVED') {
-      throw new BadRequestException(`Cannot restore campaign from ${existing.status}`);
+    if (existing.status !== "ARCHIVED") {
+      throw new BadRequestException(
+        `Cannot restore campaign from ${existing.status}`,
+      );
     }
 
     try {
       const campaign = await this.prisma.campaign.update({
         where: { id, version: dto.version ?? existing.version },
-        data: { status: 'ACTIVE', version: { increment: 1 } },
+        data: { status: "ACTIVE", version: { increment: 1 } },
       });
 
       await this.eventBus.publish(DomainEvents.CampaignRestored, {
         agencyId,
         actorId: actor.userId,
         aggregateId: campaign.id,
-        aggregateType: 'Campaign',
-        payload: { campaignId: campaign.id, previousStatus: existing.status, status: campaign.status },
+        aggregateType: "Campaign",
+        payload: {
+          campaignId: campaign.id,
+          previousStatus: existing.status,
+          status: campaign.status,
+        },
       });
 
       return campaign;
     } catch (error: any) {
-      if (error?.code === 'P2025') {
-        throw new ConflictException('Campaign was modified by another user');
+      if (error?.code === "P2025") {
+        throw new ConflictException("Campaign was modified by another user");
       }
       throw error;
     }
@@ -960,17 +1238,27 @@ export class CampaignService {
     id: string,
     dto: CampaignStatusActionDto,
     actor: IdentityContext,
-    config: { allowedFrom: CampaignStatus[]; nextStatus: CampaignStatus; eventName: DomainEventName },
+    config: {
+      allowedFrom: CampaignStatus[];
+      nextStatus: CampaignStatus;
+      eventName: DomainEventName;
+    },
   ) {
-    const agencyId = actor.agencyId ?? '';
+    const agencyId = actor.agencyId ?? "";
     this.ensureCampaignManager(actor);
     const existing = await this.prisma.campaign.findUnique({ where: { id } });
-    if (!existing || existing.agencyId !== agencyId || existing.status === 'DELETED') {
-      throw new NotFoundException('Campaign not found');
+    if (
+      !existing ||
+      existing.agencyId !== agencyId ||
+      existing.status === "DELETED"
+    ) {
+      throw new NotFoundException("Campaign not found");
     }
 
     if (!config.allowedFrom.includes(existing.status)) {
-      throw new BadRequestException(`Cannot move campaign from ${existing.status} to ${config.nextStatus}`);
+      throw new BadRequestException(
+        `Cannot move campaign from ${existing.status} to ${config.nextStatus}`,
+      );
     }
 
     try {
@@ -989,44 +1277,50 @@ export class CampaignService {
         agencyId,
         actorId: actor.userId,
         aggregateId: campaign.id,
-        aggregateType: 'Campaign',
-        payload: { campaignId: campaign.id, previousStatus: existing.status, status: campaign.status },
+        aggregateType: "Campaign",
+        payload: {
+          campaignId: campaign.id,
+          previousStatus: existing.status,
+          status: campaign.status,
+        },
       });
 
       return campaign;
     } catch (error: any) {
-      if (error?.code === 'P2025') {
-        throw new ConflictException('Campaign was modified by another user');
+      if (error?.code === "P2025") {
+        throw new ConflictException("Campaign was modified by another user");
       }
       throw error;
     }
   }
 
-  private optionalCampaignData(dto: Partial<CreateCampaignDto>): Record<string, string | Date | boolean | null | undefined> {
+  private optionalCampaignData(
+    dto: Partial<CreateCampaignDto>,
+  ): Record<string, string | Date | boolean | null | undefined> {
     const textFields: Array<keyof CreateCampaignDto> = [
-      'campaignType',
-      'priority',
-      'goal',
-      'primaryKpi',
-      'targetAudience',
-      'keyMessage',
-      'cta',
-      'reviewFrequency',
-      'workingDays',
-      'timezone',
-      'workflowTemplate',
-      'clientApprover',
-      'agencyApproverMembershipId',
-      'approvalSla',
-      'revisionLimit',
-      'references',
-      'moodBoardUrl',
-      'driveFolderUrl',
-      'internalNotes',
-      'postingDays',
-      'postingWindows',
-      'blackoutDates',
-      'platformMix',
+      "campaignType",
+      "priority",
+      "goal",
+      "primaryKpi",
+      "targetAudience",
+      "keyMessage",
+      "cta",
+      "reviewFrequency",
+      "workingDays",
+      "timezone",
+      "workflowTemplate",
+      "clientApprover",
+      "agencyApproverMembershipId",
+      "approvalSla",
+      "revisionLimit",
+      "references",
+      "moodBoardUrl",
+      "driveFolderUrl",
+      "internalNotes",
+      "postingDays",
+      "postingWindows",
+      "blackoutDates",
+      "platformMix",
     ];
 
     const data: Record<string, string | Date | boolean | null | undefined> = {};
@@ -1037,8 +1331,10 @@ export class CampaignService {
       }
     });
 
-    if (dto.useClientAudience !== undefined) data.useClientAudience = dto.useClientAudience;
-    if (dto.autoGenerateCalendar !== undefined) data.autoGenerateCalendar = dto.autoGenerateCalendar;
+    if (dto.useClientAudience !== undefined)
+      data.useClientAudience = dto.useClientAudience;
+    if (dto.autoGenerateCalendar !== undefined)
+      data.autoGenerateCalendar = dto.autoGenerateCalendar;
     if (dto.launchDate !== undefined) {
       const normalized = this.nullIfBlank(dto.launchDate);
       data.launchDate = normalized ? new Date(normalized) : null;
@@ -1047,7 +1343,10 @@ export class CampaignService {
     return data;
   }
 
-  private toDeliverablePlanCreate(agencyId: string, plan: NonNullable<CreateCampaignDto['deliverablePlans']>[number]) {
+  private toDeliverablePlanCreate(
+    agencyId: string,
+    plan: NonNullable<CreateCampaignDto["deliverablePlans"]>[number],
+  ) {
     return {
       agencyId,
       contentType: plan.contentType,
@@ -1061,12 +1360,19 @@ export class CampaignService {
     };
   }
 
-  private toPublishingScheduleCreate(agencyId: string, campaign: Pick<CreateCampaignDto, 'timezone'>, schedule: NonNullable<CreateCampaignDto['publishingSchedules']>[number]) {
+  private toPublishingScheduleCreate(
+    agencyId: string,
+    campaign: Pick<CreateCampaignDto, "timezone">,
+    schedule: NonNullable<CreateCampaignDto["publishingSchedules"]>[number],
+  ) {
     return {
       agencyId,
       platform: schedule.platform,
       scheduledAt: new Date(schedule.scheduledAt),
-      timezone: this.nullIfBlank(schedule.timezone) ?? this.nullIfBlank(campaign.timezone) ?? 'Asia/Kolkata',
+      timezone:
+        this.nullIfBlank(schedule.timezone) ??
+        this.nullIfBlank(campaign.timezone) ??
+        "Asia/Kolkata",
     };
   }
 
@@ -1074,9 +1380,21 @@ export class CampaignService {
     return {
       client: true,
       deliverablePlans: true,
-      publishingSchedules: { orderBy: { scheduledAt: 'asc' as const } },
-      assignedMemberships: { include: { user: true, role: true, roles: { include: { role: { include: { systemRole: true } } } } } },
-      teamAssignments: { include: this.teamAssignmentInclude(), orderBy: [{ assignmentRole: 'asc' as const }, { createdAt: 'asc' as const }] },
+      publishingSchedules: { orderBy: { scheduledAt: "asc" as const } },
+      assignedMemberships: {
+        include: {
+          user: true,
+          role: true,
+          roles: { include: { role: { include: { systemRole: true } } } },
+        },
+      },
+      teamAssignments: {
+        include: this.teamAssignmentInclude(),
+        orderBy: [
+          { assignmentRole: "asc" as const },
+          { createdAt: "asc" as const },
+        ],
+      },
       agencyApprover: { include: { user: true, role: true } },
       contentAssets: true,
     };
@@ -1101,32 +1419,55 @@ export class CampaignService {
           workflowInstances: {
             include: {
               currentStep: true,
-              currentTask: { include: { owner: { include: { user: true, role: { include: { systemRole: true } } } } } },
+              currentTask: {
+                include: {
+                  owner: {
+                    include: {
+                      user: true,
+                      role: { include: { systemRole: true } },
+                    },
+                  },
+                },
+              },
             },
-            orderBy: { startedAt: 'desc' as const },
+            orderBy: { startedAt: "desc" as const },
           },
         },
       },
     };
   }
 
-  private async syncMissedPublishingSlots(campaignId: string, agencyId: string, actorId?: string) {
+  private async syncMissedPublishingSlots(
+    campaignId: string,
+    agencyId: string,
+    actorId?: string,
+  ) {
     const missed = await this.prisma.publishingSchedule.findMany({
       where: {
         agencyId,
         campaignId,
         scheduledAt: { lt: new Date() },
-        status: { in: ['PLANNED', 'READY', 'SCHEDULED'] },
+        status: { in: ["PLANNED", "READY", "SCHEDULED"] },
       },
     });
 
     for (const slot of missed) {
       const updated = await this.prisma.publishingSchedule.update({
         where: { id: slot.id },
-        data: { status: 'MISSED', riskStatus: 'OVERDUE', version: { increment: 1 } },
+        data: {
+          status: "MISSED",
+          riskStatus: "OVERDUE",
+          version: { increment: 1 },
+        },
         include: this.publishingScheduleInclude(),
       });
-      await this.publishPublishingEvent(DomainEvents.PublishingSlotMissed, agencyId, actorId ?? null, campaignId, updated);
+      await this.publishPublishingEvent(
+        DomainEvents.PublishingSlotMissed,
+        agencyId,
+        actorId ?? null,
+        campaignId,
+        updated,
+      );
     }
   }
 
@@ -1134,10 +1475,12 @@ export class CampaignService {
     const views = slots.map((slot) => this.toPublishingScheduleView(slot));
 
     return {
-      upcoming: views.filter((slot) => !['PUBLISHED', 'MISSED', 'CANCELLED'].includes(slot.status)).length,
-      ready: views.filter((slot) => slot.readiness === 'READY').length,
-      atRisk: views.filter((slot) => slot.riskStatus === 'AT_RISK').length,
-      missed: views.filter((slot) => slot.status === 'MISSED').length,
+      upcoming: views.filter(
+        (slot) => !["PUBLISHED", "MISSED", "CANCELLED"].includes(slot.status),
+      ).length,
+      ready: views.filter((slot) => slot.readiness === "READY").length,
+      atRisk: views.filter((slot) => slot.riskStatus === "AT_RISK").length,
+      missed: views.filter((slot) => slot.status === "MISSED").length,
     };
   }
 
@@ -1182,7 +1525,10 @@ export class CampaignService {
             owner: currentTask?.owner
               ? {
                   membershipId: currentTask.owner.id,
-                  name: currentTask.owner.user?.name ?? currentTask.owner.role?.displayName ?? 'Owner',
+                  name:
+                    currentTask.owner.user?.name ??
+                    currentTask.owner.role?.displayName ??
+                    "Owner",
                 }
               : null,
           }
@@ -1191,80 +1537,112 @@ export class CampaignService {
   }
 
   private getPublishingReadiness(slot: any) {
-    if (slot.status === 'PUBLISHED') return 'PUBLISHED';
-    if (!slot.contentAsset) return 'UNLINKED';
-    if (slot.contentAsset.status === 'COMPLETED') return 'READY';
+    if (slot.status === "PUBLISHED") return "PUBLISHED";
+    if (!slot.contentAsset) return "UNLINKED";
+    if (slot.contentAsset.status === "COMPLETED") return "READY";
 
     const workflow = slot.contentAsset.workflowInstances?.[0];
-    if (!workflow) return 'NOT_STARTED';
-    if (workflow.status === 'COMPLETED') return 'READY';
+    if (!workflow) return "NOT_STARTED";
+    if (workflow.status === "COMPLETED") return "READY";
 
     const taskStatus = workflow.currentTask?.status;
-    if (taskStatus === 'WAITING_REVIEW' || taskStatus === 'WAITING_HANDOFF_ACCEPTANCE') return 'WAITING_APPROVAL';
+    if (
+      taskStatus === "WAITING_REVIEW" ||
+      taskStatus === "WAITING_HANDOFF_ACCEPTANCE"
+    )
+      return "WAITING_APPROVAL";
 
-    return 'IN_PRODUCTION';
+    return "IN_PRODUCTION";
   }
 
   private getPublishingReadinessReason(slot: any, readiness: string) {
-    if (readiness === 'UNLINKED') return 'No content asset linked';
-    if (readiness === 'NOT_STARTED') return 'Content workflow has not started';
-    if (readiness === 'IN_PRODUCTION') return `Content is still in ${slot.contentAsset?.workflowInstances?.[0]?.currentStep?.stage ?? 'production'}`;
-    if (readiness === 'WAITING_APPROVAL') return 'Content is waiting for approval';
-    if (readiness === 'READY') return 'Content is ready to publish';
-    if (readiness === 'PUBLISHED') return 'Publishing slot is published';
+    if (readiness === "UNLINKED") return "No content asset linked";
+    if (readiness === "NOT_STARTED") return "Content workflow has not started";
+    if (readiness === "IN_PRODUCTION")
+      return `Content is still in ${slot.contentAsset?.workflowInstances?.[0]?.currentStep?.stage ?? "production"}`;
+    if (readiness === "WAITING_APPROVAL")
+      return "Content is waiting for approval";
+    if (readiness === "READY") return "Content is ready to publish";
+    if (readiness === "PUBLISHED") return "Publishing slot is published";
     return null;
   }
 
   private getPublishingRiskStatus(slot: any, readiness: string) {
-    if (slot.status === 'MISSED') return 'OVERDUE';
-    if (slot.status === 'PUBLISHED' || slot.status === 'CANCELLED') return 'ON_TRACK';
+    if (slot.status === "MISSED") return "OVERDUE";
+    if (slot.status === "PUBLISHED" || slot.status === "CANCELLED")
+      return "ON_TRACK";
 
     const msUntilPublish = new Date(slot.scheduledAt).getTime() - Date.now();
     const isNearPublish = msUntilPublish <= 24 * 60 * 60 * 1000;
-    if (isNearPublish && !['READY', 'PUBLISHED'].includes(readiness)) return 'AT_RISK';
+    if (isNearPublish && !["READY", "PUBLISHED"].includes(readiness))
+      return "AT_RISK";
 
-    return slot.riskStatus ?? 'ON_TRACK';
+    return slot.riskStatus ?? "ON_TRACK";
   }
 
-  private async getPublishingSlotView(scheduleId: string, campaignId: string, agencyId: string) {
+  private async getPublishingSlotView(
+    scheduleId: string,
+    campaignId: string,
+    agencyId: string,
+  ) {
     const slot = await this.prisma.publishingSchedule.findFirst({
       where: { id: scheduleId, campaignId, agencyId },
       include: this.publishingScheduleInclude(),
     });
     if (!slot) {
-      throw new NotFoundException('Publishing slot not found');
+      throw new NotFoundException("Publishing slot not found");
     }
     return slot;
   }
 
-  private async ensurePublishingSlot(scheduleId: string, campaignId: string, agencyId: string): Promise<PublishingSchedule> {
+  private async ensurePublishingSlot(
+    scheduleId: string,
+    campaignId: string,
+    agencyId: string,
+  ): Promise<PublishingSchedule> {
     const slot = await this.prisma.publishingSchedule.findFirst({
       where: { id: scheduleId, campaignId, agencyId },
     });
     if (!slot) {
-      throw new NotFoundException('Publishing slot not found');
+      throw new NotFoundException("Publishing slot not found");
     }
     return slot;
   }
 
-  private async ensureCampaignContentAsset(contentAssetId: string, campaignId: string, agencyId: string) {
+  private async ensureCampaignContentAsset(
+    contentAssetId: string,
+    campaignId: string,
+    agencyId: string,
+  ) {
     const contentAsset = await this.prisma.contentAsset.findFirst({
-      where: { id: contentAssetId, campaignId, agencyId, status: { not: 'DELETED' } },
+      where: {
+        id: contentAssetId,
+        campaignId,
+        agencyId,
+        status: { not: "DELETED" },
+      },
     });
     if (!contentAsset) {
-      throw new BadRequestException('Linked content asset must belong to this campaign');
+      throw new BadRequestException(
+        "Linked content asset must belong to this campaign",
+      );
     }
     return contentAsset;
   }
 
-  private ensureWithinCampaignWindow(scheduledAt: Date, campaign: { startDate: Date; endDate: Date }) {
+  private ensureWithinCampaignWindow(
+    scheduledAt: Date,
+    campaign: { startDate: Date; endDate: Date },
+  ) {
     const windowStart = new Date(campaign.startDate);
     const windowEnd = new Date(campaign.endDate);
     windowStart.setHours(0, 0, 0, 0);
     windowEnd.setHours(23, 59, 59, 999);
 
     if (scheduledAt < windowStart || scheduledAt > windowEnd) {
-      throw new BadRequestException('scheduledAt must fall inside the campaign window');
+      throw new BadRequestException(
+        "scheduledAt must fall inside the campaign window",
+      );
     }
   }
 
@@ -1280,7 +1658,7 @@ export class CampaignService {
       agencyId,
       actorId,
       aggregateId: campaignId,
-      aggregateType: 'Campaign',
+      aggregateType: "Campaign",
       payload: {
         campaignId,
         publishingScheduleId: slot.id,
@@ -1300,7 +1678,11 @@ export class CampaignService {
     payload: unknown;
     createdAt: Date;
   }) {
-    const stored = event.payload as { actorId?: string | null; occurredAt?: string; payload?: Record<string, any> } | null;
+    const stored = event.payload as {
+      actorId?: string | null;
+      occurredAt?: string;
+      payload?: Record<string, any>;
+    } | null;
 
     return {
       id: event.id,
@@ -1316,26 +1698,30 @@ export class CampaignService {
     event: { eventType: string; payload: Record<string, any> },
     membershipNames: Map<string, string>,
   ) {
-    const memberName = event.payload.membershipId ? membershipNames.get(event.payload.membershipId) ?? 'Team member' : 'Team member';
-    const assignmentRole = this.formatAssignmentRole(event.payload.assignmentRole);
+    const memberName = event.payload.membershipId
+      ? (membershipNames.get(event.payload.membershipId) ?? "Team member")
+      : "Team member";
+    const assignmentRole = this.formatAssignmentRole(
+      event.payload.assignmentRole,
+    );
 
     switch (event.eventType) {
       case DomainEvents.CampaignCreated:
-        return 'Campaign created';
+        return "Campaign created";
       case DomainEvents.CampaignUpdated:
-        return 'Campaign details updated';
+        return "Campaign details updated";
       case DomainEvents.CampaignActivated:
-        return 'Campaign activated';
+        return "Campaign activated";
       case DomainEvents.CampaignPaused:
-        return 'Campaign paused';
+        return "Campaign paused";
       case DomainEvents.CampaignResumed:
-        return 'Campaign resumed';
+        return "Campaign resumed";
       case DomainEvents.CampaignCompleted:
-        return 'Campaign completed';
+        return "Campaign completed";
       case DomainEvents.CampaignArchived:
-        return 'Campaign archived';
+        return "Campaign archived";
       case DomainEvents.CampaignRestored:
-        return 'Campaign restored';
+        return "Campaign restored";
       case DomainEvents.CampaignManagerChanged:
         return `${memberName} assigned as Campaign Manager`;
       case DomainEvents.CampaignTeamMemberAssigned:
@@ -1343,70 +1729,78 @@ export class CampaignService {
       case DomainEvents.CampaignTeamMemberRemoved:
         return `${memberName} removed from ${assignmentRole}`;
       case DomainEvents.PublishingSlotCreated:
-        return `Publishing slot created for ${event.payload.platform ?? 'platform'}`;
+        return `Publishing slot created for ${event.payload.platform ?? "platform"}`;
       case DomainEvents.PublishingSlotUpdated:
-        return `Publishing slot updated for ${event.payload.platform ?? 'platform'}`;
+        return `Publishing slot updated for ${event.payload.platform ?? "platform"}`;
       case DomainEvents.PublishingSlotRescheduled:
-        return `Publishing slot rescheduled for ${event.payload.platform ?? 'platform'}`;
+        return `Publishing slot rescheduled for ${event.payload.platform ?? "platform"}`;
       case DomainEvents.PublishingSlotCancelled:
-        return `Publishing slot cancelled for ${event.payload.platform ?? 'platform'}`;
+        return `Publishing slot cancelled for ${event.payload.platform ?? "platform"}`;
       case DomainEvents.PublishingSlotPublished:
-        return `Publishing slot marked published for ${event.payload.platform ?? 'platform'}`;
+        return `Publishing slot marked published for ${event.payload.platform ?? "platform"}`;
       case DomainEvents.PublishingSlotMissed:
-        return `Publishing slot missed for ${event.payload.platform ?? 'platform'}`;
+        return `Publishing slot missed for ${event.payload.platform ?? "platform"}`;
       default:
         return event.eventType;
     }
   }
 
   private formatAssignmentRole(role?: string) {
-    if (!role) return 'campaign team';
+    if (!role) return "campaign team";
 
     const labels: Record<string, string> = {
-      CAMPAIGN_MANAGER: 'Campaign Manager',
-      RELATIONSHIP_MANAGER: 'Relationship Manager',
-      WRITER: 'Writer',
-      EDITOR: 'Editor',
-      DESIGNER: 'Designer',
-      DOP: 'DOP',
-      SOCIAL_MEDIA_MANAGER: 'Social Media Manager',
-      CLIENT_APPROVER: 'Client Approver',
-      AGENCY_APPROVER: 'Agency Approver',
+      CAMPAIGN_MANAGER: "Campaign Manager",
+      RELATIONSHIP_MANAGER: "Relationship Manager",
+      WRITER: "Writer",
+      EDITOR: "Editor",
+      DESIGNER: "Designer",
+      DOP: "DOP",
+      SOCIAL_MEDIA_MANAGER: "Social Media Manager",
+      CLIENT_APPROVER: "Client Approver",
+      AGENCY_APPROVER: "Agency Approver",
     };
 
-    return labels[role] ?? role.replaceAll('_', ' ').toLowerCase();
+    return labels[role] ?? role.replaceAll("_", " ").toLowerCase();
   }
 
-  private async findCampaignAssignmentMembershipId(campaignId: string, agencyId: string, assignmentRole: CampaignAssignmentRole) {
+  private async findCampaignAssignmentMembershipId(
+    campaignId: string,
+    agencyId: string,
+    assignmentRole: CampaignAssignmentRole,
+  ) {
     const assignment = await this.prisma.campaignTeamAssignment.findFirst({
       where: { campaignId, agencyId, assignmentRole },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
       select: { membershipId: true },
     });
 
     return assignment?.membershipId ?? null;
   }
 
-  private async generateContentDisplayCode(tx: Prisma.TransactionClient, agencyId: string, type: ContentType) {
+  private async generateContentDisplayCode(
+    tx: Prisma.TransactionClient,
+    agencyId: string,
+    type: ContentType,
+  ) {
     const sequence = await tx.contentAssetSequence.upsert({
       where: { agencyId_type: { agencyId, type } },
       create: { agencyId, type, nextSequence: 2 },
       update: { nextSequence: { increment: 1 } },
     });
-    const numericPart = String(sequence.nextSequence - 1).padStart(3, '0');
+    const numericPart = String(sequence.nextSequence - 1).padStart(3, "0");
     return `${this.contentDisplayPrefix(type)}-${numericPart}`;
   }
 
   private contentDisplayPrefix(type: ContentType) {
     const prefixes: Record<ContentType, string> = {
-      REEL: 'REEL',
-      CAROUSEL: 'CAR',
-      STATIC: 'STA',
-      STORY: 'STO',
-      BLOG: 'BLOG',
-      YOUTUBE: 'YT',
-      AD: 'AD',
-      OTHER: 'CNT',
+      REEL: "REEL",
+      CAROUSEL: "CAR",
+      STATIC: "STA",
+      STORY: "STO",
+      BLOG: "BLOG",
+      YOUTUBE: "YT",
+      AD: "AD",
+      OTHER: "CNT",
     };
 
     return prefixes[type];
@@ -1421,9 +1815,9 @@ export class CampaignService {
 
   private formatContentType(type: ContentType) {
     return type
-      .split('_')
+      .split("_")
       .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
-      .join(' ');
+      .join(" ");
   }
 
   private async createTaskNotification(
@@ -1433,7 +1827,7 @@ export class CampaignService {
     input: { title: string; body: string; eventType: string },
   ) {
     const membership = await tx.membership.findFirst({
-      where: { id: membershipId, agencyId, status: 'ACTIVE', deletedAt: null },
+      where: { id: membershipId, agencyId, status: "ACTIVE", deletedAt: null },
       select: { userId: true },
     });
 
@@ -1452,27 +1846,44 @@ export class CampaignService {
 
   private async ensureCampaign(id: string, agencyId: string) {
     const campaign = await this.prisma.campaign.findUnique({ where: { id } });
-    if (!campaign || campaign.agencyId !== agencyId || campaign.status === 'DELETED') {
-      throw new NotFoundException('Campaign not found');
+    if (
+      !campaign ||
+      campaign.agencyId !== agencyId ||
+      campaign.status === "DELETED"
+    ) {
+      throw new NotFoundException("Campaign not found");
     }
 
     return campaign;
   }
 
-  private async ensureAssignableMembership(membershipId: string, agencyId: string) {
+  private async ensureAssignableMembership(
+    membershipId: string,
+    agencyId: string,
+  ) {
     const membership = await this.prisma.membership.findFirst({
-      where: { id: membershipId, agencyId, status: 'ACTIVE', deletedAt: null },
-      include: { role: { include: { systemRole: true } }, roles: { include: { role: { include: { systemRole: true } } } } },
+      where: { id: membershipId, agencyId, status: "ACTIVE", deletedAt: null },
+      include: {
+        role: { include: { systemRole: true } },
+        roles: { include: { role: { include: { systemRole: true } } } },
+      },
     });
 
     if (!membership) {
-      throw new BadRequestException('Membership must be active and belong to the current agency');
+      throw new BadRequestException(
+        "Membership must be active and belong to the current agency",
+      );
     }
 
     return membership;
   }
 
-  private async ensureSingleAssignmentSlot(campaignId: string, agencyId: string, assignmentRole: CampaignAssignmentRole, currentAssignmentId?: string) {
+  private async ensureSingleAssignmentSlot(
+    campaignId: string,
+    agencyId: string,
+    assignmentRole: CampaignAssignmentRole,
+    currentAssignmentId?: string,
+  ) {
     if (!SINGLE_ASSIGNMENT_ROLES.has(assignmentRole)) return;
 
     const existing = await this.prisma.campaignTeamAssignment.findFirst({
@@ -1485,23 +1896,35 @@ export class CampaignService {
     });
 
     if (existing) {
-      throw new ConflictException(`${assignmentRole} is already assigned for this campaign`);
+      throw new ConflictException(
+        `${assignmentRole} is already assigned for this campaign`,
+      );
     }
   }
 
   private ensureCampaignManager(actor: IdentityContext) {
-    const roles = [actor.role, ...(actor.roles ?? [])].filter(Boolean).map((role) => role!.toUpperCase());
-    if (!roles.some((role) => role === 'OWNER' || role === 'MANAGER')) {
-      throw new BadRequestException('Only owners and managers can manage campaign operations');
+    const roles = [actor.role, ...(actor.roles ?? [])]
+      .filter(Boolean)
+      .map((role) => role!.toUpperCase());
+    if (!roles.some((role) => role === "OWNER" || role === "MANAGER")) {
+      throw new BadRequestException(
+        "Only owners and managers can manage campaign operations",
+      );
     }
   }
 
-  private async ensureCampaignTeamManager(campaignId: string, agencyId: string, actor: IdentityContext) {
-    const roles = [actor.role, ...(actor.roles ?? [])].filter(Boolean).map((role) => role!.toUpperCase());
-    if (roles.some((role) => role === 'OWNER' || role === 'MANAGER')) return;
+  private async ensureCampaignTeamManager(
+    campaignId: string,
+    agencyId: string,
+    actor: IdentityContext,
+  ) {
+    const roles = [actor.role, ...(actor.roles ?? [])]
+      .filter(Boolean)
+      .map((role) => role!.toUpperCase());
+    if (roles.some((role) => role === "OWNER" || role === "MANAGER")) return;
 
     if (!actor.membershipId) {
-      throw new BadRequestException('Agency membership context is required');
+      throw new BadRequestException("Agency membership context is required");
     }
 
     const assignment = await this.prisma.campaignTeamAssignment.findFirst({
@@ -1510,29 +1933,43 @@ export class CampaignService {
         agencyId,
         membershipId: actor.membershipId,
         assignmentRole: {
-          in: [CampaignAssignmentRole.CAMPAIGN_MANAGER, CampaignAssignmentRole.RELATIONSHIP_MANAGER],
+          in: [
+            CampaignAssignmentRole.CAMPAIGN_MANAGER,
+            CampaignAssignmentRole.RELATIONSHIP_MANAGER,
+          ],
         },
       },
       select: { id: true },
     });
 
     if (!assignment) {
-      throw new BadRequestException('Only owners, managers, or campaign managers can manage campaign team assignments');
+      throw new BadRequestException(
+        "Only owners, managers, or campaign managers can manage campaign team assignments",
+      );
     }
   }
 
   private ensurePublishingManager(actor: IdentityContext) {
-    const roles = [actor.role, ...(actor.roles ?? [])].filter(Boolean).map((role) => role!.toUpperCase());
+    const roles = [actor.role, ...(actor.roles ?? [])]
+      .filter(Boolean)
+      .map((role) => role!.toUpperCase());
     const permissions = new Set(actor.permissions ?? []);
     if (
-      roles.some((role) => role === 'OWNER' || role === 'MANAGER' || role === 'SOCIAL_MEDIA_MANAGER') ||
-      permissions.has('PUBLISHING_UPDATE') ||
-      permissions.has('PUBLISHING_CREATE')
+      roles.some(
+        (role) =>
+          role === "OWNER" ||
+          role === "MANAGER" ||
+          role === "SOCIAL_MEDIA_MANAGER",
+      ) ||
+      permissions.has("PUBLISHING_UPDATE") ||
+      permissions.has("PUBLISHING_CREATE")
     ) {
       return;
     }
 
-    throw new BadRequestException('Only owners, managers, or social media managers can manage publishing schedules');
+    throw new BadRequestException(
+      "Only owners, managers, or social media managers can manage publishing schedules",
+    );
   }
 
   private async ensureCampaignCanComplete(id: string, agencyId: string) {
@@ -1542,23 +1979,33 @@ export class CampaignService {
     });
 
     if (!campaign || campaign.agencyId !== agencyId) {
-      throw new NotFoundException('Campaign not found');
+      throw new NotFoundException("Campaign not found");
     }
 
-    const requiredContentCount = campaign.deliverablePlans.reduce((sum, plan) => sum + plan.quantity, 0);
-    const producedContentCount = campaign.contentAssets.filter((asset) => asset.status !== 'DELETED').length;
+    const requiredContentCount = campaign.deliverablePlans.reduce(
+      (sum, plan) => sum + plan.quantity,
+      0,
+    );
+    const producedContentCount = campaign.contentAssets.filter(
+      (asset) => asset.status !== "DELETED",
+    ).length;
     const unfinishedContentCount = campaign.contentAssets.filter(
-      (asset) => !['PUBLISHED', 'ARCHIVED', 'DELETED'].includes(asset.status),
+      (asset) => !["PUBLISHED", "ARCHIVED", "DELETED"].includes(asset.status),
     ).length;
 
-    if (requiredContentCount > producedContentCount || unfinishedContentCount > 0) {
-      throw new BadRequestException('Campaign still has unfinished deliverables');
+    if (
+      requiredContentCount > producedContentCount ||
+      unfinishedContentCount > 0
+    ) {
+      throw new BadRequestException(
+        "Campaign still has unfinished deliverables",
+      );
     }
   }
 
   private async generateCampaignCode(agencyId: string) {
     const count = await this.prisma.campaign.count({ where: { agencyId } });
-    return `CMP-${String(count + 1).padStart(3, '0')}`;
+    return `CMP-${String(count + 1).padStart(3, "0")}`;
   }
 
   private nullIfBlank(value?: string | null) {

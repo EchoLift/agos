@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '@packages/database/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "@packages/database/prisma.service";
 
 @Injectable()
 export class AuditService {
@@ -21,8 +21,8 @@ export class AuditService {
         eventType: input.eventType,
         entityType: input.entityType,
         entityId: input.entityId,
-        metadataJson: (input.metadata ?? {}) as Prisma.InputJsonValue
-      }
+        metadataJson: (input.metadata ?? {}) as Prisma.InputJsonValue,
+      },
     });
   }
 }

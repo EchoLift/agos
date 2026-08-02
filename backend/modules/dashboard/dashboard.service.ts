@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@packages/database/prisma.service';
-import { IdentityContext } from '@packages/security/interfaces/identity-context.interface';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "@packages/database/prisma.service";
+import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import {
   ApprovalStatus,
   BlockerStatus,
@@ -10,23 +10,42 @@ import {
   Prisma,
   SubmissionStatus,
   TaskStatus,
-} from '@prisma/client';
+} from "@prisma/client";
 
 @Injectable()
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getDashboard(agencyId: string, actor: IdentityContext) {
-    const roleResponsibilities = this.canSeeAgencyWork(actor) || !actor.membershipId
-      ? []
-      : await this.campaignRoleResponsibilities(agencyId, actor.membershipId);
-    const taskWhere = this.buildTaskWhere(agencyId, actor, roleResponsibilities);
-    const activityWhere = this.buildActivityWhere(agencyId, actor, roleResponsibilities);
+    const roleResponsibilities =
+      this.canSeeAgencyWork(actor) || !actor.membershipId
+        ? []
+        : await this.campaignRoleResponsibilities(agencyId, actor.membershipId);
+    const taskWhere = this.buildTaskWhere(
+      agencyId,
+      actor,
+      roleResponsibilities,
+    );
+    const activityWhere = this.buildActivityWhere(
+      agencyId,
+      actor,
+      roleResponsibilities,
+    );
 
-    const [clients, campaigns, contentAssets, pendingApprovals, blockedContent, publishingToday, recentActivity] = await Promise.all([
-      this.prisma.client.count({ where: { agencyId, status: 'ACTIVE' } }),
-      this.prisma.campaign.count({ where: { agencyId, status: 'ACTIVE' } }),
-      this.prisma.contentAsset.count({ where: { agencyId, status: ContentAssetStatus.ACTIVE } }),
+    const [
+      clients,
+      campaigns,
+      contentAssets,
+      pendingApprovals,
+      blockedContent,
+      publishingToday,
+      recentActivity,
+    ] = await Promise.all([
+      this.prisma.client.count({ where: { agencyId, status: "ACTIVE" } }),
+      this.prisma.campaign.count({ where: { agencyId, status: "ACTIVE" } }),
+      this.prisma.contentAsset.count({
+        where: { agencyId, status: ContentAssetStatus.ACTIVE },
+      }),
       this.prisma.approval.count({
         where: {
           agencyId,
@@ -47,7 +66,7 @@ export class DashboardService {
       }),
       this.prisma.workflowTransition.findMany({
         where: activityWhere,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         take: 8,
         include: { workflowInstance: { include: { contentAsset: true } } },
       }),
@@ -59,7 +78,7 @@ export class DashboardService {
         workflowInstance: { include: { contentAsset: true } },
         workflowStep: true,
       },
-      orderBy: { deadlineAt: 'asc' },
+      orderBy: { deadlineAt: "asc" },
       take: 8,
     });
 
@@ -75,22 +94,28 @@ export class DashboardService {
         displayCode: task.workflowInstance.contentAsset?.displayCode ?? null,
         campaignId: task.workflowInstance.contentAsset?.campaignId ?? null,
         clientId: task.workflowInstance.contentAsset?.clientId ?? null,
-        contentAssetTitle: task.workflowInstance.contentAsset?.title ?? 'Untitled content',
+        contentAssetTitle:
+          task.workflowInstance.contentAsset?.title ?? "Untitled content",
         status: task.status,
         deadlineAt: task.deadlineAt,
         stage: task.workflowStep?.stage ?? null,
       })),
       pendingApprovals: pendingReviews,
       blockedContent: blockedContent,
-      overdueContent: tasks.filter((task) => task.deadlineAt && task.deadlineAt < new Date()).length,
+      overdueContent: tasks.filter(
+        (task) => task.deadlineAt && task.deadlineAt < new Date(),
+      ).length,
       publishingToday: publishingToday,
       activity: recentActivity.map((transition) => ({
         id: transition.id,
         contentAssetId: transition.workflowInstance.contentAssetId,
-        displayCode: transition.workflowInstance.contentAsset?.displayCode ?? null,
-        campaignId: transition.workflowInstance.contentAsset?.campaignId ?? null,
+        displayCode:
+          transition.workflowInstance.contentAsset?.displayCode ?? null,
+        campaignId:
+          transition.workflowInstance.contentAsset?.campaignId ?? null,
         clientId: transition.workflowInstance.contentAsset?.clientId ?? null,
-        contentAssetTitle: transition.workflowInstance.contentAsset?.title ?? 'Untitled content',
+        contentAssetTitle:
+          transition.workflowInstance.contentAsset?.title ?? "Untitled content",
         toStage: transition.toStage,
         createdAt: transition.createdAt,
       })),
@@ -126,7 +151,7 @@ export class DashboardService {
     }
 
     if (!actor.membershipId) {
-      return { ...baseWhere, ownerMembershipId: '__missing_membership__' };
+      return { ...baseWhere, ownerMembershipId: "__missing_membership__" };
     }
 
     const stages = this.productionStagesFor(actor);
@@ -134,16 +159,18 @@ export class DashboardService {
       ownerMembershipId: actor.membershipId,
       ...(stages.length > 0 ? { workflowStep: { stage: { in: stages } } } : {}),
     };
-    const campaignResponsibilities = roleResponsibilities.map((responsibility) => ({
-      workflowInstance: {
-        contentAsset: {
-          campaignId: responsibility.campaignId,
+    const campaignResponsibilities = roleResponsibilities.map(
+      (responsibility) => ({
+        workflowInstance: {
+          contentAsset: {
+            campaignId: responsibility.campaignId,
+          },
         },
-      },
-      workflowStep: {
-        stage: { in: responsibility.stages },
-      },
-    }));
+        workflowStep: {
+          stage: { in: responsibility.stages },
+        },
+      }),
+    );
 
     return {
       ...baseWhere,
@@ -161,7 +188,7 @@ export class DashboardService {
     }
 
     if (!actor.membershipId) {
-      return { agencyId, workflowInstanceId: '__missing_membership__' };
+      return { agencyId, workflowInstanceId: "__missing_membership__" };
     }
 
     const stages = this.productionStagesFor(actor);
@@ -169,16 +196,18 @@ export class DashboardService {
       ownerMembershipId: actor.membershipId,
       ...(stages.length > 0 ? { workflowStep: { stage: { in: stages } } } : {}),
     };
-    const campaignResponsibilities = roleResponsibilities.map((responsibility) => ({
-      workflowInstance: {
-        contentAsset: {
-          campaignId: responsibility.campaignId,
+    const campaignResponsibilities = roleResponsibilities.map(
+      (responsibility) => ({
+        workflowInstance: {
+          contentAsset: {
+            campaignId: responsibility.campaignId,
+          },
         },
-      },
-      workflowStep: {
-        stage: { in: responsibility.stages },
-      },
-    }));
+        workflowStep: {
+          stage: { in: responsibility.stages },
+        },
+      }),
+    );
 
     return {
       agencyId,
@@ -192,27 +221,27 @@ export class DashboardService {
 
   private canSeeAgencyWork(actor: IdentityContext): boolean {
     const roles = this.roleKeys(actor);
-    return roles.some((role) => ['OWNER', 'ADMIN', 'MANAGER'].includes(role));
+    return roles.some((role) => ["OWNER", "ADMIN", "MANAGER"].includes(role));
   }
 
   private productionStagesFor(actor: IdentityContext): ContentStage[] {
     const roles = this.roleKeys(actor);
     const stages = new Set<ContentStage>();
 
-    if (roles.includes('WRITER')) {
+    if (roles.includes("WRITER")) {
       stages.add(ContentStage.WRITING);
     }
 
-    if (roles.includes('DOP')) {
+    if (roles.includes("DOP")) {
       stages.add(ContentStage.SHOOT);
     }
 
-    if (roles.includes('EDITOR')) {
+    if (roles.includes("EDITOR")) {
       stages.add(ContentStage.EDITOR_INTAKE);
       stages.add(ContentStage.EDITING);
     }
 
-    if (roles.includes('SOCIAL_MEDIA_MANAGER')) {
+    if (roles.includes("SOCIAL_MEDIA_MANAGER")) {
       stages.add(ContentStage.SCHEDULED);
       stages.add(ContentStage.PUBLISHED);
     }
@@ -220,7 +249,10 @@ export class DashboardService {
     return [...stages];
   }
 
-  private async campaignRoleResponsibilities(agencyId: string, membershipId: string) {
+  private async campaignRoleResponsibilities(
+    agencyId: string,
+    membershipId: string,
+  ) {
     const assignments = await this.prisma.campaignTeamAssignment.findMany({
       where: { agencyId, membershipId },
       select: { campaignId: true, assignmentRole: true },
@@ -247,20 +279,26 @@ export class DashboardService {
         ContentStage.CLIENT_APPROVAL,
       ],
       [CampaignAssignmentRole.WRITER]: [ContentStage.WRITING],
-      [CampaignAssignmentRole.EDITOR]: [ContentStage.EDITOR_INTAKE, ContentStage.EDITING],
+      [CampaignAssignmentRole.EDITOR]: [
+        ContentStage.EDITOR_INTAKE,
+        ContentStage.EDITING,
+      ],
       [CampaignAssignmentRole.DESIGNER]: [],
       [CampaignAssignmentRole.DOP]: [ContentStage.SHOOT],
       [CampaignAssignmentRole.SOCIAL_MEDIA_MANAGER]: [ContentStage.SCHEDULED],
       [CampaignAssignmentRole.CLIENT_APPROVER]: [ContentStage.CLIENT_APPROVAL],
-      [CampaignAssignmentRole.AGENCY_APPROVER]: [ContentStage.MANAGER_SCRIPT_REVIEW, ContentStage.MANAGER_EDIT_REVIEW],
+      [CampaignAssignmentRole.AGENCY_APPROVER]: [
+        ContentStage.MANAGER_SCRIPT_REVIEW,
+        ContentStage.MANAGER_EDIT_REVIEW,
+      ],
     };
 
     return stagesByRole[role] ?? [];
   }
 
   private roleKeys(actor: IdentityContext): string[] {
-    return [...(actor.roles ?? []), actor.role ?? '']
+    return [...(actor.roles ?? []), actor.role ?? ""]
       .filter(Boolean)
-      .map((role) => role.toUpperCase().replace(/[\s-]+/g, '_'));
+      .map((role) => role.toUpperCase().replace(/[\s-]+/g, "_"));
   }
 }

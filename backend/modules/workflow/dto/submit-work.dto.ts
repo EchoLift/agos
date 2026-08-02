@@ -1,5 +1,5 @@
-import { SubmissionType } from '@prisma/client';
-import { IsEnum, IsOptional, IsString, IsUrl, IsUUID } from 'class-validator';
+import { SubmissionType } from "@prisma/client";
+import { IsEnum, IsOptional, IsString, IsUrl, IsUUID } from "class-validator";
 
 export class SubmitWorkDto {
   @IsUUID()

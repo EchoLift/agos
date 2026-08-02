@@ -8,6 +8,7 @@ import { logout } from "@/lib/auth";
 import { getProfile, Profile } from "@/lib/api/me";
 import { activateAgency, Agency, getMyMemberships } from "@/lib/api/organization";
 import { visibleWorkspaceNavItems } from "@/lib/workspace-access";
+import { clearAgencyScopedUiState } from "@/lib/workspace-cache";
 
 export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) {
   const router = useRouter();
@@ -58,8 +59,12 @@ export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) 
     .toUpperCase();
 
   const switchWorkspace = async (targetAgency: Agency) => {
-    await activateAgency(targetAgency.id);
-    router.push(`/${targetAgency.slug}`);
+    const previousAgencyId = agency?.id;
+    const response = await activateAgency(targetAgency.id);
+    clearAgencyScopedUiState(previousAgencyId, response.activeAgencyId);
+    setAgencies((items) => items.map((item) => (item.id === response.agency.id ? { ...item, ...response.agency } : item)));
+    setIsMenuOpen(false);
+    router.push(`/${response.agency.slug}`);
     router.refresh();
   };
 

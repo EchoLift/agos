@@ -1,11 +1,16 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { OrganizationRepository } from '@modules/organization/repositories/organization.repository';
-import { SecurityContextService } from '../services/security-context.service';
-import { RequestContextService } from '@packages/request-context/request-context.service';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { SecurityErrorCode } from '../constants/error-codes.enum';
-import { IdentityContext } from '../interfaces/identity-context.interface';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { OrganizationRepository } from "@modules/organization/repositories/organization.repository";
+import { SecurityContextService } from "../services/security-context.service";
+import { RequestContextService } from "@packages/request-context/request-context.service";
+import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
+import { SecurityErrorCode } from "../constants/error-codes.enum";
+import { IdentityContext } from "../interfaces/identity-context.interface";
 
 @Injectable()
 export class TenantGuard implements CanActivate {
@@ -37,7 +42,7 @@ export class TenantGuard implements CanActivate {
     // Header-scoped workspace APIs must not be shadowed by a stale active session agency.
     const pathAgencyId = request.params?.agencyId;
     const sessionAgencyId = request.session?.activeAgencyId;
-    const headerAgencyId = this.firstHeader(request.headers['x-agency-id']);
+    const headerAgencyId = this.firstHeader(request.headers["x-agency-id"]);
 
     const resolvedAgencyId = pathAgencyId || headerAgencyId || sessionAgencyId;
 
@@ -45,30 +50,34 @@ export class TenantGuard implements CanActivate {
       return true; // No tenant scope required for this endpoint
     }
 
-    const membership = await this.organizationRepository.findMembership(resolvedAgencyId, user.userId);
-    if (!membership || membership.status !== 'ACTIVE') {
+    const membership = await this.organizationRepository.findMembership(
+      resolvedAgencyId,
+      user.userId,
+    );
+    if (!membership || membership.status !== "ACTIVE") {
       throw new ForbiddenException({
-        message: 'Active membership required for target agency',
+        message: "Active membership required for target agency",
         code: SecurityErrorCode.TENANT_MEMBERSHIP_MISSING,
       });
     }
 
     user.agencyId = resolvedAgencyId;
     user.membershipId = membership.id;
-    const assignedRoles = (membership as any).roles?.length
-      ? (membership as any).roles.map((item: any) => item.role)
-      : [(membership as any).role];
+    const assignedRoles = this.authoritativeRoles(membership);
 
     const roleKeys = assignedRoles
       .map((role: any) => role.systemRole?.key)
-      .filter((key: unknown): key is string => typeof key === 'string');
+      .filter((key: unknown): key is string => typeof key === "string");
     const permissions = [
       ...new Set(
-        assignedRoles.flatMap((role: any) =>
-          role.systemRole?.permissions?.map((item: any) => item.permission.key) ?? [],
+        assignedRoles.flatMap(
+          (role: any) =>
+            role.systemRole?.permissions?.map(
+              (item: any) => item.permission.key,
+            ) ?? [],
         ),
       ),
-    ].filter((key: unknown): key is string => typeof key === 'string');
+    ].filter((key: unknown): key is string => typeof key === "string");
 
     user.roles = roleKeys;
     user.role = roleKeys[0];
@@ -90,7 +99,17 @@ export class TenantGuard implements CanActivate {
     return true;
   }
 
-  private firstHeader(value: string | string[] | undefined): string | undefined {
+  private firstHeader(
+    value: string | string[] | undefined,
+  ): string | undefined {
     return Array.isArray(value) ? value[0] : value;
+  }
+
+  private authoritativeRoles(membership: any) {
+    if (membership.roles?.length) {
+      return membership.roles.map((item: any) => item.role).filter(Boolean);
+    }
+
+    return membership.role ? [membership.role] : [];
   }
 }
