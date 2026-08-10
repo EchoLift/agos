@@ -22,7 +22,7 @@ Use these settings for the API web service:
 ```text
 Root Directory: backend
 Build Command: npm ci && npm run build:render
-Start Command: npm run start:api
+Start Command: npm run start:api:render
 Node Version: 22
 ```
 
@@ -60,6 +60,7 @@ Required backend variables:
 ```text
 NODE_ENV=production
 DATABASE_URL=...
+DIRECT_URL=...
 REDIS_URL=...
 RABBITMQ_URL=...
 JWT_ACCESS_SECRET=...
@@ -81,3 +82,10 @@ npm run prisma:migrate:deploy
 ```
 
 Do not use `prisma migrate dev` in production.
+
+For Supabase, use the transaction pooler for runtime and the session pooler for migrations:
+
+```text
+DATABASE_URL=postgresql://...@...pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require
+DIRECT_URL=postgresql://...@...pooler.supabase.com:5432/postgres?sslmode=require
+```
