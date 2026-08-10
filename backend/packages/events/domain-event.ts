@@ -28,6 +28,10 @@ export const DomainEvents = {
   ClientArchived: "ClientArchived",
   ClientRestored: "ClientRestored",
   ClientManagerAssigned: "ClientManagerAssigned",
+  ClientContactCreated: "ClientContactCreated",
+  ClientContactUpdated: "ClientContactUpdated",
+  ClientContactArchived: "ClientContactArchived",
+  ClientContactLinkedToUser: "ClientContactLinkedToUser",
   CampaignCreated: "CampaignCreated",
   CampaignUpdated: "CampaignUpdated",
   CampaignActivated: "CampaignActivated",
@@ -69,6 +73,12 @@ export const DomainEvents = {
   NotificationFailed: "NotificationFailed",
   WebhookReceived: "WebhookReceived",
   AuditRecorded: "AuditRecorded",
+  WorkOrderCreated: "WorkOrderCreated",
+  WorkOrderUpdated: "WorkOrderUpdated",
+  WorkOrderSubmitted: "WorkOrderSubmitted",
+  WorkOrderApproved: "WorkOrderApproved",
+  WorkOrderChangesRequested: "WorkOrderChangesRequested",
+  WorkOrderCancelled: "WorkOrderCancelled",
 } as const;
 
 export type DomainEventName = (typeof DomainEvents)[keyof typeof DomainEvents];

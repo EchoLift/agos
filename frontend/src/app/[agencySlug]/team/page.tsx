@@ -206,6 +206,9 @@ export default function TeamPage() {
         <div>
           <h1 className="text-3xl font-semibold text-white">Team</h1>
           <p className="mt-2 text-sm text-zinc-400">Manage your agency members and roles.</p>
+          <Link href="/help/team-access/roles" className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200">
+            Roles and workspace access
+          </Link>
         </div>
         <Link
           href={`/${agencySlug}/team/new`}

@@ -62,22 +62,24 @@ model Session {
 }
 
 model Agency {
-  id            String         @id @default(uuid())
-  name          String
-  displayName   String         @default("")
-  slug          String         @unique
-  status        AgencyStatus   @default(ACTIVE)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  deletedAt     DateTime?
-  version       Int            @default(1)
-  auditEvents   AuditEvent[]
-  campaigns     Campaign[]
-  clients       Client[]
-  contentAssets ContentAsset[]
-  invitations   Invitation[]
-  memberships   Membership[]
-  roles         Role[]
+  id             String          @id @default(uuid())
+  name           String
+  displayName    String          @default("")
+  slug           String          @unique
+  status         AgencyStatus    @default(ACTIVE)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  version        Int             @default(1)
+  auditEvents    AuditEvent[]
+  campaigns      Campaign[]
+  clients        Client[]
+  clientContacts ClientContact[]
+  contentAssets  ContentAsset[]
+  invitations    Invitation[]
+  memberships    Membership[]
+  roles          Role[]
+  workOrders     WorkOrder[]
 
   @@map("agencies")
 }
@@ -102,37 +104,42 @@ model User {
   deletedAt             DateTime?
   version               Int             @default(1)
   memberships           Membership[]
+  clientContacts        ClientContact[]
   authUser              AuthUser        @relation(fields: [authUserId], references: [id])
 
   @@map("users")
 }
 
 model Membership {
-  id                         String               @id @default(uuid())
+  id                         String                   @id @default(uuid())
   agencyId                   String
   userId                     String
   roleId                     String
   managerMembershipId        String?
-  status                     MembershipStatus     @default(ACTIVE)
-  joinedAt                   DateTime             @default(now())
+  status                     MembershipStatus         @default(ACTIVE)
+  joinedAt                   DateTime                 @default(now())
   deletedAt                  DateTime?
-  version                    Int                  @default(1)
-  assignmentHistoryChanged   AssignmentHistory[]  @relation("AssignmentChangedBy")
-  assignmentHistoryAssigned  AssignmentHistory[]  @relation("AssignmentAssignee")
-  managedClients             Client[]             @relation("ClientManager")
-  sentInvitations            Invitation[]         @relation("InvitedByMembership")
-  agency                     Agency               @relation(fields: [agencyId], references: [id])
-  manager                    Membership?          @relation("MembershipManager", fields: [managerMembershipId], references: [id])
-  directReports              Membership[]         @relation("MembershipManager")
-  role                       Role                 @relation(fields: [roleId], references: [id])
+  version                    Int                      @default(1)
+  assignmentHistoryChanged   AssignmentHistory[]      @relation("AssignmentChangedBy")
+  assignmentHistoryAssigned  AssignmentHistory[]      @relation("AssignmentAssignee")
+  managedClients             Client[]                 @relation("ClientManager")
+  sentInvitations            Invitation[]             @relation("InvitedByMembership")
+  agency                     Agency                   @relation(fields: [agencyId], references: [id])
+  manager                    Membership?              @relation("MembershipManager", fields: [managerMembershipId], references: [id])
+  directReports              Membership[]             @relation("MembershipManager")
+  role                       Role                     @relation(fields: [roleId], references: [id])
   roles                      MembershipRole[]
-  user                       User                 @relation(fields: [userId], references: [id])
-  managedWorkflowInstances   WorkflowInstance[]   @relation("WorkflowInstanceManager")
-  ownedWorkflowTasks         WorkflowTask[]       @relation("TaskOwner")
-  workflowTransitionsChanged WorkflowTransition[] @relation("TransitionChangedBy")
-  assignedCampaigns          Campaign[]           @relation("CampaignMembers")
-  campaignApprovals          Campaign[]           @relation("CampaignAgencyApprover")
+  user                       User                     @relation(fields: [userId], references: [id])
+  managedWorkflowInstances   WorkflowInstance[]       @relation("WorkflowInstanceManager")
+  ownedWorkflowTasks         WorkflowTask[]           @relation("TaskOwner")
+  workflowTransitionsChanged WorkflowTransition[]     @relation("TransitionChangedBy")
+  assignedCampaigns          Campaign[]               @relation("CampaignMembers")
+  campaignApprovals          Campaign[]               @relation("CampaignAgencyApprover")
   campaignTeamAssignments    CampaignTeamAssignment[]
+  createdWorkOrders          WorkOrder[]              @relation("WorkOrderCreatedBy")
+  assignedWorkOrders         WorkOrder[]              @relation("WorkOrderAssignee")
+  reviewedWorkOrders         WorkOrder[]              @relation("WorkOrderReviewer")
+  workOrderSubmissions       WorkOrderSubmission[]    @relation("WorkOrderSubmittedBy")
 
   @@unique([agencyId, userId])
   @@index([agencyId, roleId])
@@ -165,21 +172,21 @@ model SystemRole {
 }
 
 model Role {
-  id           String       @id @default(uuid())
-  agencyId     String
-  systemRoleId String
-  displayName  String
-  description  String?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  deletedAt    DateTime?
-  version      Int          @default(1)
-  invitations  Invitation[]
+  id              String           @id @default(uuid())
+  agencyId        String
+  systemRoleId    String
+  displayName     String
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+  version         Int              @default(1)
+  invitations     Invitation[]
   invitationRoles InvitationRole[]
-  memberships  Membership[]
+  memberships     Membership[]
   membershipRoles MembershipRole[]
-  agency       Agency       @relation(fields: [agencyId], references: [id])
-  systemRole   SystemRole   @relation(fields: [systemRoleId], references: [id])
+  agency          Agency           @relation(fields: [agencyId], references: [id])
+  systemRole      SystemRole       @relation(fields: [systemRoleId], references: [id])
 
   @@unique([agencyId, displayName])
   @@map("roles")
@@ -238,7 +245,7 @@ model SystemRolePermission {
 }
 
 model Client {
-  id                          String         @id @default(uuid())
+  id                          String          @id @default(uuid())
   agencyId                    String
   assignedManagerMembershipId String?
   name                        String
@@ -300,73 +307,106 @@ model Client {
   internalNotes               String?
   startDate                   DateTime?
   timezone                    String?
-  status                      ClientStatus   @default(ACTIVE)
-  createdAt                   DateTime       @default(now())
-  updatedAt                   DateTime       @updatedAt
+  status                      ClientStatus    @default(ACTIVE)
+  createdAt                   DateTime        @default(now())
+  updatedAt                   DateTime        @updatedAt
   deletedAt                   DateTime?
-  version                     Int            @default(1)
+  version                     Int             @default(1)
   campaigns                   Campaign[]
-  agency                      Agency         @relation(fields: [agencyId], references: [id])
-  assignedManager             Membership?    @relation("ClientManager", fields: [assignedManagerMembershipId], references: [id])
+  agency                      Agency          @relation(fields: [agencyId], references: [id])
+  assignedManager             Membership?     @relation("ClientManager", fields: [assignedManagerMembershipId], references: [id])
   contentAssets               ContentAsset[]
+  clientContacts              ClientContact[]
+  workOrders                  WorkOrder[]
 
   @@index([agencyId])
   @@index([agencyId, assignedManagerMembershipId])
   @@map("clients")
 }
 
+model ClientContact {
+  id                     String              @id @default(uuid())
+  agencyId               String
+  clientId               String
+  userId                 String?
+  name                   String
+  designation            String?
+  emailEncrypted         String?
+  emailHash              String?
+  phoneEncrypted         String?
+  phoneHash              String?
+  whatsappEncrypted      String?
+  whatsappHash           String?
+  role                   ClientContactRole   @default(PRIMARY)
+  isPrimary              Boolean             @default(false)
+  preferredContactMethod ContactMethod?
+  status                 ClientContactStatus @default(ACTIVE)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  deletedAt              DateTime?
+  version                Int                 @default(1)
+  agency                 Agency              @relation(fields: [agencyId], references: [id])
+  client                 Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user                   User?               @relation(fields: [userId], references: [id])
+
+  @@index([agencyId, clientId])
+  @@index([agencyId, emailHash])
+  @@index([userId])
+  @@map("client_contacts")
+}
+
 model Campaign {
-  id                              String               @id @default(uuid())
-  agencyId                        String
-  clientId                        String
-  name                            String
-  campaignCode                    String?
-  campaignType                    String?
-  priority                        String?
-  strategy                        String?
-  objectives                      String?
-  goal                            String?
-  primaryKpi                      String?
-  targetAudience                  String?
-  useClientAudience               Boolean              @default(true)
-  keyMessage                      String?
-  cta                             String?
-  tone                            String?
-  deliverables                    String?
-  reviewFrequency                 String?
-  workingDays                     String?
-  launchDate                      DateTime?
-  timezone                        String?
-  workflowTemplate                String?
-  clientApprover                  String?
-  agencyApproverMembershipId      String?
-  approvalSla                     String?
-  revisionLimit                   String?
-  references                      String?
-  moodBoardUrl                    String?
-  driveFolderUrl                  String?
-  internalNotes                   String?
-  autoGenerateCalendar            Boolean              @default(false)
-  postingDays                     String?
-  postingWindows                  String?
-  blackoutDates                   String?
-  platformMix                     String?
-  startDate                       DateTime
-  endDate                         DateTime
-  status                          CampaignStatus       @default(DRAFT)
-  createdByMembershipId           String
-  createdAt                       DateTime             @default(now())
-  updatedAt                       DateTime             @updatedAt
-  deletedAt                       DateTime?
-  version                         Int                  @default(1)
-  agency                          Agency               @relation(fields: [agencyId], references: [id])
-  client                          Client               @relation(fields: [clientId], references: [id])
-  agencyApprover                  Membership?          @relation("CampaignAgencyApprover", fields: [agencyApproverMembershipId], references: [id])
-  contentAssets                   ContentAsset[]
-  deliverablePlans                CampaignDeliverablePlan[]
-  publishingSchedules             PublishingSchedule[]
-  assignedMemberships             Membership[]         @relation("CampaignMembers")
-  teamAssignments                 CampaignTeamAssignment[]
+  id                         String                    @id @default(uuid())
+  agencyId                   String
+  clientId                   String
+  name                       String
+  campaignCode               String?
+  campaignType               String?
+  priority                   String?
+  strategy                   String?
+  objectives                 String?
+  goal                       String?
+  primaryKpi                 String?
+  targetAudience             String?
+  useClientAudience          Boolean                   @default(true)
+  keyMessage                 String?
+  cta                        String?
+  tone                       String?
+  deliverables               String?
+  reviewFrequency            String?
+  workingDays                String?
+  launchDate                 DateTime?
+  timezone                   String?
+  workflowTemplate           String?
+  clientApprover             String?
+  agencyApproverMembershipId String?
+  approvalSla                String?
+  revisionLimit              String?
+  references                 String?
+  moodBoardUrl               String?
+  driveFolderUrl             String?
+  internalNotes              String?
+  autoGenerateCalendar       Boolean                   @default(false)
+  postingDays                String?
+  postingWindows             String?
+  blackoutDates              String?
+  platformMix                String?
+  startDate                  DateTime
+  endDate                    DateTime
+  status                     CampaignStatus            @default(DRAFT)
+  createdByMembershipId      String
+  createdAt                  DateTime                  @default(now())
+  updatedAt                  DateTime                  @updatedAt
+  deletedAt                  DateTime?
+  version                    Int                       @default(1)
+  agency                     Agency                    @relation(fields: [agencyId], references: [id])
+  client                     Client                    @relation(fields: [clientId], references: [id])
+  agencyApprover             Membership?               @relation("CampaignAgencyApprover", fields: [agencyApproverMembershipId], references: [id])
+  contentAssets              ContentAsset[]
+  deliverablePlans           CampaignDeliverablePlan[]
+  publishingSchedules        PublishingSchedule[]
+  assignedMemberships        Membership[]              @relation("CampaignMembers")
+  teamAssignments            CampaignTeamAssignment[]
 
   @@index([agencyId, campaignCode])
   @@index([agencyId, clientId])
@@ -392,45 +432,45 @@ model CampaignTeamAssignment {
 }
 
 model CampaignDeliverablePlan {
-  id               String      @id @default(uuid())
-  agencyId         String
-  campaignId       String
-  contentType      ContentType
-  quantity         Int
-  frequency        String?
-  preferredDays    String?
-  preferredTime    String?
-  platform         String?
-  startDate        DateTime?
-  endDate          DateTime?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-  campaign         Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  id            String      @id @default(uuid())
+  agencyId      String
+  campaignId    String
+  contentType   ContentType
+  quantity      Int
+  frequency     String?
+  preferredDays String?
+  preferredTime String?
+  platform      String?
+  startDate     DateTime?
+  endDate       DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  campaign      Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@index([agencyId, campaignId])
   @@map("campaign_deliverable_plans")
 }
 
 model ContentAsset {
-  id                String             @id @default(uuid())
-  agencyId          String
-  clientId          String
-  campaignId        String
-  displayCode       String
-  type              ContentType
-  title             String
-  brief             String
-  status            ContentAssetStatus @default(ACTIVE)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  deletedAt         DateTime?
-  version           Int                @default(1)
-  agency            Agency             @relation(fields: [agencyId], references: [id])
-  campaign          Campaign           @relation(fields: [campaignId], references: [id])
-  client            Client             @relation(fields: [clientId], references: [id])
-  files             FileAsset[]
+  id                  String               @id @default(uuid())
+  agencyId            String
+  clientId            String
+  campaignId          String
+  displayCode         String
+  type                ContentType
+  title               String
+  brief               String
+  status              ContentAssetStatus   @default(ACTIVE)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  deletedAt           DateTime?
+  version             Int                  @default(1)
+  agency              Agency               @relation(fields: [agencyId], references: [id])
+  campaign            Campaign             @relation(fields: [campaignId], references: [id])
+  client              Client               @relation(fields: [clientId], references: [id])
+  files               FileAsset[]
   publishingSchedules PublishingSchedule[]
-  workflowInstances WorkflowInstance[]
+  workflowInstances   WorkflowInstance[]
 
   @@unique([agencyId, displayCode])
   @@index([agencyId, clientId])
@@ -439,25 +479,25 @@ model ContentAsset {
 }
 
 model PublishingSchedule {
-  id             String             @id @default(uuid())
-  agencyId       String
-  campaignId     String
-  contentAssetId String?
-  platform       PublishingPlatform
-  scheduledAt    DateTime
-  status         PublishingStatus   @default(PLANNED)
-  riskStatus     ContentRisk        @default(ON_TRACK)
-  timezone       String
-  caption        String?
-  note           String?
+  id                 String             @id @default(uuid())
+  agencyId           String
+  campaignId         String
+  contentAssetId     String?
+  platform           PublishingPlatform
+  scheduledAt        DateTime
+  status             PublishingStatus   @default(PLANNED)
+  riskStatus         ContentRisk        @default(ON_TRACK)
+  timezone           String
+  caption            String?
+  note               String?
   cancellationReason String?
-  publishedAt    DateTime?
-  publishedUrl   String?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  version        Int                @default(1)
-  campaign       Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  contentAsset   ContentAsset?      @relation(fields: [contentAssetId], references: [id])
+  publishedAt        DateTime?
+  publishedUrl       String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  version            Int                @default(1)
+  campaign           Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contentAsset       ContentAsset?      @relation(fields: [contentAssetId], references: [id])
 
   @@index([agencyId, campaignId, scheduledAt])
   @@index([agencyId, contentAssetId])
@@ -680,6 +720,62 @@ model FileAsset {
   @@map("file_assets")
 }
 
+model WorkOrder {
+  id                    String                @id @default(uuid())
+  agencyId              String
+  clientId              String?
+  title                 String
+  description           String
+  workType              WorkOrderType         @default(OTHER)
+  priority              WorkOrderPriority     @default(MEDIUM)
+  status                WorkOrderStatus       @default(ASSIGNED)
+  assigneeMembershipId  String
+  reviewerMembershipId  String?
+  createdByMembershipId String
+  dueAt                 DateTime
+  estimatedHours        Int?
+  rewardAmount          Decimal?              @db.Decimal(10, 2)
+  rewardCurrency        String?
+  completedAt           DateTime?
+  cancelledAt           DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  deletedAt             DateTime?
+  version               Int                   @default(1)
+  agency                Agency                @relation(fields: [agencyId], references: [id])
+  client                Client?               @relation(fields: [clientId], references: [id])
+  assignee              Membership            @relation("WorkOrderAssignee", fields: [assigneeMembershipId], references: [id])
+  reviewer              Membership?           @relation("WorkOrderReviewer", fields: [reviewerMembershipId], references: [id])
+  createdBy             Membership            @relation("WorkOrderCreatedBy", fields: [createdByMembershipId], references: [id])
+  submissions           WorkOrderSubmission[]
+
+  @@index([agencyId, assigneeMembershipId, dueAt])
+  @@index([agencyId, reviewerMembershipId, dueAt])
+  @@index([agencyId, clientId])
+  @@index([agencyId, status])
+  @@map("work_orders")
+}
+
+model WorkOrderSubmission {
+  id            String                    @id @default(uuid())
+  agencyId      String
+  workOrderId   String
+  submittedById String
+  version       Int
+  body          String?
+  externalLink  String?
+  status        WorkOrderSubmissionStatus @default(SUBMITTED)
+  reviewComment String?
+  reviewedAt    DateTime?
+  createdAt     DateTime                  @default(now())
+  workOrder     WorkOrder                 @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  submittedBy   Membership                @relation("WorkOrderSubmittedBy", fields: [submittedById], references: [id])
+
+  @@unique([workOrderId, version])
+  @@index([agencyId, workOrderId])
+  @@map("work_order_submissions")
+}
+
 model Notification {
   id         String                 @id @default(uuid())
   agencyId   String
@@ -814,6 +910,26 @@ enum ClientStatus {
   DELETED
 }
 
+enum ClientContactRole {
+  PRIMARY
+  BILLING
+  TECHNICAL
+  CREATIVE_APPROVER
+  EXECUTIVE
+  OTHER
+}
+
+enum ClientContactStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ContactMethod {
+  EMAIL
+  PHONE
+  WHATSAPP
+}
+
 enum CampaignStatus {
   DRAFT
   ACTIVE
@@ -864,6 +980,40 @@ enum ContentType {
   YOUTUBE
   AD
   OTHER
+}
+
+enum WorkOrderType {
+  SCRIPT
+  EDIT
+  DESIGN
+  SHOOT
+  THUMBNAIL
+  CAPTION
+  RESEARCH
+  OTHER
+}
+
+enum WorkOrderPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum WorkOrderStatus {
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  CHANGES_REQUESTED
+  COMPLETED
+  CANCELLED
+}
+
+enum WorkOrderSubmissionStatus {
+  SUBMITTED
+  ACCEPTED
+  CHANGES_REQUESTED
+  RECALLED
 }
 
 enum ContentStage {

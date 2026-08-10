@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { IlamyCalendar, CalendarEvent as IlamyCalendarEvent } from "@ilamy/calendar";
 import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
@@ -20,6 +21,7 @@ const scopeOptions: Array<{ value: CalendarScope; label: string }> = [
 
 const calendarTypes = [
   { value: "WORKFLOW_TASK", label: "My Tasks" },
+  { value: "WORK_ORDER", label: "Gigs" },
   { value: "PUBLISHING", label: "Publishing" },
   { value: "SHOOT", label: "Shoots" },
   { value: "REVIEW", label: "Reviews" },
@@ -29,7 +31,7 @@ const calendarTypes = [
   { value: "TEAM_EVENT", label: "Team Events" },
 ];
 
-const defaultVisibleTypes = ["WORKFLOW_TASK", "PUBLISHING", "SHOOT", "REVIEW", "APPROVAL"];
+const defaultVisibleTypes = ["WORKFLOW_TASK", "WORK_ORDER", "PUBLISHING", "SHOOT", "REVIEW", "APPROVAL"];
 
 export default function CalendarPage() {
   const { agencyId, agency, agencySlug } = useAgency();
@@ -58,6 +60,7 @@ export default function CalendarPage() {
   const requestedScope = scopeOverride || defaultScope;
   const selectedScope = allowedScopeOptions.some((option) => option.value === requestedScope) ? requestedScope : defaultScope;
   const visibleTypesStorageKey = useMemo(() => agencyStorageKey(agencyId, "calendar.visibleTypes"), [agencyId]);
+  const visibleTypesVersionKey = useMemo(() => agencyStorageKey(agencyId, "calendar.visibleTypesVersion"), [agencyId]);
 
   useEffect(() => {
     const legacyStored = window.localStorage.getItem("agos.calendar.visibleTypes");
@@ -66,14 +69,24 @@ export default function CalendarPage() {
       try {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          queueMicrotask(() => setVisibleTypes(parsed));
+          const knownTypes = new Set(calendarTypes.map((type) => type.value));
+          const restoredTypes = parsed.filter((type) => knownTypes.has(type));
+          const hasCurrentDefaults =
+            window.localStorage.getItem(visibleTypesVersionKey) === "2";
+          const missingDefaultTypes = hasCurrentDefaults
+            ? []
+            : defaultVisibleTypes.filter((type) => !restoredTypes.includes(type));
+          queueMicrotask(() =>
+            setVisibleTypes([...restoredTypes, ...missingDefaultTypes]),
+          );
+          window.localStorage.setItem(visibleTypesVersionKey, "2");
         }
       } catch {
         window.localStorage.removeItem(visibleTypesStorageKey);
       }
     }
     window.localStorage.removeItem("agos.calendar.visibleTypes");
-  }, [visibleTypesStorageKey]);
+  }, [visibleTypesStorageKey, visibleTypesVersionKey]);
 
   useEffect(() => {
     window.localStorage.setItem(visibleTypesStorageKey, JSON.stringify(visibleTypes));
@@ -121,6 +134,10 @@ export default function CalendarPage() {
   const calendarEvents = useMemo(() => toIlamyEvents(calendar?.events || []), [calendar]);
 
   const openCalendarEvent = (event: CalendarEvent) => {
+    if (event.workOrder?.id) {
+      router.push(`/${agencySlug}/gigs/${event.workOrder.id}`);
+      return;
+    }
     if (event.contentAsset?.id) {
       router.push(`/${agencySlug}/workflow/${event.contentAsset.id}`);
       return;
@@ -150,6 +167,9 @@ export default function CalendarPage() {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
             Work assigned to you appears here like a meeting invite, with broader schedules available when your role permits it.
           </p>
+          <Link href="/help/daily-operations/calendar" className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200">
+            How AGOS Calendar works
+          </Link>
         </div>
         <button type="button" onClick={resetDefaults} className="rounded-full border border-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-900">
           Reset to defaults
@@ -215,6 +235,7 @@ export default function CalendarPage() {
                 events={calendarEvents}
                 initialView="week"
                 firstDayOfWeek="monday"
+                scrollTime="09:00:00"
                 timeFormat="12-hour"
                 disableCellClick
                 disableDragAndDrop
@@ -282,8 +303,9 @@ function CalendarEventCard({ event, onOpen }: { event: CalendarEvent; onOpen: ()
             {event.forwardedToMe ? <span className={statusPillClasses("ASSIGNED")}>Assigned to me</span> : null}
           </div>
           <h3 className="mt-3 text-base font-semibold text-white">{event.title}</h3>
-          <p className="mt-1 text-sm text-zinc-500">{formatTime(event.startsAt)} · {event.client?.name || "No client"} · {event.campaign.name}</p>
+          <p className="mt-1 text-sm text-zinc-500">{formatTime(event.startsAt)} · {event.client?.name || "No client"} · {event.campaign?.name || "Standalone gig"}</p>
           {event.contentAsset ? <p className="mt-2 text-sm text-zinc-300">{event.contentAsset.displayCode} · {event.contentAsset.title}</p> : null}
+          {event.workOrder ? <p className="mt-2 text-sm text-zinc-300">{formatLabel(event.workOrder.workType)} · {event.workOrder.title}</p> : null}
         </div>
         <div className="text-right text-sm text-zinc-500">
           <div className={statusPillClasses(event.status)}>{formatLabel(event.status)}</div>
@@ -303,7 +325,7 @@ function VisualCalendarEvent({ event }: { event: IlamyCalendarEvent }) {
     <div className={`h-full min-h-7 overflow-hidden rounded-md border px-2 py-1 text-left text-[11px] leading-tight ${eventTypeBorderClass(type)} ${risk === "OVERDUE" || risk === "BLOCKED" ? "bg-red-500/15" : "bg-indigo-500/15"}`}>
       <div className="truncate font-semibold text-white">{event.title}</div>
       <div className="truncate text-zinc-300">
-        {agosEvent?.contentAsset?.displayCode || formatLabel(type)}
+        {agosEvent?.contentAsset?.displayCode || agosEvent?.workOrder?.title || formatLabel(type)}
         {agosEvent?.forwardedToMe ? " · Assigned to me" : ""}
       </div>
     </div>

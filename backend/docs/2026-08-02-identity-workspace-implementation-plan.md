@@ -176,10 +176,17 @@ Reason:
 8. Invite the same email to a second agency and repeat login.
 9. Confirm both agencies appear and can be switched.
 
-## Remaining Future Phase
+## Implementation Status (Completed August 4, 2026)
 
-ClientContact should be designed separately as:
-
-- Client organization remains `Client`.
-- Client-side people become contacts linked to client and optionally to universal `User`.
-- Client portal access is modeled as membership/contact capability, not as global user type.
+- **Slice 1**: Centralized email normalization (`trim().toLowerCase()`) and SHA-256 HMAC lookup hashing in `CryptoService`.
+- **Slice 2**: Automatic pending invitation claiming on login in `InvitationClaimService`, with outbox event publishing (`InvitationAccepted`, `MemberJoined`, `MemberInvitationClaimed`).
+- **Slice 3**: `MembershipRole` established as authoritative authorization source in `TenantGuard`, with `Membership.roleId` retained as display/migration fallback only.
+- **Slice 4**: Server-side active membership validation and transactional `Session.activeAgencyId` updates with outbox event `WorkspaceActivated` and agency-scoped frontend cache invalidation (`workspace-cache.ts`).
+- **ClientContact Phase**:
+  - Implemented standalone `ClientContact` model with `AES-256-GCM` field-level encryption for sensitive contact channels (`emailEncrypted`, `phoneEncrypted`, `whatsappEncrypted`) and HMAC lookup hashes.
+  - Implemented primary contact uniqueness toggle (`isPrimary`).
+  - Added optional universal `User` profile linkage (`userId`).
+  - Emitted outbox events (`ClientContactCreated`, `ClientContactUpdated`, `ClientContactArchived`, `ClientContactLinkedToUser`).
+  - Added REST endpoints under `/api/v1/clients/:clientId/contacts`.
+  - Added comprehensive unit tests in `modules/client/client-contact.service.spec.ts`.
+- **Validation**: All 15 backend Jest test suites (59 tests) passed; Prisma schema validated; backend and frontend builds passing cleanly.

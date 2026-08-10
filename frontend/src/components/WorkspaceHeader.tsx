@@ -150,7 +150,7 @@ export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) 
               </div>
 
               <div className="p-2">
-                <div className="rounded-xl px-3 py-2 text-sm text-zinc-500">Help & Support</div>
+                <MenuLink href="/help" label="Help & Support" onClick={() => setIsMenuOpen(false)} />
                 <button
                   type="button"
                   onClick={confirmLogout}

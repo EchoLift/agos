@@ -2,9 +2,11 @@ import { apiClient } from "../api-client";
 
 export interface DashboardData {
   myTasks: Array<{
+    sourceType?: "WORKFLOW_TASK" | "WORK_ORDER";
     id: string;
     title: string;
     contentAssetId: string | null;
+    workOrderId?: string | null;
     displayCode: string | null;
     campaignId: string | null;
     clientId: string | null;

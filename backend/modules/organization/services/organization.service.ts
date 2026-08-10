@@ -594,11 +594,21 @@ export class OrganizationService implements OnModuleInit {
         .map((id) => id.trim())
         .filter(Boolean),
     );
+    const allowedUserIds = new Set(
+      (this.configService.get<string>("DEV_ROLE_TESTING_USER_IDS") ?? "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
+    );
+    const actorAgencyMatches = !actor.agencyId || actor.agencyId === agencyId;
+    const actorIsAllowed =
+      allowedAuthUserIds.has(actor.authUserId) ||
+      allowedUserIds.has(actor.userId);
 
     return (
       enabled &&
-      actor.agencyId === agencyId &&
-      allowedAuthUserIds.has(actor.authUserId) &&
+      actorAgencyMatches &&
+      actorIsAllowed &&
       membership.id === actor.membershipId &&
       membership.userId === actor.userId
     );

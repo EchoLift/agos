@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAgency } from "@/components/AgencyProvider";
 import { getWorkflowBoard, performWorkflowAction, WorkflowActionType, WorkflowBoard, WorkflowBoardItem } from "@/lib/api/workflow";
@@ -102,6 +103,9 @@ export default function WorkflowPage() {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
             What is moving, what is stuck, who owns it, and what should happen next.
           </p>
+          <Link href="/help/daily-operations/workflow" className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200">
+            Understand the production workflow
+          </Link>
         </div>
         <div className="rounded-full border border-zinc-800 bg-zinc-950 px-4 py-2 text-sm text-zinc-400">Board view</div>
       </div>
