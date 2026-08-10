@@ -42,3 +42,4 @@ npm run dev:api
 - [API Contract - July 20, 2026](./docs/2026-07-20-api-contract.md)
 - [Living API Documentation](./docs/api.md)
 - [Google OAuth Implementation - July 26, 2026](./docs/2026-07-26-google-oauth.md)
+- [Render Backend Deployment - August 10, 2026](./docs/2026-08-10-render-backend-deployment.md)
