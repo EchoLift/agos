@@ -1,7 +1,7 @@
 import { ValidationPipe, VersioningType } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
-import * as cookieParser from "cookie-parser";
+import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { Logger } from "nestjs-pino";
 import { ApiModule } from "./api.module";
@@ -40,6 +40,11 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup("docs", app, document);
+
+  // Expose a lightweight root route for Render / health checks.
+  app.getHttpAdapter().get("/", (_req, res) =>
+    res.json({ status: "ok", api: "/api", docs: "/api/docs" }),
+  );
 
   const port = Number(
     config.get<string>("PORT") ?? config.get<string>("API_PORT") ?? 4000,
