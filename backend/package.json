@@ -3,18 +3,24 @@
   "version": "0.1.0",
   "private": true,
   "description": "Agency OS backend foundation",
+  "engines": {
+    "node": "22.x",
+    "npm": ">=10"
+  },
   "scripts": {
     "dev:api": "nest start api --watch",
     "dev:worker": "nest start worker --watch",
     "dev:websocket": "nest start websocket --watch",
     "build": "nest build api && nest build worker && nest build websocket",
-    "start:api": "node dist/apps/api/main.js",
-    "start:worker": "node dist/apps/worker/main.js",
-    "start:websocket": "node dist/apps/websocket/main.js",
+    "build:render": "npm run prisma:generate && npm run build",
+    "start:api": "node dist/apps/api/src/main.js",
+    "start:worker": "node dist/apps/worker/src/main.js",
+    "start:websocket": "node dist/apps/websocket/src/main.js",
     "lint": "eslint \"{apps,modules,packages}/**/*.ts\"",
     "format": "prettier --write \"{apps,modules,packages}/**/*.ts\"",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "seed:demo": "ts-node -r tsconfig-paths/register scripts/demo-seed/index.ts",
     "seed:demo:reset": "ts-node -r tsconfig-paths/register scripts/demo-seed/index.ts --reset"
   },
