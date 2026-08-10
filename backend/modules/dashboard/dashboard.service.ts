@@ -10,6 +10,7 @@ import {
   Prisma,
   SubmissionStatus,
   TaskStatus,
+  WorkOrderStatus,
 } from "@prisma/client";
 
 @Injectable()
@@ -72,39 +73,82 @@ export class DashboardService {
       }),
     ]);
 
-    const tasks = await this.prisma.workflowTask.findMany({
-      where: taskWhere,
-      include: {
-        workflowInstance: { include: { contentAsset: true } },
-        workflowStep: true,
-      },
-      orderBy: { deadlineAt: "asc" },
-      take: 8,
-    });
+    const [tasks, workOrders] = await Promise.all([
+      this.prisma.workflowTask.findMany({
+        where: taskWhere,
+        include: {
+          workflowInstance: { include: { contentAsset: true } },
+          workflowStep: true,
+        },
+        orderBy: { deadlineAt: "asc" },
+        take: 8,
+      }),
+      this.prisma.workOrder.findMany({
+        where: this.buildWorkOrderWhere(agencyId, actor),
+        include: { client: true },
+        orderBy: { dueAt: "asc" },
+        take: 8,
+      }),
+    ]);
 
     const pendingReviews = await this.prisma.submission.count({
       where: { agencyId, status: SubmissionStatus.SUBMITTED },
     });
 
     return {
-      myTasks: tasks.map((task) => ({
-        id: task.id,
-        title: task.displayName,
-        contentAssetId: task.workflowInstance.contentAssetId,
-        displayCode: task.workflowInstance.contentAsset?.displayCode ?? null,
-        campaignId: task.workflowInstance.contentAsset?.campaignId ?? null,
-        clientId: task.workflowInstance.contentAsset?.clientId ?? null,
-        contentAssetTitle:
-          task.workflowInstance.contentAsset?.title ?? "Untitled content",
-        status: task.status,
-        deadlineAt: task.deadlineAt,
-        stage: task.workflowStep?.stage ?? null,
-      })),
+      myTasks: [
+        ...tasks.map((task) => ({
+          sourceType: "WORKFLOW_TASK",
+          id: task.id,
+          title: task.displayName,
+          contentAssetId: task.workflowInstance.contentAssetId,
+          workOrderId: null,
+          displayCode: task.workflowInstance.contentAsset?.displayCode ?? null,
+          campaignId: task.workflowInstance.contentAsset?.campaignId ?? null,
+          clientId: task.workflowInstance.contentAsset?.clientId ?? null,
+          contentAssetTitle:
+            task.workflowInstance.contentAsset?.title ?? "Untitled content",
+          status: task.status,
+          deadlineAt: task.deadlineAt,
+          stage: task.workflowStep?.stage ?? null,
+        })),
+        ...workOrders.map((workOrder) => ({
+          sourceType: "WORK_ORDER",
+          id: `work-order:${workOrder.id}`,
+          title: workOrder.title,
+          contentAssetId: null,
+          workOrderId: workOrder.id,
+          displayCode: null,
+          campaignId: null,
+          clientId: workOrder.clientId,
+          contentAssetTitle:
+            workOrder.client?.displayName ??
+            workOrder.client?.name ??
+            "Standalone gig",
+          status: workOrder.status,
+          deadlineAt: workOrder.dueAt,
+          stage: workOrder.workType,
+        })),
+      ]
+        .sort(
+          (a, b) =>
+            new Date(a.deadlineAt ?? 0).getTime() -
+            new Date(b.deadlineAt ?? 0).getTime(),
+        )
+        .slice(0, 8),
       pendingApprovals: pendingReviews,
       blockedContent: blockedContent,
-      overdueContent: tasks.filter(
-        (task) => task.deadlineAt && task.deadlineAt < new Date(),
-      ).length,
+      overdueContent:
+        tasks.filter((task) => task.deadlineAt && task.deadlineAt < new Date())
+          .length +
+        workOrders.filter(
+          (workOrder) =>
+            workOrder.dueAt < new Date() &&
+            !new Set<WorkOrderStatus>([
+              WorkOrderStatus.COMPLETED,
+              WorkOrderStatus.CANCELLED,
+            ]).has(workOrder.status),
+        ).length,
       publishingToday: publishingToday,
       activity: recentActivity.map((transition) => ({
         id: transition.id,
@@ -125,6 +169,37 @@ export class DashboardService {
         activeContent: contentAssets,
         blockedItems: blockedContent,
       },
+    };
+  }
+
+  private buildWorkOrderWhere(
+    agencyId: string,
+    actor: IdentityContext,
+  ): Prisma.WorkOrderWhereInput {
+    const baseWhere: Prisma.WorkOrderWhereInput = {
+      agencyId,
+      deletedAt: null,
+      status: {
+        in: [
+          WorkOrderStatus.ASSIGNED,
+          WorkOrderStatus.IN_PROGRESS,
+          WorkOrderStatus.SUBMITTED,
+          WorkOrderStatus.CHANGES_REQUESTED,
+        ],
+      },
+    };
+
+    if (this.canSeeAgencyWork(actor)) return baseWhere;
+    if (!actor.membershipId) {
+      return { ...baseWhere, assigneeMembershipId: "__missing_membership__" };
+    }
+
+    return {
+      ...baseWhere,
+      OR: [
+        { assigneeMembershipId: actor.membershipId },
+        { reviewerMembershipId: actor.membershipId },
+      ],
     };
   }
 

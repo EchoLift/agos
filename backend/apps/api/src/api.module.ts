@@ -13,6 +13,7 @@ import { NotificationModule } from "@modules/notification/notification.module";
 import { OrganizationModule } from "@modules/organization/organization.module";
 import { UserModule } from "@modules/user/user.module";
 import { WorkflowModule } from "@modules/workflow/workflow.module";
+import { WorkOrderModule } from "@modules/work-order/work-order.module";
 import { ConfigValidationModule } from "@packages/config/config-validation.module";
 import { DatabaseModule } from "@packages/database/database.module";
 import { EventBusModule } from "@packages/events/event-bus.module";
@@ -44,6 +45,7 @@ import { PermissionsGuard } from "@packages/security/guards/permissions.guard";
     ContentModule,
     DashboardModule,
     WorkflowModule,
+    WorkOrderModule,
     NotificationModule,
     AuditModule,
     FileModule,

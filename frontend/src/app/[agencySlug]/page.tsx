@@ -180,7 +180,10 @@ export default function WorkspaceDashboard() {
                     <button
                       key={task.id}
                       type="button"
-                      onClick={() => task.contentAssetId && router.push(`/${agencySlug}/workflow/${task.contentAssetId}`)}
+                      onClick={() => {
+                        if (task.workOrderId) router.push(`/${agencySlug}/gigs/${task.workOrderId}`);
+                        else if (task.contentAssetId) router.push(`/${agencySlug}/workflow/${task.contentAssetId}`);
+                      }}
                       className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 text-left transition hover:border-indigo-500/40 hover:bg-zinc-900"
                     >
                       <div className="flex items-center justify-between gap-3">

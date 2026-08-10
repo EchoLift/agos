@@ -2,6 +2,8 @@
 
 Date: July 20, 2026
 
+Last updated: August 8, 2026
+
 ## Purpose
 
 This document defines the domain events Agency OS should use as the system grows.
@@ -67,6 +69,12 @@ All events should use this envelope:
 | `BlockerRaised` | Workflow | Notification, Audit, WebSocket | `contentAssetId`, `blockerId`, `reason` |
 | `BlockerResolved` | Workflow | Notification, Audit, WebSocket | `contentAssetId`, `blockerId` |
 | `DeadlineMissed` | Workflow Worker | Notification, Audit, WebSocket | `contentAssetId`, `ownerMembershipId`, `deadlineAt` |
+| `WorkOrderCreated` | Work Order | Notification, Audit, Calendar, Dashboard | `workOrderId`, `clientId`, `assigneeMembershipId`, `reviewerMembershipId`, `workType`, `dueAt` |
+| `WorkOrderUpdated` | Work Order | Audit, Calendar, Dashboard | `workOrderId`, `changedFields` |
+| `WorkOrderSubmitted` | Work Order | Notification, Audit, Calendar, Dashboard | `workOrderId`, `submissionId`, `submittedById`, `version` |
+| `WorkOrderApproved` | Work Order | Notification, Audit, Calendar, Dashboard | `workOrderId`, `submissionId`, `reviewerMembershipId` |
+| `WorkOrderChangesRequested` | Work Order | Notification, Audit, Calendar, Dashboard | `workOrderId`, `submissionId`, `reviewerMembershipId` |
+| `WorkOrderCancelled` | Work Order | Notification, Audit, Calendar, Dashboard | `workOrderId`, `cancelledById`, `reason` |
 | `NotificationQueued` | Notification | Audit | `notificationId`, `channels` |
 | `NotificationSent` | Notification | Audit | `notificationId`, `deliveryId`, `channel` |
 | `NotificationFailed` | Notification | Audit | `notificationId`, `deliveryId`, `channel`, `retryCount` |
@@ -93,4 +101,3 @@ DeadlineMissed
 NotificationQueued
 WebhookReceived
 ```
-

@@ -11,9 +11,10 @@ export interface CalendarEvent {
   endsAt: string;
   assignedMembershipIds: string[];
   roleKeys: string[];
-  campaign: { id: string; name: string };
+  campaign: { id: string; name: string } | null;
   client?: { id: string; name: string };
   contentAsset: { id: string; displayCode: string; title: string } | null;
+  workOrder?: { id: string; title: string; workType: string } | null;
   visibility: string;
   status: string;
   riskStatus: string;

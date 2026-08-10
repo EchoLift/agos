@@ -1,6 +1,6 @@
 # API Documentation (Living)
 
-Last updated: August 1, 2026
+Last updated: August 8, 2026
 
 This document mirrors the REST endpoints currently implemented in the AGOS NestJS API. Base path is `/api/v1`.
 
@@ -775,13 +775,114 @@ Legacy request bodies commonly include `actorId` and sometimes `workflowTaskId`,
 
 ---
 
+## Gigs / Work Orders
+
+Standalone work assignments for one-off scripts, edits, shoots, designs, research, captions, thumbnails, or overflow work. A gig can be linked to a client but does not require a campaign or campaign team assignment.
+
+### Create Work Order
+
+`POST /work-orders`
+
+Owner, admin, and manager roles only.
+
+Request:
+
+```json
+{
+  "clientId": "client-uuid",
+  "title": "Need 5 IPL meme scripts",
+  "description": "Write five short Telugu-English meme scripts for this week's IPL trend.",
+  "workType": "SCRIPT",
+  "priority": "HIGH",
+  "assigneeMembershipId": "writer-membership-uuid",
+  "reviewerMembershipId": "manager-membership-uuid",
+  "dueAt": "2026-08-09T18:00:00.000Z",
+  "estimatedHours": 4,
+  "rewardAmount": 1500,
+  "rewardCurrency": "INR"
+}
+```
+
+Emits `WorkOrderCreated`.
+
+### List Work Orders
+
+`GET /work-orders`
+
+Returns gigs visible to the authenticated membership. Owners, admins, and managers see agency gigs. Production roles see gigs where they are the assignee or reviewer.
+
+### Get Work Order
+
+`GET /work-orders/:id`
+
+Returns one visible gig with assignee, reviewer, client, and submissions.
+
+### Update Work Order
+
+`PATCH /work-orders/:id`
+
+Owner, admin, and manager roles only. Updates planning fields and uses optimistic locking via `version`.
+
+Emits `WorkOrderUpdated`.
+
+### Submit Work Order
+
+`POST /work-orders/:id/submit`
+
+Assignee only. At least one of `body` or `externalLink` is required.
+
+Request:
+
+```json
+{
+  "body": "Draft script notes or handoff details.",
+  "externalLink": "https://docs.google.com/document/example"
+}
+```
+
+Emits `WorkOrderSubmitted`.
+
+### Approve Work Order
+
+`POST /work-orders/:id/approve`
+
+Reviewer, owner, admin, or manager only. The gig must be in `SUBMITTED` state.
+
+Request:
+
+```json
+{
+  "comment": "Approved. This is ready."
+}
+```
+
+Emits `WorkOrderApproved`.
+
+### Request Work Order Changes
+
+`POST /work-orders/:id/request-changes`
+
+Reviewer, owner, admin, or manager only. The gig must be in `SUBMITTED` state and `comment` is required.
+
+Request:
+
+```json
+{
+  "comment": "Make the hook sharper and add one regional reference."
+}
+```
+
+Emits `WorkOrderChangesRequested`.
+
+---
+
 ## Calendar
 
 ### Get Calendar Events
 
 `GET /calendar/events`
 
-Returns a role-aware calendar read model for workflow tasks and publishing slots.
+Returns a role-aware calendar read model for workflow tasks, publishing slots, and standalone work orders.
 
 Query parameters:
 

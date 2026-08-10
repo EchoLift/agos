@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useAgency } from "@/components/AgencyProvider";
 import { getClients, Client } from "@/lib/api/clients";
 import { useRouter } from "next/navigation";
@@ -53,6 +54,9 @@ export default function ClientsPage() {
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">Directory</p>
           <h1 className="mt-2 text-3xl font-semibold text-white">Clients</h1>
+          <Link href="/help/clients/client-playbook" className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200">
+            What belongs in a client playbook?
+          </Link>
         </div>
         <button 
           onClick={() => router.push(`/${agencySlug}/clients/new`)}

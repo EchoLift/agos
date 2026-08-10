@@ -33,21 +33,17 @@ describe("AuthService Integration", () => {
     };
 
     const mockRequestContext = {
-      get: jest
-        .fn()
-        .mockReturnValue({
-          correlationId: "test-corr-id",
-          requestId: "test-req-id",
-          ip: "127.0.0.1",
-        }),
+      get: jest.fn().mockReturnValue({
+        correlationId: "test-corr-id",
+        requestId: "test-req-id",
+        ip: "127.0.0.1",
+      }),
     };
     const mockUserService = {
-      provisionUser: jest
-        .fn()
-        .mockResolvedValue({
-          id: "profile-user-id",
-          authUserId: "auth-user-id",
-        }),
+      provisionUser: jest.fn().mockResolvedValue({
+        id: "profile-user-id",
+        authUserId: "auth-user-id",
+      }),
     };
     const mockInvitationClaimService = {
       claimPendingInvitationsForUser: jest

@@ -9,6 +9,7 @@ import {
   PublishingPlatform,
   PublishingStatus,
   TaskStatus,
+  WorkOrderStatus,
 } from "@prisma/client";
 import { PrismaService } from "@packages/database/prisma.service";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
@@ -25,7 +26,8 @@ type CalendarEventType =
   | "PUBLISHING"
   | "CAMPAIGN_MILESTONE"
   | "CLIENT_MEETING"
-  | "TEAM_EVENT";
+  | "TEAM_EVENT"
+  | "WORK_ORDER";
 
 @Injectable()
 export class CalendarService {
@@ -57,9 +59,10 @@ export class CalendarService {
     const roleKeys = this.roleKeys(actor);
     const taskStatuses = this.enumValues(TaskStatus, statuses);
     const publishingStatuses = this.enumValues(PublishingStatus, statuses);
+    const workOrderStatuses = this.enumValues(WorkOrderStatus, statuses);
     const publishingPlatforms = this.enumValues(PublishingPlatform, platforms);
 
-    const [taskEvents, publishingEvents] = await Promise.all([
+    const [taskEvents, publishingEvents, workOrderEvents] = await Promise.all([
       !eventTypes.length ||
       eventTypes.some((type) =>
         ["WORKFLOW_TASK", "SHOOT", "REVIEW", "APPROVAL"].includes(type),
@@ -94,9 +97,26 @@ export class CalendarService {
             accessibleCampaignIds,
           })
         : Promise.resolve([]),
+      !eventTypes.length || eventTypes.includes("WORK_ORDER")
+        ? this.getWorkOrderEvents({
+            agencyId,
+            membershipId,
+            roleKeys,
+            scope,
+            from,
+            to,
+            memberId: query.memberId,
+            statuses: workOrderStatuses,
+            rawStatuses: statuses,
+          })
+        : Promise.resolve([]),
     ]);
 
-    const events = [...taskEvents, ...publishingEvents].sort(
+    const events = [
+      ...taskEvents,
+      ...publishingEvents,
+      ...workOrderEvents,
+    ].sort(
       (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
     );
 
@@ -384,6 +404,143 @@ export class CalendarService {
     }));
   }
 
+  private async getWorkOrderEvents(params: {
+    agencyId: string;
+    membershipId: string;
+    roleKeys: string[];
+    scope: CalendarScope;
+    from: Date;
+    to: Date;
+    memberId?: string;
+    statuses: WorkOrderStatus[];
+    rawStatuses: string[];
+  }) {
+    if (params.rawStatuses.length && !params.statuses.length) return [];
+
+    const where: any = {
+      agencyId: params.agencyId,
+      deletedAt: null,
+      dueAt: { gte: params.from, lte: params.to },
+      ...(params.statuses.length ? { status: { in: params.statuses } } : {}),
+    };
+
+    if (params.scope === "MY_SCHEDULE") {
+      where.OR = [
+        { assigneeMembershipId: params.membershipId },
+        { reviewerMembershipId: params.membershipId },
+      ];
+    } else if (params.scope === "MY_ROLE") {
+      where.assignee = {
+        OR: [
+          {
+            role: {
+              systemRole: {
+                key: { in: params.roleKeys },
+              },
+            },
+          },
+          {
+            roles: {
+              some: {
+                role: {
+                  systemRole: {
+                    key: { in: params.roleKeys },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      };
+    } else if (params.scope !== "AGENCY" && params.scope !== "MY_TEAM") {
+      where.assigneeMembershipId = params.membershipId;
+    }
+
+    if (params.memberId && params.memberId !== params.membershipId) {
+      where.OR = [
+        { assigneeMembershipId: params.memberId },
+        { reviewerMembershipId: params.memberId },
+      ];
+    }
+
+    const workOrders = await this.prisma.workOrder.findMany({
+      where,
+      include: {
+        client: true,
+        assignee: {
+          include: {
+            user: true,
+            role: { include: { systemRole: true } },
+            roles: { include: { role: { include: { systemRole: true } } } },
+          },
+        },
+        reviewer: {
+          include: {
+            user: true,
+            role: { include: { systemRole: true } },
+            roles: { include: { role: { include: { systemRole: true } } } },
+          },
+        },
+      },
+      orderBy: { dueAt: "asc" },
+    });
+
+    return workOrders.map((workOrder) => {
+      const assignedMembershipIds = [
+        ...new Set(
+          [
+            workOrder.assigneeMembershipId,
+            workOrder.reviewerMembershipId,
+          ].filter(Boolean) as string[],
+        ),
+      ];
+      const isDirectAssignment = assignedMembershipIds.includes(
+        params.membershipId,
+      );
+
+      return {
+        id: `work-order:${workOrder.id}`,
+        sourceId: workOrder.id,
+        eventType: "WORK_ORDER" as CalendarEventType,
+        title: workOrder.title,
+        startsAt: workOrder.dueAt.toISOString(),
+        endsAt: workOrder.dueAt.toISOString(),
+        assignedMembershipIds,
+        roleKeys: workOrder.assignee
+          ? this.membershipRoleKeys(workOrder.assignee)
+          : [],
+        campaign: null,
+        client: workOrder.client
+          ? {
+              id: workOrder.client.id,
+              name: workOrder.client.displayName ?? workOrder.client.name,
+            }
+          : null,
+        contentAsset: null,
+        workOrder: {
+          id: workOrder.id,
+          title: workOrder.title,
+          workType: workOrder.workType,
+        },
+        visibility: isDirectAssignment
+          ? "DIRECT_ASSIGNMENT"
+          : this.labelize(params.scope),
+        status: workOrder.status,
+        riskStatus: this.workOrderRisk(workOrder.status, workOrder.dueAt),
+        owner: workOrder.assignee
+          ? {
+              membershipId: workOrder.assignee.id,
+              name: workOrder.assignee.user.name ?? "Unassigned",
+            }
+          : null,
+        forwardedToMe: isDirectAssignment,
+        reason: isDirectAssignment
+          ? "Assigned to me"
+          : this.labelize(params.scope),
+      };
+    });
+  }
+
   private async resolveAccessibleCampaignIds(
     scope: CalendarScope,
     agencyId: string,
@@ -606,6 +763,19 @@ export class CalendarService {
     )
       return ContentRisk.ON_TRACK;
     if (scheduledAt < new Date()) return ContentRisk.OVERDUE;
+    return ContentRisk.ON_TRACK;
+  }
+
+  private workOrderRisk(status: WorkOrderStatus, dueAt: Date) {
+    if (
+      dueAt < new Date() &&
+      !new Set<WorkOrderStatus>([
+        WorkOrderStatus.COMPLETED,
+        WorkOrderStatus.CANCELLED,
+      ]).has(status)
+    ) {
+      return ContentRisk.OVERDUE;
+    }
     return ContentRisk.ON_TRACK;
   }
 

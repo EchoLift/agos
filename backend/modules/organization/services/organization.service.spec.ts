@@ -19,6 +19,7 @@ describe("OrganizationService Unit Tests", () => {
   let repository: jest.Mocked<OrganizationRepository>;
   let userLookup: jest.Mocked<UserLookupService>;
   let cryptoService: jest.Mocked<CryptoService>;
+  let configService: jest.Mocked<ConfigService>;
 
   beforeEach(async () => {
     const mockRepo = {
@@ -81,6 +82,7 @@ describe("OrganizationService Unit Tests", () => {
               if (key === "NODE_ENV") return "test";
               if (key === "DEV_ROLE_TESTING_OVERRIDE_ENABLED") return "false";
               if (key === "DEV_ROLE_TESTING_AUTH_USER_IDS") return "";
+              if (key === "DEV_ROLE_TESTING_USER_IDS") return "";
               return null;
             }),
           },
@@ -92,6 +94,7 @@ describe("OrganizationService Unit Tests", () => {
     repository = module.get(OrganizationRepository) as any;
     userLookup = module.get(UserLookupService) as any;
     cryptoService = module.get(CryptoService) as any;
+    configService = module.get(ConfigService) as any;
   });
 
   describe("createAgency", () => {
@@ -344,6 +347,116 @@ describe("OrganizationService Unit Tests", () => {
           sessionId: "session-1",
         } as any),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe("updateMemberRole", () => {
+    const editorRole = {
+      id: "role-editor",
+      displayName: "Editor",
+      systemRole: { key: "EDITOR" },
+    };
+    const ownerRole = {
+      id: "role-owner",
+      displayName: "Owner",
+      systemRole: { key: "OWNER" },
+    };
+
+    beforeEach(() => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === "NODE_ENV") return "development";
+        if (key === "DEV_ROLE_TESTING_OVERRIDE_ENABLED") return "true";
+        if (key === "DEV_ROLE_TESTING_USER_IDS") return "user-allowed";
+        if (key === "DEV_ROLE_TESTING_AUTH_USER_IDS") return "";
+        return null;
+      });
+    });
+
+    it("allows an explicitly configured user to update only their own roles for local testing", async () => {
+      const membership = {
+        id: "mem-self",
+        agencyId: "agency-1",
+        userId: "user-allowed",
+        status: "ACTIVE",
+        role: editorRole,
+        roles: [{ role: editorRole }],
+        user: {
+          name: "EchoLift",
+          avatarUrl: null,
+          authUser: { emailEncrypted: "encrypted@example.com" },
+        },
+      };
+      const updatedMembership = {
+        ...membership,
+        roleId: ownerRole.id,
+        role: ownerRole,
+        roles: [{ role: ownerRole }],
+        version: 3,
+        joinedAt: new Date("2026-08-08T00:00:00.000Z"),
+      };
+
+      repository.findMembershipById.mockResolvedValue(membership as any);
+      repository.findAgencyRolesByIds.mockResolvedValue([ownerRole] as any);
+      repository.updateMembershipRole.mockResolvedValue(
+        updatedMembership as any,
+      );
+
+      const result = await service.updateMemberRole(
+        "agency-1",
+        "mem-self",
+        { roleId: "role-owner", roleIds: ["role-owner"], version: 2 },
+        {
+          authUserId: "auth-allowed",
+          userId: "user-allowed",
+          agencyId: "agency-1",
+          membershipId: "mem-self",
+          role: "EDITOR",
+          roles: ["EDITOR"],
+        } as any,
+      );
+
+      expect(repository.updateMembershipRole).toHaveBeenCalledWith(
+        "agency-1",
+        "mem-self",
+        "role-owner",
+        ["role-owner"],
+        2,
+        "auth-allowed",
+        "corr-123",
+      );
+      expect(result.roles).toEqual([
+        { id: "role-owner", key: "OWNER", name: "Owner" },
+      ]);
+    });
+
+    it("does not let the local testing override change another member's roles", async () => {
+      repository.findMembershipById.mockResolvedValue({
+        id: "mem-other",
+        agencyId: "agency-1",
+        userId: "user-other",
+        status: "ACTIVE",
+        role: editorRole,
+        roles: [{ role: editorRole }],
+      } as any);
+      repository.findAgencyRolesByIds.mockResolvedValue([ownerRole] as any);
+
+      await expect(
+        service.updateMemberRole(
+          "agency-1",
+          "mem-other",
+          { roleId: "role-owner", roleIds: ["role-owner"], version: 2 },
+          {
+            authUserId: "auth-allowed",
+            userId: "user-allowed",
+            agencyId: "agency-1",
+            membershipId: "mem-self",
+            role: "EDITOR",
+            roles: ["EDITOR"],
+          } as any,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(repository.updateMembershipRole).not.toHaveBeenCalled();
     });
   });
 });

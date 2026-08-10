@@ -1,6 +1,6 @@
 import { Agency } from "@/lib/api/organization";
 
-export type WorkspaceNavKey = "dashboard" | "clients" | "campaigns" | "content" | "workflow" | "calendar" | "team";
+export type WorkspaceNavKey = "dashboard" | "clients" | "campaigns" | "gigs" | "content" | "workflow" | "calendar" | "team";
 
 export interface WorkspaceNavItem {
   key: WorkspaceNavKey;
@@ -13,6 +13,7 @@ export const workspaceNavItems: WorkspaceNavItem[] = [
   { key: "dashboard", label: "Dashboard", shortLabel: "DB", href: (slug) => `/${slug}` },
   { key: "clients", label: "Clients", shortLabel: "CL", href: (slug) => `/${slug}/clients` },
   { key: "campaigns", label: "Campaigns", shortLabel: "CP", href: (slug) => `/${slug}/campaigns` },
+  { key: "gigs", label: "Gigs", shortLabel: "GG", href: (slug) => `/${slug}/gigs` },
   { key: "content", label: "Content", shortLabel: "CT", href: (slug) => `/${slug}/content` },
   { key: "workflow", label: "Workflow", shortLabel: "WF", href: (slug) => `/${slug}/workflow` },
   { key: "calendar", label: "Calendar", shortLabel: "CA", href: (slug) => `/${slug}/calendar` },
@@ -33,18 +34,18 @@ const isRoleTestingOverrideEnabled =
   process.env.NEXT_PUBLIC_DEV_ROLE_TESTING_OVERRIDE_ENABLED === "true";
 
 const roleAccess: Record<string, WorkspaceNavKey[]> = {
-  OWNER: ["dashboard", "clients", "campaigns", "content", "workflow", "calendar", "team"],
-  ADMIN: ["dashboard", "clients", "campaigns", "content", "workflow", "calendar", "team"],
-  MANAGER: ["dashboard", "campaigns", "workflow", "calendar", "team"],
-  WRITER: ["dashboard", "campaigns", "workflow", "calendar"],
-  DOP: ["dashboard", "campaigns", "workflow", "calendar"],
-  EDITOR: ["dashboard", "campaigns", "workflow", "calendar"],
-  DESIGNER: ["dashboard", "campaigns", "workflow", "calendar"],
-  SOCIAL_MEDIA_MANAGER: ["dashboard", "campaigns", "calendar"],
+  OWNER: ["dashboard", "clients", "campaigns", "gigs", "content", "workflow", "calendar", "team"],
+  ADMIN: ["dashboard", "clients", "campaigns", "gigs", "content", "workflow", "calendar", "team"],
+  MANAGER: ["dashboard", "campaigns", "gigs", "workflow", "calendar", "team"],
+  WRITER: ["dashboard", "campaigns", "gigs", "workflow", "calendar"],
+  DOP: ["dashboard", "campaigns", "gigs", "workflow", "calendar"],
+  EDITOR: ["dashboard", "campaigns", "gigs", "workflow", "calendar"],
+  DESIGNER: ["dashboard", "campaigns", "gigs", "workflow", "calendar"],
+  SOCIAL_MEDIA_MANAGER: ["dashboard", "campaigns", "gigs", "calendar"],
   FINANCE: ["dashboard", "clients"],
   HR: ["dashboard", "team"],
   CLIENT: ["dashboard", "campaigns", "calendar"],
-  MEMBER: ["dashboard", "campaigns", "workflow", "calendar"],
+  MEMBER: ["dashboard", "campaigns", "gigs", "workflow", "calendar"],
 };
 
 export function visibleWorkspaceNavItems(agency: Agency | null, slug: string, userId?: string | null) {
@@ -88,12 +89,14 @@ export function canAccessWorkspacePath(pathname: string, agency: Agency | null, 
   }
   if (relativePath.startsWith("/settings/agency")) return hasAnyRole(agency, ["OWNER", "ADMIN"]);
   if (relativePath === "/campaigns/new") return hasAnyRole(agency, ["OWNER", "ADMIN", "MANAGER"]);
+  if (relativePath === "/gigs/new") return hasAnyRole(agency, ["OWNER", "ADMIN", "MANAGER"]);
   if (relativePath === "/clients/new") return hasAnyRole(agency, ["OWNER", "ADMIN", "MANAGER"]);
   if (relativePath === "/content/new") return hasAnyRole(agency, ["OWNER", "ADMIN", "MANAGER"]);
   if (relativePath === "/team/new") return hasAnyRole(agency, ["OWNER", "ADMIN", "MANAGER"]);
 
   if (relativePath.startsWith("/clients")) return allowed.has("clients");
   if (relativePath.startsWith("/campaigns")) return allowed.has("campaigns");
+  if (relativePath.startsWith("/gigs")) return allowed.has("gigs");
   if (relativePath.startsWith("/content")) return allowed.has("content");
   if (relativePath.startsWith("/workflow")) return allowed.has("workflow");
   if (relativePath.startsWith("/calendar")) return allowed.has("calendar");

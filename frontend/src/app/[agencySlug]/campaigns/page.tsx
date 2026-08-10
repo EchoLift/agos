@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useAgency } from "@/components/AgencyProvider";
 import { getCampaigns, Campaign } from "@/lib/api/campaigns";
 import { getClients, Client } from "@/lib/api/clients";
@@ -57,6 +58,9 @@ export default function CampaignsPage() {
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">Initiatives</p>
           <h1 className="mt-2 text-3xl font-semibold text-white">Campaigns</h1>
+          <Link href="/help/campaigns/campaign-planning" className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200">
+            Learn how campaigns work
+          </Link>
         </div>
         <button 
           onClick={() => router.push(`/${agencySlug}/campaigns/new`)}

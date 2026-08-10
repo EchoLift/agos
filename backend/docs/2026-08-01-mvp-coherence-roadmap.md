@@ -1,6 +1,6 @@
 # AGOS MVP Coherence Roadmap
 
-Last updated: August 1, 2026
+Last updated: August 8, 2026
 
 ## Purpose
 
@@ -23,6 +23,13 @@ Every other screen is a projection:
 - Activity: historical projection
 
 A task should have one production state, one current owner, one deadline, one activity history, and one next required action.
+
+AGOS now supports two entry points into work:
+
+- **Campaign Production**: structured client campaigns, content assets, workflow tasks, and publishing schedules.
+- **Gig / Work Orders**: direct one-off assignments such as scripts, edits, shoots, thumbnails, or overflow work without requiring a campaign team.
+
+Employees should experience both through the same operational surfaces: My Work, Workflow, Calendar, Notifications, and Activity. The employee should not need to care whether the work originated from a campaign or a standalone gig.
 
 ## Non-Goals For This Phase
 
@@ -73,6 +80,7 @@ Consumers:
 - `GET /dashboard`
 - `GET /workflow/board`
 - `GET /calendar/events`
+- `GET /work-orders`
 - Employee My Work endpoint or dashboard projection
 - Campaign detail summaries
 
@@ -84,6 +92,7 @@ Consumers:
 - Overdue means the same thing everywhere.
 - Completing a workflow action updates every view after refetch.
 - Published content/publishing slots reflect consistently in Campaign, Content, Workflow, Calendar, Dashboard, and Activity.
+- Work orders appear consistently in My Work and Calendar for the assigned or reviewing membership.
 
 ## Slice 2: Security Hardening
 
@@ -148,6 +157,7 @@ Social Media Manager:
 - My Work only shows work assigned to the current membership or review work the current membership can actually perform.
 - Multi-role users see a merged work queue for their active roles without exposing unrelated admin pages.
 - My Work, Workflow, and Calendar agree on the same assigned items.
+- Standalone work orders and campaign workflow tasks appear in one unified queue.
 
 ## Slice 4: Notification Centre
 
@@ -173,6 +183,10 @@ Make in-app notifications reliable before adding email, WhatsApp, or Google Cale
 - Approved
 - Rejected
 - Workflow advanced
+- Work order assigned
+- Work order submitted
+- Work order changes requested
+- Work order approved
 - Publishing today
 - Overdue
 - Blocker raised
@@ -311,4 +325,3 @@ Recommended structure:
 14. Calendar
 15. Notifications
 16. Files
-
