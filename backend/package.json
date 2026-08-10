@@ -14,6 +14,7 @@
     "build": "nest build api && nest build worker && nest build websocket",
     "build:render": "npm run prisma:generate && npm run build",
     "start:api": "node dist/apps/api/src/main.js",
+    "start:api:render": "npm run prisma:migrate:deploy && npm run start:api",
     "start:worker": "node dist/apps/worker/src/main.js",
     "start:websocket": "node dist/apps/websocket/src/main.js",
     "lint": "eslint \"{apps,modules,packages}/**/*.ts\"",
