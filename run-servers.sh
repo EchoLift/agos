@@ -1,8 +1,18 @@
 #!/bin/bash
+set -e
 
-# Navigate to backend and start the api in the background
-cd backend && npm run dev:api &
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Navigate back to root and start frontend in the foreground
-cd ../frontend && npm run dev
+# Start the API app in the background from the backend package.
+(cd "$ROOT_DIR/backend" && npm run dev:api) &
+BACKEND_PID=$!
 
+cleanup() {
+  kill "$BACKEND_PID" 2>/dev/null || true
+}
+
+trap cleanup EXIT
+
+# Start the frontend in the foreground.
+cd "$ROOT_DIR/frontend"
+npm run dev
