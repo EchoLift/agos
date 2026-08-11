@@ -12,7 +12,7 @@ import { RegisterDto } from "../dto/register.dto";
 import { LoginDto } from "../dto/login.dto";
 import { RequestContextService } from "@packages/request-context/request-context.service";
 import { ConfigService } from "@nestjs/config";
-import { AuthProvider } from "@prisma/client";
+import { AuthProvider, Prisma } from "@prisma/client";
 import { OAuth2Client } from "google-auth-library";
 import { UserService } from "@modules/user/services/user.service";
 import { InvitationClaimService } from "./invitation-claim.service";
@@ -156,48 +156,16 @@ export class AuthService {
     let user = identityLookup.user;
 
     if (!user) {
-      const emailEncrypted = this.crypto.encrypt(email);
-      const context = this.requestContext.get();
-
-      user = await this.repository.createUser(
-        {
-          emailHash,
-          emailEncrypted,
-          identities: {
-            create: {
-              provider: AuthProvider.GOOGLE,
-              providerUserId,
-              emailHash,
-            },
-          },
-        },
-        {
-          eventType: "UserRegistered",
-          emailHash,
-          provider: "google",
-          occurredAt: new Date().toISOString(),
-          requestId: context?.requestId,
-          correlationId: context?.correlationId,
-        },
-        context?.correlationId,
+      user = await this.createGoogleUserOrRecover(
+        providerUserId,
+        email,
+        emailHash,
       );
     } else if (!identityLookup.matchedProvider) {
-      const context = this.requestContext.get();
-      user = await this.repository.linkProviderIdentity(
+      user = await this.linkGoogleProviderOrRecover(
         user.id,
-        AuthProvider.GOOGLE,
         providerUserId,
         emailHash,
-        {
-          eventType: "AuthProviderLinked",
-          authUserId: user.id,
-          emailHash,
-          provider: "google",
-          occurredAt: new Date().toISOString(),
-          requestId: context?.requestId,
-          correlationId: context?.correlationId,
-        },
-        context?.correlationId,
       );
     }
 
@@ -230,6 +198,97 @@ export class AuthService {
     return (
       isDev && isPlaceholderClient && idToken.startsWith("dev-google-token:")
     );
+  }
+
+  private async createGoogleUserOrRecover(
+    providerUserId: string,
+    email: string,
+    emailHash: string,
+  ) {
+    const emailEncrypted = this.crypto.encrypt(email);
+    const context = this.requestContext.get();
+
+    try {
+      return await this.repository.createUser(
+        {
+          emailHash,
+          emailEncrypted,
+          identities: {
+            create: {
+              provider: AuthProvider.GOOGLE,
+              providerUserId,
+              emailHash,
+            },
+          },
+        },
+        {
+          eventType: "UserRegistered",
+          emailHash,
+          provider: "google",
+          occurredAt: new Date().toISOString(),
+          requestId: context?.requestId,
+          correlationId: context?.correlationId,
+        },
+        context?.correlationId,
+      );
+    } catch (error: unknown) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        const retryLookup = await this.repository.findByProviderIdentityOrEmail(
+          AuthProvider.GOOGLE,
+          providerUserId,
+          emailHash,
+        );
+        if (retryLookup.user) {
+          return retryLookup.user;
+        }
+      }
+      throw error;
+    }
+  }
+
+  private async linkGoogleProviderOrRecover(
+    authUserId: string,
+    providerUserId: string,
+    emailHash: string,
+  ) {
+    const context = this.requestContext.get();
+
+    try {
+      return await this.repository.linkProviderIdentity(
+        authUserId,
+        AuthProvider.GOOGLE,
+        providerUserId,
+        emailHash,
+        {
+          eventType: "AuthProviderLinked",
+          authUserId,
+          emailHash,
+          provider: "google",
+          occurredAt: new Date().toISOString(),
+          requestId: context?.requestId,
+          correlationId: context?.correlationId,
+        },
+        context?.correlationId,
+      );
+    } catch (error: unknown) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        const retryLookup = await this.repository.findByProviderIdentityOrEmail(
+          AuthProvider.GOOGLE,
+          providerUserId,
+          emailHash,
+        );
+        if (retryLookup.user) {
+          return retryLookup.user;
+        }
+      }
+      throw error;
+    }
   }
 
   private async claimPendingInvitations(
