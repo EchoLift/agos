@@ -4,9 +4,15 @@ import ThemeController from "@/components/ThemeController";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Agency OS — Run your creative agency without WhatsApp, Notion, and Excel",
+  title: "AGOS | Creative Agency Operations Platform",
   description:
-    "Agency OS helps creative agencies plan campaigns, manage content, and run approvals from one clear workflow.",
+    "AGOS is a creative agency operations platform for managing clients, campaigns, content production, team assignments, approvals, deadlines, and delivery in one workspace.",
+  openGraph: {
+    title: "AGOS | Creative Agency Operations Platform",
+    description:
+      "AGOS is a creative agency operations platform for managing clients, campaigns, content production, team assignments, approvals, deadlines, and delivery in one workspace.",
+    siteName: "AGOS",
+  },
 };
 
 export default function RootLayout({
