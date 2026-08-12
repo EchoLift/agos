@@ -1,0 +1,52 @@
+# Transactional Email Delivery Architecture
+
+## Overview
+This document details the transactional email delivery slice integrated into the AGOS Notification architecture. Email serves as an asynchronous, secondary delivery channel behind in-app notifications.
+
+## Key Architectural Principles
+
+1. **Isolation**: Business modules call `NotificationService.notify(...)`. Email delivery happens asynchronously in the background worker via RabbitMQ and outbox events. Email API failures never roll back AGOS business operations.
+2. **Channel Policy Ownership**: `NotificationModule` owns event-to-channel policy (`eventType` → `IN_APP` / `EMAIL`). High-value operational events trigger `EMAIL` delivery records; generic or celebratory events remain `IN_APP` only.
+3. **Reference-Only Payloads**: Outbox and RabbitMQ event payloads contain references ONLY (`deliveryId`, `invitationId`, `agencyId`). No raw recipient email addresses, decrypted emails, or credentials are place in event streams.
+4. **Authoritative DB Resolution**: The background worker loads the delivery/invitation record from the database and resolves recipient emails:
+   - **Operational Emails**: Decrypts universal `AuthUser.emailEncrypted` using `FieldCryptoService`. Checks that `Membership.status === 'ACTIVE'` for the target agency. If suspended/removed, delivery is set to `CANCELLED`.
+   - **Invitation Emails**: Validates that `Invitation.status === 'PENDING'` and `expiresAt > now()`. Does not require active membership.
+5. **Provider Failover & Semantic Error Classification**:
+   - **Resend** is the **Primary** provider (`https://api.resend.com/emails`).
+   - **SendGrid** is the **Fallback** provider (`https://api.sendgrid.com/v3/mail/send`).
+   - Failover occurs ONLY for transient failure categories (`PROVIDER_UNAVAILABLE`, `RATE_LIMITED`, `UNKNOWN_TRANSIENT`).
+   - Permanent errors (`RECIPIENT_INVALID`, `RECIPIENT_SUPPRESSED`, `MESSAGE_INVALID`, `POLICY_REJECTED`, `PROVIDER_AUTH_FAILURE`) do not failover.
+
+## Environment Variables
+
+| Variable | Description | Example |
+|---|---|---|
+| `RESEND_API_KEY` | Primary email provider API key | `re_123456789...` |
+| `RESEND_FROM_EMAIL` | Verified sender address for Resend | `AGOS <notifications@calcie.fun>` |
+| `SENDGRID_API_KEY` | Fallback email provider API key | `SG.123456789...` |
+| `SENDGRID_FROM_EMAIL` | Sender address for SendGrid | `notifications@calcie.fun` |
+| `SENDGRID_FROM_NAME` | Sender display name for SendGrid | `AGOS` |
+| `FRONTEND_URL` | Base URL for deep links | `https://client-agos.calcie.fun` |
+
+## High-Value Email Events (V1 Scope)
+
+- `MemberInvited`: Agency invitation + role name + accept link
+- `WorkOrderCreated` / `WorkOrderAssigned`: Work order assigned + client + due date + deep link
+- `WorkflowTaskAssigned` / `ContentAssigned`: Task assigned + stage + asset title + deep link
+- `SubmissionCreated` / `WorkOrderSubmitted`: Review required + deep link
+- `ChangesRequested` / `WorkOrderChangesRequested`: Revisions / feedback requested + deep link
+- `WorkflowStageChanged`: Workflow stage handoff to next craft + deep link
+- `ActionableApproval`: Approval requiring immediate next actor action + deep link
+
+## Testing & Verification
+
+Run tests:
+```bash
+cd backend
+npx jest
+```
+Build apps:
+```bash
+cd backend
+npm run build
+```

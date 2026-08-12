@@ -1,12 +1,100 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "@packages/database/prisma.service";
+import { EventBusService } from "@packages/events/event-bus.service";
+import { DomainEvents } from "@packages/events/domain-event";
+
+export interface NotifyInput {
+  agencyId: string;
+  userId: string;
+  title: string;
+  body: string;
+  eventType: string;
+  metadata?: Record<string, any>;
+}
 
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventBus: EventBusService,
+  ) {}
 
+  /**
+   * Channel Policy Mapping:
+   * Determines whether an event requires an EMAIL delivery channel in addition to IN_APP.
+   */
+  isEmailChannelRequired(eventType: string): boolean {
+    const emailEventTypes = new Set<string>([
+      DomainEvents.MemberInvited,
+      DomainEvents.WorkOrderCreated,
+      DomainEvents.WorkOrderSubmitted,
+      DomainEvents.WorkOrderChangesRequested,
+      DomainEvents.ContentAssigned,
+      DomainEvents.WorkflowStageChanged,
+      DomainEvents.SubmissionCreated,
+      DomainEvents.ChangesRequested,
+      "ActionableApproval",
+      "WorkflowTaskAssigned",
+    ]);
+
+    return emailEventTypes.has(eventType);
+  }
+
+  /**
+   * Generic notification entry point for business modules.
+   * Business modules call notify(...) without needing to decide email delivery logic.
+   */
+  async notify(input: NotifyInput) {
+    this.logger.log(
+      `Creating notification for user ${input.userId} in agency ${input.agencyId} [eventType: ${input.eventType}]`,
+    );
+
+    const notification = await this.prisma.notification.create({
+      data: {
+        agencyId: input.agencyId,
+        userId: input.userId,
+        title: input.title,
+        body: input.body,
+        eventType: input.eventType,
+      },
+    });
+
+    let deliveryId: string | null = null;
+
+    if (this.isEmailChannelRequired(input.eventType)) {
+      const delivery = await this.prisma.notificationDelivery.create({
+        data: {
+          agencyId: input.agencyId,
+          notificationId: notification.id,
+          channel: "EMAIL",
+          status: "QUEUED",
+        },
+      });
+      deliveryId = delivery.id;
+
+      // Publish NotificationQueued with REFERENCE-ONLY payload ({ deliveryId })
+      await this.eventBus.publish(DomainEvents.NotificationQueued, {
+        agencyId: input.agencyId,
+        actorId: null,
+        aggregateId: delivery.id,
+        aggregateType: "NotificationDelivery",
+        payload: {
+          deliveryId: delivery.id,
+        },
+      });
+    }
+
+    return {
+      notification,
+      deliveryId,
+    };
+  }
+
+  /**
+   * Legacy helper for backwards compatibility.
+   */
   async createInAppNotification(input: {
     agencyId: string;
     userId: string;
@@ -14,7 +102,6 @@ export class NotificationService {
     body: string;
     eventType: string;
   }) {
-    this.logger.log(`Creating notification for ${input.userId}`);
-    return this.prisma.notification.create({ data: input });
+    return this.notify(input);
   }
 }
