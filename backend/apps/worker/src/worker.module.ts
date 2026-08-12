@@ -8,6 +8,7 @@ import { EventBusModule } from "@packages/events/event-bus.module";
 import { RequestContextModule } from "@packages/request-context/request-context.module";
 import { UserModule } from "@modules/user/user.module";
 import { ScheduleModule } from "@nestjs/schedule";
+import { NotificationConsumer } from "./consumers/notification.consumer";
 
 @Module({
   imports: [
@@ -21,5 +22,6 @@ import { ScheduleModule } from "@nestjs/schedule";
     UserModule,
     ScheduleModule.forRoot(),
   ],
+  providers: [NotificationConsumer],
 })
 export class WorkerModule {}
