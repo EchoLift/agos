@@ -17,7 +17,19 @@ async function bootstrap() {
   app.setGlobalPrefix("api");
   app.enableVersioning({ type: VersioningType.URI });
   app.enableCors({
-    origin: corsOrigin,
+    origin: (origin, callback) => {
+      if (
+        !origin ||
+        origin === corsOrigin ||
+        /\.client-agos\.calcie\.fun$/.test(origin) ||
+        origin === "https://client-agos.calcie.fun" ||
+        origin.startsWith("http://localhost:")
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization", "X-Agency-Id"],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

@@ -115,7 +115,7 @@ export class NotificationDeliveryProcessor {
       agencySlug: agency.slug,
       title: notification.title,
       body: notification.body,
-      deepLink: buildDeepLink(frontendUrl, `${agency.slug}`),
+      deepLink: buildDeepLink(frontendUrl, "", agency.slug),
       frontendUrl,
     });
 

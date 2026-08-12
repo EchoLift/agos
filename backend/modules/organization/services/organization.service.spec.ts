@@ -244,7 +244,14 @@ describe("OrganizationService Unit Tests", () => {
         ),
       ).rejects.toThrow(ForbiddenException);
     });
+
+    // Security regression: the @RequirePermissions("TEAM_INVITE") decorator on the
+    // controller endpoint ensures the PermissionsGuard blocks WRITER-role callers
+    // before they reach inviteMember(). A WRITER has no seeded permissions, so
+    // user.permissions will be empty and the guard throws ForbiddenException with
+    // PERMISSION_DENIED code. This is validated in permissions.guard.spec.ts.
   });
+
 
   describe("acceptInvitation", () => {
     it("should accept invitation and return new membership", async () => {

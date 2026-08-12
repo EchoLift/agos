@@ -1,15 +1,8 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpStatus,
-  Param,
-  Patch,
-  Post,
-} from "@nestjs/common";
+import { Body, Controller, Get, HttpStatus, Param, Patch, Post } from "@nestjs/common";
 import { ApiBearerAuth, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { CurrentUser } from "@packages/security/decorators/current-user.decorator";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
+import { RequirePermissions } from "@packages/security/decorators/require-permissions.decorator";
 import { ClientService } from "./client.service";
 import { ClientContactService } from "./client-contact.service";
 import { CreateClientDto } from "./dto/create-client.dto";
@@ -27,6 +20,7 @@ export class ClientController {
   ) {}
 
   @Post()
+  @RequirePermissions("CLIENT_CREATE")
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: "Client playbook created",
@@ -51,6 +45,7 @@ export class ClientController {
   }
 
   @Patch(":id")
+  @RequirePermissions("CLIENT_UPDATE")
   @ApiResponse({
     status: HttpStatus.OK,
     description: "Client playbook updated",
@@ -64,16 +59,19 @@ export class ClientController {
   }
 
   @Post(":id/archive")
+  @RequirePermissions("CLIENT_ARCHIVE")
   archive(@Param("id") id: string, @CurrentUser() user: IdentityContext) {
     return this.clientService.archive(id, user.agencyId ?? "", user.userId);
   }
 
   @Post(":id/restore")
+  @RequirePermissions("CLIENT_ARCHIVE")
   restore(@Param("id") id: string, @CurrentUser() user: IdentityContext) {
     return this.clientService.restore(id, user.agencyId ?? "", user.userId);
   }
 
   @Post(":id/assign-manager")
+  @RequirePermissions("CLIENT_UPDATE")
   assignManager(
     @Param("id") id: string,
     @Body("membershipId") membershipId: string,
@@ -88,6 +86,7 @@ export class ClientController {
   }
 
   @Post(":clientId/contacts")
+  @RequirePermissions("CLIENT_UPDATE")
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: "Client contact created",
@@ -122,6 +121,7 @@ export class ClientController {
   }
 
   @Patch(":clientId/contacts/:contactId")
+  @RequirePermissions("CLIENT_UPDATE")
   @ApiResponse({
     status: HttpStatus.OK,
     description: "Client contact updated",
@@ -142,6 +142,7 @@ export class ClientController {
   }
 
   @Post(":clientId/contacts/:contactId/archive")
+  @RequirePermissions("CLIENT_ARCHIVE")
   @ApiResponse({
     status: HttpStatus.OK,
     description: "Client contact archived",
@@ -160,6 +161,7 @@ export class ClientController {
   }
 
   @Post(":clientId/contacts/:contactId/link-user")
+  @RequirePermissions("CLIENT_UPDATE")
   @ApiResponse({
     status: HttpStatus.OK,
     description: "Client contact linked to universal user profile",
