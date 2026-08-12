@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { Dispatch, ReactNode, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAgency } from "@/components/AgencyProvider";
@@ -16,6 +16,7 @@ export default function WorkflowPage() {
   const roleKeys = useMemo(() => getAgencyRoleKeys(agency), [agency]);
   const [board, setBoard] = useState<WorkflowBoard | null>(null);
   const [selectedItem, setSelectedItem] = useState<WorkflowBoardItem | null>(null);
+  const [mobileStage, setMobileStage] = useState("");
   const [filters, setFilters] = useState({ clientId: "", campaignId: "", ownerId: "", risk: "", search: "" });
   const [actionDraft, setActionDraft] = useState({ externalLink: "", comment: "", reason: "" });
   const [isActionRunning, setIsActionRunning] = useState(false);
@@ -24,7 +25,6 @@ export default function WorkflowPage() {
 
   const loadBoard = useCallback(async () => {
     if (!agencyId) return;
-    setIsLoading(true);
     const data = await getWorkflowBoard(agencyId, filters);
     setBoard(data);
     setError(null);
@@ -33,9 +33,16 @@ export default function WorkflowPage() {
   }, [agencyId, filters]);
 
   useEffect(() => {
+    if (!agencyId) return;
     let isMounted = true;
 
-    loadBoard()
+    getWorkflowBoard(agencyId, filters)
+      .then((data) => {
+        if (!isMounted) return;
+        setBoard(data);
+        setError(null);
+        setIsLoading(false);
+      })
       .catch((err: unknown) => {
         if (!isMounted) return;
         setError(err instanceof Error ? err.message : "Failed to load workflow board.");
@@ -45,11 +52,12 @@ export default function WorkflowPage() {
     return () => {
       isMounted = false;
     };
-  }, [loadBoard]);
+  }, [agencyId, filters]);
 
-  useEffect(() => {
+  const selectItem = (item: WorkflowBoardItem | null) => {
+    setSelectedItem(item);
     setActionDraft({ externalLink: "", comment: "", reason: "" });
-  }, [selectedItem?.contentAssetId, selectedItem?.stage]);
+  };
 
   const runWorkflowAction = async (action: WorkflowActionType) => {
     if (!agencyId || !selectedItem) return;
@@ -74,8 +82,7 @@ export default function WorkflowPage() {
       }).then(() => loadBoard());
 
       const nextSelected = refreshed?.columns.flatMap((column) => column.items).find((item) => item.contentAssetId === selectedItem.contentAssetId) ?? null;
-      setSelectedItem(nextSelected);
-      setActionDraft({ externalLink: "", comment: "", reason: "" });
+      selectItem(nextSelected);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Workflow action failed.");
     } finally {
@@ -93,13 +100,22 @@ export default function WorkflowPage() {
   }, [board]);
 
   const hasItems = board?.columns.some((column) => column.items.length > 0);
+  const defaultMobileStage = board?.columns.find((column) => column.items.length > 0)?.stage
+    ?? board?.columns[0]?.stage
+    ?? "";
+  const effectiveMobileStage = board?.columns.some((column) => column.stage === mobileStage)
+    ? mobileStage
+    : defaultMobileStage;
+  const mobileColumn = board?.columns.find((column) => column.stage === effectiveMobileStage)
+    ?? board?.columns.find((column) => column.items.length > 0)
+    ?? board?.columns[0];
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="space-y-3 sm:space-y-4 lg:space-y-8">
+      <div className="flex flex-wrap items-end justify-between gap-3 lg:gap-4">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">Operations</p>
-          <h1 className="mt-2 text-3xl font-semibold text-white">Workflow</h1>
+          <h1 className="mt-1 text-2xl font-semibold text-white sm:text-3xl lg:mt-2">Workflow</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
             What is moving, what is stuck, who owns it, and what should happen next.
           </p>
@@ -107,10 +123,10 @@ export default function WorkflowPage() {
             Understand the production workflow
           </Link>
         </div>
-        <div className="rounded-full border border-zinc-800 bg-zinc-950 px-4 py-2 text-sm text-zinc-400">Board view</div>
+        <div className="hidden rounded-full border border-zinc-800 bg-zinc-950 px-4 py-2 text-sm text-zinc-400 lg:block">Board view</div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 lg:gap-3">
         <SummaryCard label="Active" value={board?.summary.active ?? 0} />
         <SummaryCard label="Waiting Review" value={board?.summary.waitingReview ?? 0} />
         <SummaryCard label="Blocked" value={board?.summary.blocked ?? 0} tone="danger" />
@@ -118,7 +134,14 @@ export default function WorkflowPage() {
         <SummaryCard label="Due Today" value={board?.summary.dueToday ?? 0} tone="attention" />
       </div>
 
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-4 shadow-2xl shadow-black/20 sm:p-5">
+      <details className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 lg:hidden">
+        <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-zinc-300">Search and filters</summary>
+        <div className="grid gap-2 pt-2">
+          <WorkflowFilters filters={filters} setFilters={setFilters} options={filterOptions} />
+        </div>
+      </details>
+
+      <div className="hidden rounded-3xl border border-zinc-800 bg-zinc-950/80 p-5 shadow-2xl shadow-black/20 lg:block">
         <div className="grid gap-3 md:grid-cols-5">
           <input
             value={filters.search}
@@ -142,7 +165,7 @@ export default function WorkflowPage() {
         </div>
       </div>
 
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-4 shadow-2xl shadow-black/20">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-2 shadow-xl shadow-black/10 lg:rounded-3xl lg:p-4 lg:shadow-2xl">
         {isLoading ? (
           <div className="p-4 text-sm text-zinc-500">Loading workflow board...</div>
         ) : error ? (
@@ -154,7 +177,7 @@ export default function WorkflowPage() {
             <p className="mt-2 text-sm text-zinc-400">Create content assets or clear filters to see production movement.</p>
           </div>
         ) : (
-          <div className="flex gap-4 overflow-x-auto pb-2">
+          <div className="hidden gap-4 overflow-x-auto pb-2 lg:flex">
             {board?.columns.map((column) => (
               <section key={column.stage} className="min-w-72 flex-1 rounded-2xl border border-zinc-800 bg-[#0b0b11]">
                 <div className="flex items-center justify-between border-b border-zinc-800/70 px-4 py-3">
@@ -171,7 +194,7 @@ export default function WorkflowPage() {
                       <button
                         key={item.contentAssetId}
                         type="button"
-                        onClick={() => setSelectedItem(item)}
+                        onClick={() => selectItem(item)}
                         className="w-full rounded-2xl border border-zinc-800 bg-zinc-950 p-4 text-left transition hover:bg-zinc-900/30"
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -199,22 +222,64 @@ export default function WorkflowPage() {
             ))}
           </div>
         )}
+
+        {!isLoading && !error && hasItems && mobileColumn ? (
+          <div className="lg:hidden">
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2">
+              {board?.columns.map((column) => (
+                <button
+                  key={column.stage}
+                  type="button"
+                  onClick={() => setMobileStage(column.stage)}
+                  className={`min-h-11 shrink-0 rounded-md border px-3 text-sm font-medium ${mobileColumn.stage === column.stage ? "border-indigo-500 bg-indigo-500/15 text-indigo-200" : "border-zinc-800 bg-zinc-900 text-zinc-400"}`}
+                >
+                  {column.label} <span className="ml-1 text-xs opacity-70">{column.count}</span>
+                </button>
+              ))}
+            </div>
+            <div className="space-y-2 pt-1">
+              {mobileColumn.items.length === 0 ? (
+                <div className="rounded-md border border-dashed border-zinc-800 p-5 text-center text-sm text-zinc-500">Nothing in {mobileColumn.label}</div>
+              ) : mobileColumn.items.map((item) => (
+                <button
+                  key={item.contentAssetId}
+                  type="button"
+                  onClick={() => selectItem(item)}
+                  className="min-h-24 w-full rounded-md border border-zinc-800 bg-zinc-950 p-3 text-left"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-indigo-300">{item.displayCode}</div>
+                      <div className="mt-1 truncate text-sm font-semibold text-white">{item.title}</div>
+                    </div>
+                    <RiskBadge risk={item.riskStatus} />
+                  </div>
+                  <div className="mt-2 truncate text-xs text-zinc-500">{item.clientName} · {item.campaignName}</div>
+                  <div className="mt-2 flex items-center justify-between gap-2 text-xs text-zinc-400">
+                    <span className="truncate">{item.owner?.name || "Unassigned"}</span>
+                    <span className="shrink-0">{formatDateTime(item.deadlineAt)}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {selectedItem ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60">
-          <button type="button" className="flex-1 cursor-default" aria-label="Close workflow detail" onClick={() => setSelectedItem(null)} />
-          <aside className="h-full w-full max-w-xl overflow-y-auto border-l border-zinc-800 bg-zinc-950 p-6 shadow-2xl shadow-black/40">
+          <button type="button" className="hidden flex-1 cursor-default lg:block" aria-label="Close workflow detail" onClick={() => selectItem(null)} />
+          <aside className="h-full w-full overflow-y-auto bg-zinc-950 p-3 pb-[calc(5rem+env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 sm:p-4 lg:max-w-xl lg:border-l lg:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-indigo-300">{selectedItem.displayCode}</p>
                 <h2 className="mt-2 text-2xl font-semibold text-white">{selectedItem.title}</h2>
                 <p className="mt-2 text-sm text-zinc-400">{selectedItem.clientName} · {selectedItem.campaignName}</p>
               </div>
-              <button type="button" onClick={() => setSelectedItem(null)} className="rounded-full border border-zinc-800 px-3 py-1.5 text-sm text-zinc-400 transition hover:bg-zinc-900 hover:text-white">Close</button>
+              <button type="button" onClick={() => selectItem(null)} className="min-h-11 rounded-md border border-zinc-800 px-3 text-sm text-zinc-400 transition hover:bg-zinc-900 hover:text-white lg:rounded-full">Close</button>
             </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid grid-cols-2 gap-2 lg:mt-6 lg:gap-3">
               <Detail label="Current Stage" value={formatLabel(selectedItem.stage)} />
               <Detail label="Risk" value={formatLabel(selectedItem.riskStatus)} />
               <Detail label="Owner" value={selectedItem.owner?.name || "Unassigned"} />
@@ -249,7 +314,7 @@ export default function WorkflowPage() {
               <button
                 type="button"
                 onClick={() => router.push(`/${agencySlug}/workflow/${selectedItem.contentAssetId}`)}
-                className="rounded-full bg-indigo-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400"
+                className="min-h-11 rounded-md bg-indigo-500 px-5 text-sm font-semibold text-white transition hover:bg-indigo-400 lg:rounded-full"
               >
                 Open full details
               </button>
@@ -289,7 +354,7 @@ function WorkflowActionPanel({
   if (!canShowSubmit && !canReview && !showBlock && !showUnblock) return null;
 
   return (
-    <section className="mt-6 rounded-2xl border border-zinc-800 bg-[#0b0b11] p-4">
+    <section className="mt-4 rounded-md border border-zinc-800 bg-[#0b0b11] p-3 lg:mt-6 lg:rounded-2xl lg:p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">Move this work</h3>
@@ -306,14 +371,14 @@ function WorkflowActionPanel({
               value={draft.externalLink}
               onChange={(event) => onDraftChange({ ...draft, externalLink: event.target.value })}
               placeholder={submitPlaceholder(item.stage)}
-              className="mt-2 w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500"
+              className="mt-2 min-h-11 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 text-base text-white outline-none transition focus:border-indigo-500 lg:rounded-2xl lg:text-sm"
             />
           </label>
           <button
             type="button"
             disabled={isRunning || !canSubmit}
             onClick={() => submitAction && onAction(submitAction.action)}
-            className="w-full rounded-full bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-11 w-full rounded-md bg-indigo-500 px-4 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60 lg:rounded-full"
           >
             {isRunning ? "Moving..." : submitAction?.label}
           </button>
@@ -329,7 +394,7 @@ function WorkflowActionPanel({
               onChange={(event) => onDraftChange({ ...draft, comment: event.target.value })}
               rows={3}
               placeholder="Add a clear note for the next person."
-              className="mt-2 w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500"
+              className="mt-2 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-3 text-base text-white outline-none transition focus:border-indigo-500 lg:rounded-2xl lg:text-sm"
             />
           </label>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -339,7 +404,7 @@ function WorkflowActionPanel({
                 type="button"
                 disabled={isRunning}
                 onClick={() => onAction(action.action)}
-                className={`rounded-full px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${action.tone === "danger" ? "border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/15" : "bg-emerald-500 px-4 text-white hover:bg-emerald-400"}`}
+                className={`min-h-11 rounded-md px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 lg:rounded-full ${action.tone === "danger" ? "border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/15" : "bg-emerald-500 px-4 text-white hover:bg-emerald-400"}`}
               >
                 {isRunning ? "Moving..." : action.label}
               </button>
@@ -357,7 +422,7 @@ function WorkflowActionPanel({
                 value={draft.reason}
                 onChange={(event) => onDraftChange({ ...draft, reason: event.target.value })}
                 placeholder="Waiting for assets, unclear brief, missing footage..."
-                className="mt-2 w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500"
+                className="mt-2 min-h-11 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 text-base text-white outline-none transition focus:border-indigo-500 lg:rounded-2xl lg:text-sm"
               />
             </label>
           ) : null}
@@ -365,7 +430,7 @@ function WorkflowActionPanel({
             type="button"
             disabled={isRunning || (showBlock && !draft.reason.trim())}
             onClick={() => onAction(showUnblock ? "UNBLOCK" : "BLOCK")}
-            className={`w-full rounded-full px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${showUnblock ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15" : "border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15"}`}
+            className={`min-h-11 w-full rounded-md px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 lg:rounded-full ${showUnblock ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15" : "border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15"}`}
           >
             {isRunning ? "Saving..." : showUnblock ? "Resolve blocker" : "Raise blocker"}
           </button>
@@ -378,16 +443,54 @@ function WorkflowActionPanel({
 function SummaryCard({ label, value, tone = "default" }: { label: string; value: number; tone?: "default" | "attention" | "danger" }) {
   const valueClass = tone === "danger" ? "text-red-300" : tone === "attention" ? "text-amber-300" : "text-white";
   return (
-    <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-5 shadow-2xl shadow-black/20">
+    <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 shadow-lg shadow-black/10 lg:rounded-3xl lg:p-5 lg:shadow-2xl">
       <div className="text-sm text-zinc-400">{label}</div>
-      <div className={`mt-4 text-3xl font-semibold ${valueClass}`}>{value}</div>
+      <div className={`mt-2 text-2xl font-semibold lg:mt-4 lg:text-3xl ${valueClass}`}>{value}</div>
     </div>
   );
 }
 
-function FilterSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ id: string; label: string }> }) {
+function WorkflowFilters({
+  filters,
+  setFilters,
+  options,
+}: {
+  filters: { clientId: string; campaignId: string; ownerId: string; risk: string; search: string };
+  setFilters: Dispatch<SetStateAction<{ clientId: string; campaignId: string; ownerId: string; risk: string; search: string }>>;
+  options: {
+    clients: Array<{ id: string; label: string }>;
+    campaigns: Array<{ id: string; label: string }>;
+    owners: Array<{ id: string; label: string }>;
+  };
+}) {
   return (
-    <select value={value} onChange={(event) => onChange(event.target.value)} className="rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500">
+    <>
+      <input
+        value={filters.search}
+        onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+        placeholder="Search code, client, campaign"
+        className="min-h-11 rounded-md border border-zinc-800 bg-[#0b0b11] px-3 text-base text-white outline-none transition focus:border-indigo-500"
+      />
+      <FilterSelect label="All clients" value={filters.clientId} onChange={(value) => setFilters((current) => ({ ...current, clientId: value }))} options={options.clients} compact />
+      <FilterSelect label="All campaigns" value={filters.campaignId} onChange={(value) => setFilters((current) => ({ ...current, campaignId: value }))} options={options.campaigns} compact />
+      <FilterSelect label="All owners" value={filters.ownerId} onChange={(value) => setFilters((current) => ({ ...current, ownerId: value }))} options={options.owners} compact />
+      <select
+        value={filters.risk}
+        onChange={(event) => setFilters((current) => ({ ...current, risk: event.target.value }))}
+        className="min-h-11 rounded-md border border-zinc-800 bg-[#0b0b11] px-3 text-base text-white outline-none transition focus:border-indigo-500"
+      >
+        <option value="">All risk</option>
+        {riskOptions.map((risk) => (
+          <option key={risk} value={risk}>{formatLabel(risk)}</option>
+        ))}
+      </select>
+    </>
+  );
+}
+
+function FilterSelect({ label, value, onChange, options, compact = false }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ id: string; label: string }>; compact?: boolean }) {
+  return (
+    <select value={value} onChange={(event) => onChange(event.target.value)} className={compact ? "min-h-11 rounded-md border border-zinc-800 bg-[#0b0b11] px-3 text-base text-white outline-none transition focus:border-indigo-500" : "rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500"}>
       <option value="">{label}</option>
       {options.map((option) => (
         <option key={option.id} value={option.id}>{option.label}</option>
@@ -398,7 +501,7 @@ function FilterSelect({ label, value, onChange, options }: { label: string; valu
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-[#0b0b11] p-4">
+    <div className="rounded-md border border-zinc-800 bg-[#0b0b11] p-3 lg:rounded-2xl lg:p-4">
       <div className="text-xs uppercase tracking-wider text-zinc-600">{label}</div>
       <div className="mt-2 truncate text-sm text-zinc-200">{value}</div>
     </div>

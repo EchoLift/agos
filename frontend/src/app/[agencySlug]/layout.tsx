@@ -31,10 +31,10 @@ export default async function WorkspaceLayout({
       <AgencyProvider slug={agencySlug}>
         <div className="agos-workspace min-h-screen bg-[#09090b] text-zinc-100">
           <WorkspaceHeader agencySlug={agencySlug} />
-          <main className="w-full px-3 py-4 pl-24 pr-3 md:px-4 lg:px-5">
+          <main className="w-full px-2 py-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:px-3 md:px-4 lg:px-5 lg:pb-4">
             <WorkspaceAccessGuard>{children}</WorkspaceAccessGuard>
           </main>
-          <footer className="border-t border-zinc-800/70 bg-[#09090b]/95 py-3 pl-20 text-center text-xs text-zinc-500 md:pl-0">
+          <footer className="border-t border-zinc-800/70 bg-[#09090b]/95 py-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))] text-center text-xs text-zinc-500 lg:pb-3">
             Powered by AGOS
           </footer>
         </div>

@@ -15,6 +15,7 @@ export default function WorkflowDetailPage() {
   const params = useParams<{ contentId: string }>();
   const { agencyId, agencySlug, agency } = useAgency();
   const roleKeys = useMemo(() => getAgencyRoleKeys(agency), [agency]);
+  const canEditAsset = roleKeys.some((roleKey) => ["OWNER", "ADMIN", "MANAGER"].includes(roleKey));
   const [asset, setAsset] = useState<ContentAsset | null>(null);
   const [draft, setDraft] = useState({ title: "", type: "REEL", brief: "" });
   const [actionDraft, setActionDraft] = useState({ externalLink: "", comment: "" });
@@ -94,39 +95,39 @@ export default function WorkflowDetailPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+    <div className="mx-auto max-w-6xl space-y-3 lg:space-y-5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2 lg:gap-4">
           <button
             type="button"
             onClick={() => router.push(`/${agencySlug}/workflow`)}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white lg:rounded-full"
           >
             ←
           </button>
-          <div>
+          <div className="min-w-0">
             <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">Workflow</p>
-            <h1 className="mt-1 text-3xl font-semibold text-white">{asset?.title || (isLoading ? "Loading..." : "Workflow Item")}</h1>
+            <h1 className="mt-1 truncate text-2xl font-semibold leading-tight text-white lg:text-3xl">{asset?.title || (isLoading ? "Loading..." : "Workflow Item")}</h1>
           </div>
         </div>
-        {asset ? (
+        {asset && canEditAsset ? (
           <button
             type="button"
             onClick={() => setIsEditing((value) => !value)}
-            className="rounded-full border border-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-900"
+            className="min-h-11 shrink-0 rounded-md border border-zinc-800 px-3 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-900 lg:rounded-full lg:px-4"
           >
             {isEditing ? "Cancel" : "Edit"}
           </button>
         ) : null}
       </div>
 
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-6 shadow-2xl shadow-black/20 sm:p-8">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 shadow-xl shadow-black/20 sm:p-4 lg:rounded-xl lg:p-6">
         {isLoading ? (
           <div className="text-sm text-zinc-500">Loading workflow...</div>
         ) : error ? (
           <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>
         ) : asset ? (
-          <div className="space-y-6">
+          <div className="space-y-3 lg:space-y-5">
             <div className="flex flex-wrap items-center gap-3">
               <span className={statusPillClasses(asset.stage || "DRAFT", "sm")}>
                 {formatLabel(asset.stage || "DRAFT")}
@@ -136,13 +137,13 @@ export default function WorkflowDetailPage() {
             </div>
 
             {isEditing ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <label className="block text-sm font-medium text-zinc-300">
                   Task Title
                   <input
                     value={draft.title}
                     onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
-                    className="mt-2 w-full rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-base text-white outline-none transition focus:border-indigo-500"
+                    className="mt-2 min-h-11 w-full rounded-md border border-zinc-800 bg-[#0b0b11] px-3 text-base text-white outline-none transition focus:border-indigo-500"
                   />
                 </label>
                 <label className="block text-sm font-medium text-zinc-300">
@@ -150,7 +151,7 @@ export default function WorkflowDetailPage() {
                   <select
                     value={draft.type}
                     onChange={(event) => setDraft((current) => ({ ...current, type: event.target.value }))}
-                    className="mt-2 w-full rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-base text-white outline-none transition focus:border-indigo-500"
+                    className="mt-2 min-h-11 w-full rounded-md border border-zinc-800 bg-[#0b0b11] px-3 text-base text-white outline-none transition focus:border-indigo-500"
                   >
                     {contentTypes.map((type) => (
                       <option key={type} value={type}>{type}</option>
@@ -163,7 +164,7 @@ export default function WorkflowDetailPage() {
                     value={draft.brief}
                     onChange={(event) => setDraft((current) => ({ ...current, brief: event.target.value }))}
                     rows={5}
-                    className="mt-2 w-full rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-base text-white outline-none transition focus:border-indigo-500"
+                    className="mt-2 w-full rounded-md border border-zinc-800 bg-[#0b0b11] px-3 py-3 text-base text-white outline-none transition focus:border-indigo-500"
                   />
                 </label>
                 <div className="flex justify-end">
@@ -171,21 +172,21 @@ export default function WorkflowDetailPage() {
                     type="button"
                     disabled={isSaving || !draft.title.trim()}
                     onClick={save}
-                    className="rounded-full bg-indigo-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="min-h-11 rounded-md bg-indigo-500 px-5 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60 lg:rounded-full"
                   >
                     {isSaving ? "Saving..." : "Save changes"}
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="space-y-6">
-                <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-3 lg:space-y-5">
+                <div className="grid gap-2 sm:grid-cols-2 lg:gap-4">
                   <Detail label="Type" value={asset.type} />
                   <Detail label="Stage" value={asset.stage || "Draft"} />
                   <Detail label="Campaign" value={asset.campaignSummary?.name || asset.campaignId} />
                   <Detail label="Client" value={asset.clientSummary?.name || asset.clientId} />
                 </div>
-                <section className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+                <section className="grid gap-2 lg:grid-cols-[0.8fr_1.2fr] lg:gap-4">
                   <CampaignContext campaign={asset.campaignSummary} />
                   <ClientContext
                     client={asset.clientSummary}
@@ -204,7 +205,7 @@ export default function WorkflowDetailPage() {
                 />
                 <section className="space-y-2">
                   <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">Brief</h2>
-                  <p className="rounded-2xl border border-zinc-800 bg-[#0b0b11] p-4 text-sm leading-6 text-zinc-300">
+                  <p className="rounded-md border border-zinc-800 bg-[#0b0b11] p-3 text-sm leading-6 text-zinc-300">
                     {asset.brief || "No brief added yet."}
                   </p>
                 </section>
@@ -224,7 +225,7 @@ function LatestSubmissionCard({ submission }: { submission: ContentAsset["latest
   const isLink = submittedValue.startsWith("http");
 
   return (
-    <section className="rounded-2xl border border-zinc-800 bg-[#0b0b11] p-4">
+    <section className="rounded-md border border-zinc-800 bg-[#0b0b11] p-3 lg:rounded-lg lg:p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">Latest submission</h2>
@@ -237,7 +238,7 @@ function LatestSubmissionCard({ submission }: { submission: ContentAsset["latest
         <div className="text-xs text-zinc-600">{formatSubmittedAt(submission.createdAt)}</div>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-3">
+      <div className="mt-3 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-3">
         <div className="text-xs uppercase tracking-wider text-zinc-600">Handoff URL / note</div>
         {submittedValue ? (
           isLink ? (
@@ -262,9 +263,9 @@ function LatestSubmissionCard({ submission }: { submission: ContentAsset["latest
 
 function CampaignContext({ campaign }: { campaign: ContentAsset["campaignSummary"] }) {
   return (
-    <section className="rounded-2xl border border-zinc-800 bg-[#0b0b11] p-4">
+    <section className="rounded-md border border-zinc-800 bg-[#0b0b11] p-3 lg:rounded-lg lg:p-4">
       <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">Campaign context</h2>
-      <div className="mt-4 space-y-3">
+      <div className="mt-3 space-y-2">
         <ContextLine label="Name" value={campaign?.name} />
         <ContextLine label="Type" value={campaign?.campaignType ? formatLabel(campaign.campaignType) : null} />
         <ContextLine label="Goal" value={campaign?.goal ? formatLabel(campaign.goal) : null} />
@@ -297,26 +298,28 @@ function WorkflowDetailActions({
   if (!submitAction && reviewActions.length === 0) return null;
 
   return (
-    <section className="rounded-2xl border border-zinc-800 bg-[#0b0b11] p-4">
+    <section className="rounded-md border border-zinc-800 bg-[#0b0b11] p-3 lg:rounded-lg lg:p-4">
       <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">Task flow</h2>
       <p className="mt-1 text-xs leading-5 text-zinc-500">Move the current stage forward with a recorded submission, handover, approval, or change request.</p>
 
       {submitAction ? (
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-3 space-y-3">
           <input
             value={draft.externalLink}
             onChange={(event) => onDraftChange({ ...draft, externalLink: event.target.value })}
             placeholder={submitPlaceholder(stage)}
-            className="min-w-0 flex-1 rounded-2xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500"
+            className="min-h-11 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 text-base text-white outline-none transition focus:border-indigo-500 sm:text-sm"
           />
-          <button
-            type="button"
-            disabled={isRunning || !canSubmit}
-            onClick={() => onAction(submitAction.action)}
-            className="rounded-full bg-indigo-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isRunning ? "Moving..." : submitAction.label}
-          </button>
+          <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 -mx-3 border-t border-zinc-800 bg-[#0b0b11]/95 p-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
+            <button
+              type="button"
+              disabled={isRunning || !canSubmit}
+              onClick={() => onAction(submitAction.action)}
+              className="min-h-11 w-full rounded-md bg-indigo-500 px-5 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto lg:rounded-full"
+            >
+              {isRunning ? "Moving..." : submitAction.label}
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -327,16 +330,16 @@ function WorkflowDetailActions({
             onChange={(event) => onDraftChange({ ...draft, comment: event.target.value })}
             rows={3}
             placeholder="Review comment or reason"
-            className="w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500"
+            className="w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-3 text-base text-white outline-none transition focus:border-indigo-500 sm:text-sm"
           />
-          <div className="flex flex-wrap gap-2">
+          <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 -mx-3 flex gap-2 border-t border-zinc-800 bg-[#0b0b11]/95 p-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
             {reviewActions.map((action) => (
               <button
                 key={action.action}
                 type="button"
                 disabled={isRunning}
                 onClick={() => onAction(action.action)}
-                className={`rounded-full px-5 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${action.tone === "danger" ? "border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/15" : "bg-emerald-500 text-white hover:bg-emerald-400"}`}
+                className={`min-h-11 flex-1 rounded-md px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none lg:rounded-full ${action.tone === "danger" ? "border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/15" : "bg-emerald-500 text-white hover:bg-emerald-400"}`}
               >
                 {isRunning ? "Moving..." : action.label}
               </button>
@@ -362,7 +365,7 @@ function ClientContext({
     : [];
 
   return (
-    <section className="rounded-2xl border border-zinc-800 bg-[#0b0b11] p-4">
+    <section className="rounded-md border border-zinc-800 bg-[#0b0b11] p-3 lg:rounded-lg lg:p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">Client vibe</h2>
@@ -376,7 +379,7 @@ function ClientContext({
         <button
           type="button"
           onClick={onView}
-          className="shrink-0 rounded-full border border-zinc-800 px-3 py-1.5 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-900 hover:text-white"
+          className="min-h-11 shrink-0 rounded-md border border-zinc-800 px-3 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-900 hover:text-white lg:rounded-full"
         >
           View client
         </button>
@@ -423,7 +426,7 @@ function ContextLine({ label, value }: { label: string; value?: string | null })
 
 function Detail({ label, value, mono = false }: { label: string; value?: string | null; mono?: boolean }) {
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-[#0b0b11] p-4">
+    <div className="rounded-md border border-zinc-800 bg-[#0b0b11] p-3 lg:rounded-lg lg:p-4">
       <div className="text-xs uppercase tracking-wider text-zinc-600">{label}</div>
       <div className={`mt-2 truncate text-sm text-zinc-200 ${mono ? "font-mono" : ""}`}>{value || "—"}</div>
     </div>

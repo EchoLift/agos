@@ -16,7 +16,7 @@ export default function HelpSearch({ articles }: { articles: SearchArticle[] }) 
 
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return articles.slice(0, 8);
+    if (!normalized) return [];
 
     return articles
       .filter((article) =>
@@ -37,7 +37,7 @@ export default function HelpSearch({ articles }: { articles: SearchArticle[] }) 
         placeholder="Search setup, campaigns, workflow..."
         className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary"
       />
-      <div className="mt-3 space-y-2">
+      {query.trim() ? <div className="mt-3 space-y-2">
         {results.map((article) => (
           <Link
             key={article.href}
@@ -53,7 +53,8 @@ export default function HelpSearch({ articles }: { articles: SearchArticle[] }) 
             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{article.description}</p>
           </Link>
         ))}
-      </div>
+        {results.length === 0 ? <p className="px-1 py-2 text-sm text-muted-foreground">No help articles found.</p> : null}
+      </div> : null}
     </div>
   );
 }

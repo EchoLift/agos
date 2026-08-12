@@ -201,10 +201,10 @@ export default function TeamPage() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="w-full min-w-0 max-w-full space-y-4 overflow-x-clip sm:space-y-6 lg:space-y-8">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-semibold text-white">Team</h1>
+          <h1 className="text-2xl font-semibold text-white sm:text-3xl">Team</h1>
           <p className="mt-2 text-sm text-zinc-400">Manage your agency members and roles.</p>
           <Link href="/help/team-access/roles" className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200">
             Roles and workspace access
@@ -212,20 +212,20 @@ export default function TeamPage() {
         </div>
         <Link
           href={`/${agencySlug}/team/new`}
-          className="rounded-full bg-indigo-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400"
+          className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-indigo-500 px-3 text-sm font-semibold text-white hover:bg-indigo-400 sm:px-5"
         >
           Invite Member
         </Link>
       </div>
 
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-4 shadow-2xl shadow-black/20">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 shadow-lg shadow-black/20 sm:p-4">
         <div className="grid gap-3 md:grid-cols-4">
-          <input value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Search name, email, mobile" className="rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500 md:col-span-2" />
-          <select value={filters.roleId} onChange={(event) => setFilters((current) => ({ ...current, roleId: event.target.value }))} className="rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500">
+          <input value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Search name, email, mobile" className="min-h-11 min-w-0 rounded-lg border border-zinc-800 bg-[#0b0b11] px-3 text-sm text-white outline-none transition focus:border-indigo-500 md:col-span-2" />
+          <select value={filters.roleId} onChange={(event) => setFilters((current) => ({ ...current, roleId: event.target.value }))} className="min-h-11 min-w-0 rounded-lg border border-zinc-800 bg-[#0b0b11] px-3 text-sm text-white outline-none transition focus:border-indigo-500">
             <option value="">All roles</option>
             {roles.map((role) => <option key={role.id} value={role.id}>{role.displayName}</option>)}
           </select>
-          <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} className="rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500">
+          <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} className="min-h-11 min-w-0 rounded-lg border border-zinc-800 bg-[#0b0b11] px-3 text-sm text-white outline-none transition focus:border-indigo-500">
             <option value="">All status</option>
             <option value="ACTIVE">Active</option>
             <option value="INACTIVE">Inactive</option>
@@ -233,7 +233,7 @@ export default function TeamPage() {
         </div>
       </div>
 
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl shadow-black/20">
+      <div className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 shadow-lg shadow-black/20 sm:p-4 lg:p-8">
         {error ? (
           <div className="mb-5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
             {error}
@@ -261,7 +261,58 @@ export default function TeamPage() {
         ) : filteredMembers.length === 0 ? (
           <div className="py-12 text-center text-sm text-zinc-500">No team members match these filters.</div>
         ) : (
-          <div className="overflow-hidden">
+          <>
+            <div className="space-y-2 lg:hidden">
+              {filteredMembers.map((member) => (
+                <article key={member.id} className="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zinc-800">
+                      {member.avatarUrl ? (
+                        <img src={member.avatarUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-sm font-medium text-zinc-400">{(member.name || member.email || "?").charAt(0).toUpperCase()}</span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h2 className="truncate font-semibold text-zinc-100">{member.name || "Unknown"}</h2>
+                          <p className="truncate text-sm text-zinc-500">{member.email || member.mobileNumber || "No contact"}</p>
+                        </div>
+                        <span className={statusPillClasses(member.status, "sm")}>{member.status}</span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {(member.roles?.length ? member.roles : [{ id: member.roleId, name: member.roleName, key: member.roleName.toUpperCase() }]).map((role) => (
+                          <span key={role.id} className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs font-medium text-zinc-200">
+                            {role.name}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-xs text-zinc-500">Joined {new Date(member.joinedAt).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 border-t border-zinc-800 pt-3">
+                    <button
+                      type="button"
+                      disabled={busyMemberId === member.id || (!canChangeRoles && !canUseSelfRoleTestingOverride(member))}
+                      onClick={() => requestRoleChange(member)}
+                      className="min-h-11 rounded-lg border border-zinc-700 px-3 text-sm font-semibold text-zinc-300 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Edit roles
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyMemberId === member.id}
+                      onClick={() => handleRemove(member)}
+                      className="min-h-11 rounded-lg border border-red-500/30 px-3 text-sm font-semibold text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="hidden overflow-hidden lg:block">
             <table className="w-full text-left text-sm text-zinc-400">
               <thead className="border-b border-zinc-800/50 text-xs uppercase tracking-wider text-zinc-500">
                 <tr>
@@ -336,13 +387,14 @@ export default function TeamPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </div>
 
       {pendingRoleChange ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-2xl rounded-2xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl shadow-black/40">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:px-4">
+          <div className="max-h-[calc(100dvh-1rem)] w-full max-w-2xl overflow-y-auto rounded-t-lg border border-zinc-800 bg-zinc-950 p-4 shadow-2xl shadow-black/40 sm:rounded-lg sm:p-6">
             <h2 className="text-lg font-semibold text-white">
               {pendingRoleChange.blockedReason ? "Cannot change roles" : "Edit roles"}
             </h2>

@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import HelpDesktopSidebar from "@/components/help/HelpDesktopSidebar";
+import HelpHeader from "@/components/help/HelpHeader";
+import HelpMobileNavigation from "@/components/help/HelpMobileNavigation";
 import HelpSearch from "@/components/help/HelpSearch";
 import MarkdownContent from "@/components/help/MarkdownContent";
 import { getAllDocs, getDocBySlug, getDocsNavigation } from "@/lib/docs";
@@ -24,20 +27,11 @@ export default async function HelpPage({ params }: { params: Promise<{ slug?: st
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-xl">
-        <div className="flex w-full items-center justify-between px-4 py-3 lg:px-6">
-          <Link href="/" className="rounded-xl bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
-            AGOS Help
-          </Link>
-          <div className="flex items-center gap-2">
-            <Link href="/login" className="rounded-full border border-border px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground">
-              Login
-            </Link>
-          </div>
-        </div>
+        <HelpHeader />
       </header>
 
-      <main className="grid min-h-[calc(100vh-57px)] grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)_260px]">
-        <aside className="border-b border-border bg-muted/30 p-4 lg:sticky lg:top-[57px] lg:h-[calc(100vh-57px)] lg:overflow-y-auto lg:border-b-0 lg:border-r">
+      <main className="grid min-h-[calc(100vh-61px)] min-w-0 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)_260px]">
+        <aside className="border-b border-border bg-muted/30 p-3 sm:p-4 lg:hidden">
           <HelpSearch
             articles={articles.map(({ href, title, description, category, status }) => ({
               href,
@@ -47,36 +41,26 @@ export default async function HelpPage({ params }: { params: Promise<{ slug?: st
               status,
             }))}
           />
-          <nav className="mt-4 space-y-5">
-            {navigation.map((section) => (
-              <div key={section.category}>
-                <div className="px-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">{section.category}</div>
-                <div className="mt-2 space-y-1">
-                  {section.articles.map((item) => {
-                    const isActive = article?.slug === item.slug;
-                    return (
-                      <Link
-                        key={item.slug}
-                        href={item.href}
-                        className={`block rounded-xl px-3 py-2 text-sm transition ${
-                          isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        }`}
-                      >
-                        {item.title}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </nav>
+          <HelpMobileNavigation navigation={navigation} activeSlug={article?.slug} />
         </aside>
 
-        <section className="min-w-0 p-4 lg:p-6">
+        <HelpDesktopSidebar
+          articles={articles.map(({ href, title, description, category, status }) => ({
+            href,
+            title,
+            description,
+            category,
+            status,
+          }))}
+          navigation={navigation}
+          activeSlug={article?.slug}
+        />
+
+        <section className="min-w-0 p-3 sm:p-4 lg:p-6">
           {article ? <ArticleView article={article} articles={articles} /> : <HelpOverview navigation={navigation} />}
         </section>
 
-        <aside className="hidden border-l border-border bg-muted/30 p-4 lg:sticky lg:top-[57px] lg:block lg:h-[calc(100vh-57px)] lg:overflow-y-auto">
+        <aside className="hidden border-l border-border bg-muted/30 p-4 lg:sticky lg:top-[61px] lg:block lg:h-[calc(100vh-61px)] lg:overflow-y-auto">
           {article ? (
             <>
               <div className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">On This Page</div>
@@ -111,9 +95,9 @@ function HelpOverview({ navigation }: { navigation: ReturnType<typeof getDocsNav
       <p className="mt-4 max-w-3xl text-lg leading-8 text-muted-foreground">
         Start with setup, then learn how clients, campaigns, gigs, workflow, and calendar connect inside one agency operating system.
       </p>
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
+      <div className="mt-5 grid gap-3 md:mt-8 md:grid-cols-2 md:gap-4">
         {navigation.map((section) => (
-          <div key={section.category} className="rounded-2xl border border-border bg-card p-4">
+          <div key={section.category} className="rounded-lg border border-border bg-card p-3 sm:p-4">
             <h2 className="text-lg font-semibold text-foreground">{section.category}</h2>
             <div className="mt-3 space-y-2">
               {section.articles.slice(0, 5).map((article) => (
@@ -135,7 +119,7 @@ function ArticleView({ article, articles }: { article: NonNullable<ReturnType<ty
   const next = index < articles.length - 1 ? articles[index + 1] : null;
 
   return (
-    <article className="mx-auto max-w-4xl rounded-3xl border border-border bg-card p-5 shadow-2xl shadow-black/10 lg:p-8">
+    <article className="mx-auto max-w-4xl rounded-lg border border-border bg-card p-4 shadow-lg shadow-black/10 sm:p-5 lg:p-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
