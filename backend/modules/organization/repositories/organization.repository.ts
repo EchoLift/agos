@@ -240,6 +240,7 @@ export class OrganizationRepository {
     roleIds: string[] = [roleId],
     mobileNumber: string | null = null,
     correlationId?: string,
+    emailEncrypted?: string | null,
   ): Promise<any> {
     return this.prisma.$transaction(async (tx) => {
       const uniqueRoleIds = [...new Set([roleId, ...roleIds])];
@@ -247,6 +248,7 @@ export class OrganizationRepository {
         data: {
           agencyId,
           emailHash,
+          emailEncrypted,
           roleId,
           invitedByMembershipId,
           token,

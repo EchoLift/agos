@@ -184,29 +184,41 @@ export class NotificationDeliveryProcessor {
       return false;
     }
 
-    // Resolve recipient email from AuthUser (authoritative source via emailHash)
+    // Resolve recipient email:
+    // 1. Primary source: Decrypt invitation.emailEncrypted (persisted at invitation creation)
     let recipientEmail: string | null = null;
-    const authUser = await this.prisma.authUser.findUnique({
-      where: { emailHash: invitation.emailHash },
-    });
-    if (authUser?.emailEncrypted) {
+    if (invitation.emailEncrypted) {
       try {
-        recipientEmail = this.crypto.decrypt(authUser.emailEncrypted);
-      } catch {
-        // fall through to warn below
+        recipientEmail = this.crypto.decrypt(invitation.emailEncrypted);
+      } catch (err) {
+        this.logger.error(`Failed to decrypt emailEncrypted for invitation ${invitation.id}`);
       }
     }
 
+    // 2. Fallback: Lookup AuthUser by emailHash (for existing registered users / legacy compatibility)
+    if (!recipientEmail) {
+      const authUser = await this.prisma.authUser.findUnique({
+        where: { emailHash: invitation.emailHash },
+      });
+      if (authUser?.emailEncrypted) {
+        try {
+          recipientEmail = this.crypto.decrypt(authUser.emailEncrypted);
+        } catch {
+          // fall through to check below
+        }
+      }
+    }
+
+    // 3. Handle unresolvable legacy invitations safely (do not retry infinitely)
     if (!recipientEmail) {
       this.logger.warn(
-        `Cannot resolve recipient email for invitation ${invitation.id}; will retry`,
+        `Cannot resolve recipient email for invitation ${invitation.id}; cancelling delivery (legacy/unresolvable)`,
       );
-      await this.markFailed(
+      await this.markCancelled(
         deliveryId,
-        "Recipient email unresolvable from emailHash",
-        delivery.retryCount + 1,
+        "Legacy invitation emailEncrypted missing and unresolvable",
       );
-      return false;
+      return true; // Stop scheduling retries for unrecoverable legacy invitation
     }
 
     const frontendUrl =
