@@ -51,6 +51,7 @@ describe("OrganizationService Unit Tests", () => {
       hashLookup: jest.fn().mockReturnValue("hashed-email"),
       normalizeEmail: jest.fn((email: string) => email.trim().toLowerCase()),
       hashEmailLookup: jest.fn().mockReturnValue("hashed-email"),
+      encrypt: jest.fn().mockReturnValue("encrypted-email"),
       decrypt: jest.fn((value: string) => value),
     };
 

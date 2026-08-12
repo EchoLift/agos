@@ -298,11 +298,11 @@ describe("NotificationDeliveryProcessor", () => {
 
   // ── New: processDelivery invitation branch ─────────────────────────────────
 
-  describe("processDelivery — invitation branch (TEST-8)", () => {
-    it("TEST-8: sends invitation email via email_delivery queue without checking user membership", async () => {
-      const invitation = makeInvitation();
+  describe("processDelivery — invitation branch", () => {
+    it("decrypts invitation.emailEncrypted and sends email to unregistered invitee without AuthUser lookup", async () => {
+      const invitation = makeInvitation({ emailEncrypted: "encrypted:unregistered@example.com" });
       const delivery = {
-        id: "del-inv",
+        id: "del-inv-1",
         agencyId: "agency_1",
         invitationId: "inv_55",
         status: "QUEUED",
@@ -318,31 +318,60 @@ describe("NotificationDeliveryProcessor", () => {
 
       prisma.notificationDelivery.findUnique.mockResolvedValue(delivery);
       prisma.invitation.findUnique.mockResolvedValue(invitation);
-      prisma.authUser.findUnique.mockResolvedValue({
-        id: "auth-1",
-        emailEncrypted: "enc:invitee@example.com",
+      crypto.decrypt.mockImplementation((val: string) => {
+        if (val === "encrypted:unregistered@example.com") return "unregistered@example.com";
+        return val;
       });
-      crypto.decrypt.mockReturnValue("invitee@example.com");
       emailDelivery.sendEmail.mockResolvedValue({
         success: true,
         provider: "RESEND",
-        providerMessageId: "msg-inv-abc",
+        providerMessageId: "msg-inv-123",
       });
-      prisma.notificationDelivery.update.mockResolvedValue({});
 
-      const result = await processor.processDelivery("del-inv");
+      const result = await processor.processDelivery("del-inv-1");
 
       expect(result).toBe(true);
+      expect(crypto.decrypt).toHaveBeenCalledWith("encrypted:unregistered@example.com");
       expect(emailDelivery.sendEmail).toHaveBeenCalledWith(
-        expect.objectContaining({ to: "invitee@example.com" }),
+        expect.objectContaining({ to: "unregistered@example.com" }),
       );
-      expect(prisma.notificationDelivery.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ status: "SENT", provider: "RESEND" }),
-        }),
-      );
-      // Must NOT check membership for invitation deliveries
+      // emailHash should NOT be queried on AuthUser when emailEncrypted is on invitation
+      expect(prisma.authUser.findUnique).not.toHaveBeenCalled();
       expect(prisma.membership.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("handles legacy invitations safely: marks CANCELLED and returns true when recipient email cannot be resolved (no infinite retry)", async () => {
+      const legacyInvitation = makeInvitation({ emailEncrypted: null }); // legacy invitation without emailEncrypted
+      const delivery = {
+        id: "del-legacy",
+        agencyId: "agency_1",
+        invitationId: "inv_55",
+        status: "QUEUED",
+        retryCount: 0,
+        notification: {
+          id: "notif-legacy",
+          userId: null,
+          eventType: "MemberInvited",
+          title: "Invited",
+          body: "Join us",
+        },
+      };
+
+      prisma.notificationDelivery.findUnique.mockResolvedValue(delivery);
+      prisma.invitation.findUnique.mockResolvedValue(legacyInvitation);
+      prisma.authUser.findUnique.mockResolvedValue(null); // Not registered yet
+
+      const result = await processor.processDelivery("del-legacy");
+
+      expect(result).toBe(true); // Processed gracefully (stopped retrying)
+      expect(emailDelivery.sendEmail).not.toHaveBeenCalled();
+      expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
+        where: { id: "del-legacy" },
+        data: expect.objectContaining({
+          status: "CANCELLED",
+          lastError: expect.stringContaining("Legacy invitation emailEncrypted missing"),
+        }),
+      });
     });
   });
 });

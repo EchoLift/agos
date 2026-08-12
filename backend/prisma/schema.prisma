@@ -197,6 +197,7 @@ model Invitation {
   id                    String           @id @default(uuid())
   agencyId              String
   emailHash             String
+  emailEncrypted        String?
   roleId                String
   invitedByMembershipId String
   mobileNumber          String?

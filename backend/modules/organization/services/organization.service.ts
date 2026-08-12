@@ -287,6 +287,7 @@ export class OrganizationService implements OnModuleInit {
 
     const email = this.cryptoService.normalizeEmail(dto.email);
     const emailHash = this.cryptoService.hashEmailLookup(email);
+    const emailEncrypted = this.cryptoService.encrypt(email);
     const token = crypto.randomBytes(24).toString("hex");
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
     const context = this.requestContext.get();
@@ -301,6 +302,7 @@ export class OrganizationService implements OnModuleInit {
       roleIds,
       dto.mobileNumber ?? null,
       context?.correlationId,
+      emailEncrypted,
     );
 
     return {
