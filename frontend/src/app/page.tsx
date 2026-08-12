@@ -177,17 +177,21 @@ export default function Home() {
           <div className="absolute inset-0 z-10 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.12),transparent_50%)]" />
           <div className="relative z-20 max-w-2xl">
             <p className="mb-4 inline-flex rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-sm font-medium uppercase tracking-widest text-indigo-300">
-              Creative Agency Operations
+              Creative Agency Operations Platform
             </p>
-            <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-              Run your creative agency without WhatsApp, Notion, and Excel.
+            {/* h1 = "AGOS" — required by Google branding verification */}
+            <h1 className="bg-gradient-to-r from-indigo-300 via-violet-300 to-indigo-400 bg-clip-text text-6xl font-bold tracking-tight text-transparent sm:text-7xl lg:text-8xl">
+              AGOS
             </h1>
+            <p className="mt-4 text-2xl font-semibold leading-snug tracking-tight text-foreground sm:text-3xl">
+              Run your creative agency without WhatsApp, Notion, and Excel.
+            </p>
             <p className="mt-5 text-base font-medium leading-relaxed text-foreground/90">
               AGOS is a creative agency operations platform for managing
               clients, campaigns, content production, team assignments,
               approvals, deadlines, and delivery in one workspace.
             </p>
-            <p className="mt-4 text-lg leading-8 text-muted-foreground">
+            <p className="mt-3 text-base leading-7 text-muted-foreground">
               Plan campaigns, assign work to writers, designers, editors and
               production teams, track every deliverable through its workflow,
               and keep everyone aligned from brief to publication.
