@@ -51,8 +51,8 @@ export class NotificationConsumer implements OnModuleInit {
         try {
           const content = msg.content.toString();
           const event = JSON.parse(content);
+          // Payload is reference-only: never extract raw email from event
           const invitationId = event.payload?.invitationId || event.aggregateId;
-          const email = event.payload?.email;
 
           this.logger.log(
             `Consuming MemberInvited event for invitationId: ${invitationId}`,
@@ -63,7 +63,9 @@ export class NotificationConsumer implements OnModuleInit {
             return;
           }
 
-          await this.processor.processInvitationDelivery(invitationId, email);
+          // Creates Notification + NotificationDelivery rows and publishes NotificationQueued.
+          // Throws on DB/publish failure so RabbitMQ does not ACK prematurely.
+          await this.processor.processInvitationDelivery(invitationId);
         } catch (error) {
           this.logger.error("Failed to process MemberInvited event", error);
           throw error;

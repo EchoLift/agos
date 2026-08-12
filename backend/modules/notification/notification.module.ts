@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { CryptoModule } from "@packages/crypto/crypto.module";
+import { EventBusModule } from "@packages/events/event-bus.module";
 import { NotificationService } from "./notification.service";
 import { EmailDeliveryService } from "./email/services/email-delivery.service";
 import { ResendProvider } from "./email/providers/resend.provider";
@@ -7,7 +8,7 @@ import { SendGridProvider } from "./email/providers/sendgrid.provider";
 import { NotificationDeliveryProcessor } from "./processors/notification-delivery.processor";
 
 @Module({
-  imports: [CryptoModule],
+  imports: [CryptoModule, EventBusModule],
   providers: [
     NotificationService,
     EmailDeliveryService,
