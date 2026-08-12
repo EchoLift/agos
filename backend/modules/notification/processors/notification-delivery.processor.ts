@@ -2,6 +2,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "@packages/database/prisma.service";
 import { FieldCryptoService } from "@packages/crypto/field-crypto.service";
 import { ConfigService } from "@nestjs/config";
+import { EventBusService } from "@packages/events/event-bus.service";
+import { DomainEvents } from "@packages/events/domain-event";
 import { EmailDeliveryService } from "../email/services/email-delivery.service";
 import {
   buildDeepLink,
@@ -17,6 +19,7 @@ export class NotificationDeliveryProcessor {
     private readonly crypto: FieldCryptoService,
     private readonly config: ConfigService,
     private readonly emailDelivery: EmailDeliveryService,
+    private readonly eventBus: EventBusService,
   ) {}
 
   /**
@@ -27,9 +30,7 @@ export class NotificationDeliveryProcessor {
 
     const delivery = await this.prisma.notificationDelivery.findUnique({
       where: { id: deliveryId },
-      include: {
-        notification: true,
-      },
+      include: { notification: true },
     });
 
     if (!delivery) {
@@ -42,6 +43,14 @@ export class NotificationDeliveryProcessor {
       return true;
     }
 
+    // --- INVITATION BRANCH ---
+    // Invitation deliveries have invitationId set and no userId on the Notification.
+    // They bypass the user/membership check and resolve recipient email via emailHash.
+    if (delivery.invitationId) {
+      return this.processInvitationEmailSend(delivery, deliveryId);
+    }
+
+    // --- OPERATIONAL BRANCH ---
     const { agencyId, notification } = delivery;
 
     // Load agency
@@ -55,9 +64,9 @@ export class NotificationDeliveryProcessor {
       return false;
     }
 
-    // Load target user profile and auth user
+    // Load target user profile and auth user (userId is non-null for operational notifications)
     const user = await this.prisma.user.findUnique({
-      where: { id: notification.userId },
+      where: { id: notification.userId! },
       include: { authUser: true },
     });
 
@@ -133,7 +142,6 @@ export class NotificationDeliveryProcessor {
       return true;
     }
 
-    // Delivery failed
     await this.markFailed(
       deliveryId,
       result.error || `Failed via ${result.provider}`,
@@ -144,54 +152,60 @@ export class NotificationDeliveryProcessor {
   }
 
   /**
-   * Process a MemberInvited event using reference invitationId.
-   * Invitation emails DO NOT require an ACTIVE membership, but validate that Invitation is PENDING and not expired.
+   * Send the actual invitation email for a delivery that was created from a MemberInvited event.
+   * Resolves recipient email authoritatively from the Invitation (via emailHash → AuthUser).
    */
-  async processInvitationDelivery(invitationId: string, emailOverride?: string): Promise<boolean> {
-    this.logger.log(`Processing invitation email delivery for invitationId: ${invitationId}`);
-
+  private async processInvitationEmailSend(
+    delivery: { id: string; invitationId: string | null; retryCount: number; agencyId: string },
+    deliveryId: string,
+  ): Promise<boolean> {
     const invitation = await this.prisma.invitation.findUnique({
-      where: { id: invitationId },
-      include: {
-        agency: true,
-        role: true,
-      },
+      where: { id: delivery.invitationId! },
+      include: { agency: true },
     });
 
     if (!invitation) {
-      this.logger.warn(`Invitation ${invitationId} not found`);
+      this.logger.warn(`Invitation ${delivery.invitationId} not found for delivery ${deliveryId}`);
+      await this.markCancelled(deliveryId, "Invitation not found");
       return false;
     }
 
     if (invitation.status !== "PENDING") {
-      this.logger.log(`Invitation ${invitationId} status is ${invitation.status}. Skipping email.`);
+      this.logger.log(
+        `Invitation ${invitation.id} status is ${invitation.status}; cancelling delivery ${deliveryId}`,
+      );
+      await this.markCancelled(deliveryId, `Invitation status is ${invitation.status}`);
       return true;
     }
 
     if (invitation.expiresAt < new Date()) {
-      this.logger.warn(`Invitation ${invitationId} is expired.`);
+      this.logger.warn(`Invitation ${invitation.id} is expired; cancelling delivery ${deliveryId}`);
+      await this.markCancelled(deliveryId, "Invitation expired");
       return false;
     }
 
-    // Resolve target recipient email
-    let targetEmail = emailOverride;
-
-    if (!targetEmail) {
-      // Look up AuthUser by emailHash if user already registered
-      const authUser = await this.prisma.authUser.findUnique({
-        where: { emailHash: invitation.emailHash },
-      });
-      if (authUser?.emailEncrypted) {
-        try {
-          targetEmail = this.crypto.decrypt(authUser.emailEncrypted);
-        } catch {
-          // Ignore fallback
-        }
+    // Resolve recipient email from AuthUser (authoritative source via emailHash)
+    let recipientEmail: string | null = null;
+    const authUser = await this.prisma.authUser.findUnique({
+      where: { emailHash: invitation.emailHash },
+    });
+    if (authUser?.emailEncrypted) {
+      try {
+        recipientEmail = this.crypto.decrypt(authUser.emailEncrypted);
+      } catch {
+        // fall through to warn below
       }
     }
 
-    if (!targetEmail) {
-      this.logger.warn(`Cannot resolve recipient email for invitation ${invitationId}`);
+    if (!recipientEmail) {
+      this.logger.warn(
+        `Cannot resolve recipient email for invitation ${invitation.id}; will retry`,
+      );
+      await this.markFailed(
+        deliveryId,
+        "Recipient email unresolvable from emailHash",
+        delivery.retryCount + 1,
+      );
       return false;
     }
 
@@ -209,21 +223,133 @@ export class NotificationDeliveryProcessor {
     });
 
     const result = await this.emailDelivery.sendEmail({
-      to: targetEmail,
+      to: recipientEmail,
       subject: rendered.subject,
       html: rendered.html,
       text: rendered.text,
     });
 
     if (result.success) {
+      await this.prisma.notificationDelivery.update({
+        where: { id: deliveryId },
+        data: {
+          status: "SENT",
+          provider: result.provider,
+          providerMessageId: result.providerMessageId,
+          sentAt: new Date(),
+        },
+      });
       this.logger.log(
-        `Sent invitation email for ${invitationId} to ${targetEmail} via ${result.provider}`,
+        `Sent invitation email for ${invitation.id} via ${result.provider} (msgId: ${result.providerMessageId})`,
       );
       return true;
     }
 
-    this.logger.warn(`Failed to send invitation email for ${invitationId}: ${result.error}`);
+    this.logger.warn(
+      `Failed to send invitation email for ${invitation.id}: ${result.error} (category: ${result.failureCategory})`,
+    );
+    await this.markFailed(
+      deliveryId,
+      result.error || `Failed via ${result.provider}`,
+      delivery.retryCount + 1,
+      result.provider,
+    );
     return false;
+  }
+
+  /**
+   * Process a MemberInvited event by creating Notification + NotificationDelivery rows
+   * and publishing NotificationQueued { deliveryId } to route to the email_delivery queue.
+   *
+   * Invitation emails DO NOT require ACTIVE membership — only that the Invitation is PENDING and not expired.
+   * The actual email send happens downstream in processDelivery() via notification_module.email_delivery.
+   *
+   * Idempotent: if a NotificationDelivery already exists for this invitationId + EMAIL channel,
+   * we skip creation and do NOT re-publish (prevents duplicate sends on MemberInvited redelivery).
+   *
+   * THROWS on DB or publish failure so that RabbitMQ does NOT ACK the MemberInvited message.
+   */
+  async processInvitationDelivery(invitationId: string): Promise<void> {
+    this.logger.log(`Queuing invitation email delivery for invitationId: ${invitationId}`);
+
+    // --- 1. Validate invitation ---
+    const invitation = await this.prisma.invitation.findUnique({
+      where: { id: invitationId },
+      include: { agency: true },
+    });
+
+    if (!invitation) {
+      // Invitation not found — treat as permanent skip (do not retry)
+      this.logger.warn(`Invitation ${invitationId} not found; skipping email delivery`);
+      return;
+    }
+
+    if (invitation.status !== "PENDING") {
+      this.logger.log(
+        `Invitation ${invitationId} status is ${invitation.status}; skipping email delivery`,
+      );
+      return;
+    }
+
+    if (invitation.expiresAt < new Date()) {
+      this.logger.warn(`Invitation ${invitationId} is expired; skipping email delivery`);
+      return;
+    }
+
+    // --- 2. Idempotency check: skip if delivery already queued/sent for this invitation ---
+    const existing = await this.prisma.notificationDelivery.findFirst({
+      where: { invitationId, channel: "EMAIL" },
+    });
+    if (existing) {
+      this.logger.log(
+        `NotificationDelivery already exists (id: ${existing.id}, status: ${existing.status}) for invitation ${invitationId}; skipping re-queue`,
+      );
+      return;
+    }
+
+    // --- 3. Create Notification + NotificationDelivery in a transaction ---
+    // Notification.userId is nullable for invitation-sourced notifications (invitee may not be registered).
+    const { notification, delivery } = await this.prisma.$transaction(async (tx) => {
+      const notification = await tx.notification.create({
+        data: {
+          agencyId: invitation.agencyId,
+          userId: null,               // Invited user may not have a registered account yet
+          title: `You're invited to join ${invitation.agency.name}`,
+          body: `Accept your invitation to become a member of ${invitation.agency.name} on AGOS.`,
+          eventType: DomainEvents.MemberInvited,
+        },
+      });
+
+      const delivery = await tx.notificationDelivery.create({
+        data: {
+          agencyId: invitation.agencyId,
+          notificationId: notification.id,
+          invitationId: invitation.id,
+          channel: "EMAIL",
+          status: "QUEUED",
+        },
+      });
+
+      return { notification, delivery };
+    });
+
+    this.logger.log(
+      `Created NotificationDelivery ${delivery.id} for invitation ${invitationId}; publishing NotificationQueued`,
+    );
+
+    // --- 4. Publish NotificationQueued with REFERENCE-ONLY payload ---
+    // This routes to notification_module.email_delivery where processDelivery() sends the actual email.
+    await this.eventBus.publish(DomainEvents.NotificationQueued, {
+      agencyId: invitation.agencyId,
+      actorId: null,
+      aggregateId: delivery.id,
+      aggregateType: "NotificationDelivery",
+      payload: { deliveryId: delivery.id },
+    });
+
+    this.logger.log(
+      `NotificationQueued published for deliveryId: ${delivery.id} (invitation: ${invitationId})`,
+    );
   }
 
   private async markCancelled(deliveryId: string, reason: string) {
