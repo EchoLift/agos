@@ -119,24 +119,24 @@ export default function GigDetailPage() {
           <button
             type="button"
             onClick={() => router.push(`/${agencySlug}/gigs`)}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white"
+            className="flex h-11 w-11 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white lg:rounded-full"
           >
             ←
           </button>
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-zinc-500">Gig</p>
-            <h1 className="mt-1 text-3xl font-semibold text-white">{workOrder?.title || (isLoading ? "Loading..." : "Gig")}</h1>
+            <h1 className="mt-1 text-xl font-semibold text-white sm:text-2xl lg:text-3xl">{workOrder?.title || (isLoading ? "Loading..." : "Gig")}</h1>
           </div>
         </div>
       </div>
 
-      <section className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-5 shadow-2xl shadow-black/20">
+      <section className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 shadow-lg shadow-black/10 lg:rounded-3xl lg:p-5 lg:shadow-2xl">
         {isLoading ? (
           <div className="text-sm text-zinc-500">Loading gig...</div>
         ) : error ? (
           <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>
         ) : workOrder ? (
-          <div className="space-y-5">
+          <div className="space-y-3 lg:space-y-5">
             <div className="flex flex-wrap items-center gap-2">
               <span className={statusPillClasses(workOrder.workType, "sm")}>{formatLabel(workOrder.workType)}</span>
               <span className={statusPillClasses(workOrder.status, "sm")}>{formatLabel(workOrder.status)}</span>
@@ -150,7 +150,7 @@ export default function GigDetailPage() {
               <Detail label="Due" value={formatDateTime(workOrder.dueAt)} />
             </div>
 
-            <section className="rounded-2xl border border-zinc-800 bg-[#0b0b11] p-4">
+            <section className="rounded-md border border-zinc-800 bg-[#0b0b11] p-3 lg:rounded-2xl lg:p-4">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">Instructions</h2>
               <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-300">{workOrder.description}</p>
             </section>
@@ -158,28 +158,28 @@ export default function GigDetailPage() {
             <LatestSubmission workOrder={workOrder} />
 
             {canSubmit ? (
-              <section className="rounded-2xl border border-zinc-800 bg-[#0b0b11] p-4">
+              <section className="rounded-md border border-zinc-800 bg-[#0b0b11] p-3 lg:rounded-2xl lg:p-4">
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">Submit work</h2>
                 <div className="mt-3 grid gap-3">
                   <input
                     value={submissionDraft.externalLink}
                     onChange={(event) => setSubmissionDraft((current) => ({ ...current, externalLink: event.target.value }))}
                     placeholder="Google Doc, Drive, Frame.io, or reference link"
-                    className="rounded-2xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500"
+                    className="min-h-11 rounded-md border border-zinc-800 bg-zinc-950 px-3 text-base text-white outline-none transition focus:border-indigo-500 lg:rounded-2xl lg:text-sm"
                   />
                   <textarea
                     value={submissionDraft.body}
                     onChange={(event) => setSubmissionDraft((current) => ({ ...current, body: event.target.value }))}
                     rows={4}
                     placeholder="Notes, script, handoff details, or anything the reviewer should know"
-                    className="rounded-2xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500"
+                    className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-3 text-base text-white outline-none transition focus:border-indigo-500 lg:rounded-2xl lg:text-sm"
                   />
-                  <div className="flex justify-end">
+                  <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 flex justify-end bg-[#0b0b11] py-1 lg:static lg:py-0">
                     <button
                       type="button"
                       disabled={isRunning || !hasSubmissionInput}
                       onClick={submit}
-                      className="rounded-full bg-indigo-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="min-h-11 w-full rounded-md bg-indigo-500 px-5 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto lg:rounded-full"
                     >
                       {isRunning ? "Submitting..." : "Submit for review"}
                     </button>
@@ -189,21 +189,21 @@ export default function GigDetailPage() {
             ) : null}
 
             {canReview ? (
-              <section className="rounded-2xl border border-zinc-800 bg-[#0b0b11] p-4">
+              <section className="rounded-md border border-zinc-800 bg-[#0b0b11] p-3 lg:rounded-2xl lg:p-4">
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">Review submission</h2>
                 <textarea
                   value={reviewComment}
                   onChange={(event) => setReviewComment(event.target.value)}
                   rows={3}
                   placeholder="Review comment or change request reason"
-                  className="mt-3 w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none transition focus:border-indigo-500"
+                  className="mt-3 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-3 text-base text-white outline-none transition focus:border-indigo-500 lg:rounded-2xl lg:text-sm"
                 />
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 mt-3 grid grid-cols-2 gap-2 bg-[#0b0b11] py-1 lg:static lg:flex lg:py-0">
                   <button
                     type="button"
                     disabled={isRunning}
                     onClick={approve}
-                    className="rounded-full bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="min-h-11 rounded-md bg-emerald-500 px-5 text-sm font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 lg:rounded-full"
                   >
                     Approve
                   </button>
@@ -211,7 +211,7 @@ export default function GigDetailPage() {
                     type="button"
                     disabled={isRunning || !reviewComment.trim()}
                     onClick={requestChanges}
-                    className="rounded-full border border-red-500/30 bg-red-500/10 px-5 py-2.5 text-sm font-semibold text-red-300 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="min-h-11 rounded-md border border-red-500/30 bg-red-500/10 px-5 text-sm font-semibold text-red-300 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60 lg:rounded-full"
                   >
                     Request changes
                   </button>
@@ -274,7 +274,7 @@ function LatestSubmission({ workOrder }: { workOrder: WorkOrder }) {
 
 function Detail({ label, value }: { label: string; value?: string | null }) {
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-[#0b0b11] p-4">
+    <div className="rounded-md border border-zinc-800 bg-[#0b0b11] p-3 lg:rounded-2xl lg:p-4">
       <div className="text-xs uppercase tracking-wider text-zinc-600">{label}</div>
       <div className="mt-2 truncate text-sm text-zinc-200">{value || "—"}</div>
     </div>

@@ -120,17 +120,17 @@ export default function WorkspaceDashboard() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl shadow-black/20">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-3 sm:space-y-4 lg:space-y-8">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-4 shadow-xl shadow-black/10 lg:rounded-3xl lg:p-8 lg:shadow-2xl">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
           <div>
             <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">
               {isMyWork ? "My work" : "Founder command center"}
             </p>
-            <h1 className="mt-2 text-4xl font-semibold text-white">
+            <h1 className="mt-1 text-2xl font-semibold leading-tight text-white sm:text-3xl lg:mt-2 lg:text-4xl">
               {showDashboard ? (isMyWork ? "What needs your attention today" : `Good morning, ${name}`) : "Let’s set up your first workspace."}
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-400">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400 lg:mt-3 lg:leading-7">
               {showDashboard
                 ? isMyWork
                   ? "Assigned work appears here first. Finish what is due, respond to reviews, and keep your handoffs moving."
@@ -138,43 +138,43 @@ export default function WorkspaceDashboard() {
                 : "Create your first client to unlock the dashboard and turn this workspace into a real operating system."}
             </p>
           </div>
-          <div className="rounded-full border border-zinc-800 bg-zinc-900/80 px-4 py-2 text-sm text-zinc-300">
+          <div className="w-fit rounded-md border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-300 lg:rounded-full lg:px-4">
             {showDashboard ? (isMyWork ? homeLabel : "Operational view") : `${progress}% complete`}
           </div>
         </div>
       </div>
 
       {showDashboard ? (
-        <div className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="space-y-3 sm:space-y-4 lg:space-y-6">
+          <div className="grid grid-cols-2 gap-2 lg:gap-4 xl:grid-cols-4">
             {metrics.map((card) => (
               <button
                 key={card.label}
                 type="button"
                 onClick={() => router.push(`/${agencySlug}/${card.href}`)}
-                className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-6 text-left shadow-2xl shadow-black/20 transition hover:border-indigo-500/40 hover:bg-zinc-900/70"
+                className="min-h-24 rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 text-left shadow-lg shadow-black/10 transition hover:border-indigo-500/40 hover:bg-zinc-900/70 lg:rounded-3xl lg:p-6 lg:shadow-2xl"
               >
                 <p className="text-sm text-zinc-500">{card.label}</p>
-                <p className="mt-3 text-3xl font-semibold text-white">{card.value}</p>
+                <p className="mt-2 text-2xl font-semibold text-white lg:mt-3 lg:text-3xl">{card.value}</p>
               </button>
             ))}
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl shadow-black/20">
+          <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr] lg:gap-6">
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 shadow-xl shadow-black/10 lg:rounded-3xl lg:p-8 lg:shadow-2xl">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">Today’s priorities</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-white">
+                  <h2 className="mt-1 text-xl font-semibold text-white lg:mt-2 lg:text-2xl">
                     {isMyWork ? "Your work queue" : "What needs attention now"}
                   </h2>
                 </div>
-                <div className="rounded-full border border-zinc-800 bg-zinc-900/80 px-3 py-1 text-sm text-zinc-300">
+                <div className="rounded-md border border-zinc-800 bg-zinc-900/80 px-2 py-1 text-xs text-zinc-300 lg:rounded-full lg:px-3 lg:text-sm">
                   {myTasks.length} tasks
                 </div>
               </div>
 
-              <div className="mt-6 space-y-3">
+              <div className="mt-3 space-y-2 lg:mt-6 lg:space-y-3">
                 {myTasks.length > 0 ? (
                   myTasks.map((task) => (
                     <button
@@ -184,7 +184,7 @@ export default function WorkspaceDashboard() {
                         if (task.workOrderId) router.push(`/${agencySlug}/gigs/${task.workOrderId}`);
                         else if (task.contentAssetId) router.push(`/${agencySlug}/workflow/${task.contentAssetId}`);
                       }}
-                      className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 text-left transition hover:border-indigo-500/40 hover:bg-zinc-900"
+                      className="min-h-20 w-full rounded-md border border-zinc-800 bg-zinc-900/70 p-3 text-left transition hover:border-indigo-500/40 hover:bg-zinc-900 lg:rounded-2xl lg:p-4"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
@@ -199,7 +199,7 @@ export default function WorkspaceDashboard() {
                     </button>
                   ))
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/40 p-6 text-sm text-zinc-400">
+                    <div className="rounded-md border border-dashed border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-400 lg:rounded-2xl lg:p-6">
                     {isMyWork
                       ? "No work is assigned to you right now. When a manager assigns a stage to you, it will appear here."
                       : "No active tasks yet. Create a campaign and content asset to see the first work queue."}
@@ -208,11 +208,11 @@ export default function WorkspaceDashboard() {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl shadow-black/20">
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 shadow-xl shadow-black/10 lg:rounded-3xl lg:p-8 lg:shadow-2xl">
               <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">
                 {isMyWork ? "Recent movement" : "Latest activity"}
               </p>
-              <div className="mt-6 space-y-3">
+              <div className="mt-3 space-y-2 lg:mt-6 lg:space-y-3">
                 {(dashboardData?.activity ?? []).length > 0 ? (
                   (dashboardData?.activity ?? []).map((item) => (
                     <button
@@ -220,7 +220,7 @@ export default function WorkspaceDashboard() {
                       type="button"
                       disabled={!item.contentAssetId}
                       onClick={() => item.contentAssetId && router.push(`/${agencySlug}/workflow/${item.contentAssetId}`)}
-                      className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 text-left transition hover:border-indigo-500/40 hover:bg-zinc-900 disabled:cursor-default disabled:hover:border-zinc-800 disabled:hover:bg-zinc-900/70"
+                      className="min-h-16 w-full rounded-md border border-zinc-800 bg-zinc-900/70 p-3 text-left transition hover:border-indigo-500/40 hover:bg-zinc-900 disabled:cursor-default disabled:hover:border-zinc-800 disabled:hover:bg-zinc-900/70 lg:rounded-2xl lg:p-4"
                     >
                       <p className="text-sm font-semibold text-white">
                         {item.displayCode ? `${item.displayCode} · ` : ""}{item.contentAssetTitle}
@@ -229,7 +229,7 @@ export default function WorkspaceDashboard() {
                     </button>
                   ))
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/40 p-6 text-sm text-zinc-400">
+                  <div className="rounded-md border border-dashed border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-400 lg:rounded-2xl lg:p-6">
                     {isMyWork
                       ? "Feedback and handoffs connected to your work will appear here."
                       : "Activity will appear here as content moves through the workflow."}
