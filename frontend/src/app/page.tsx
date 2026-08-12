@@ -179,17 +179,17 @@ export default function Home() {
             <p className="mb-4 inline-flex rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-sm font-medium uppercase tracking-widest text-indigo-300">
               Creative Agency Operations Platform
             </p>
-            {/* h1 = "AGOS" — required by Google branding verification */}
-            <h1 className="bg-gradient-to-r from-indigo-300 via-violet-300 to-indigo-400 bg-clip-text text-6xl font-bold tracking-tight text-transparent sm:text-7xl lg:text-8xl">
-              AGOS
+            {/* Primary H1 Heading — explicitly AGOS for Google OAuth verification & branding */}
+            <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+              <span className="block bg-gradient-to-r from-indigo-300 via-violet-300 to-indigo-400 bg-clip-text text-transparent text-6xl font-extrabold sm:text-7xl lg:text-8xl mb-2">
+                AGOS
+              </span>
+              <span className="block text-2xl font-semibold tracking-tight text-foreground sm:text-3xl mt-2">
+                Run your creative agency without WhatsApp, Notion, and Excel.
+              </span>
             </h1>
-            <p className="mt-4 text-2xl font-semibold leading-snug tracking-tight text-foreground sm:text-3xl">
-              Run your creative agency without WhatsApp, Notion, and Excel.
-            </p>
             <p className="mt-5 text-base font-medium leading-relaxed text-foreground/90">
-              AGOS is a creative agency operations platform for managing
-              clients, campaigns, content production, team assignments,
-              approvals, deadlines, and delivery in one workspace.
+              AGOS is a multi-tenant agency operating system designed for marketing and creative teams to manage work orders, deadlines, workflows, approvals, and Google Calendar event syncs.
             </p>
             <p className="mt-3 text-base leading-7 text-muted-foreground">
               Plan campaigns, assign work to writers, designers, editors and
@@ -647,9 +647,9 @@ export default function Home() {
                   </Link>
                 </li>
                 <li>
-                  <a href="#" className="transition hover:text-foreground">
+                  <Link href="/terms" className="transition hover:text-foreground">
                     Terms of Service
-                  </a>
+                  </Link>
                 </li>
               </ul>
             </div>
