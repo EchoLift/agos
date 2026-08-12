@@ -23,6 +23,7 @@ import { InviteMemberDto } from "../dto/invite-member.dto";
 import { UpdateMemberRoleDto } from "../dto/update-member-role.dto";
 import { CurrentUser } from "@packages/security/decorators/current-user.decorator";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
+import { RequirePermissions } from "@packages/security/decorators/require-permissions.decorator";
 
 @ApiTags("Organizations")
 @ApiBearerAuth()
@@ -70,6 +71,7 @@ export class OrganizationController {
 
   @Post(":agencyId/invitations")
   @HttpCode(HttpStatus.CREATED)
+  @RequirePermissions("TEAM_INVITE")
   @ApiOperation({ summary: "Invite a member to an agency" })
   @ApiResponse({
     status: HttpStatus.CREATED,

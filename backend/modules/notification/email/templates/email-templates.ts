@@ -24,9 +24,38 @@ export interface EmailTemplateData {
 export function buildDeepLink(
   frontendUrl: string,
   path: string,
+  agencySlug?: string,
 ): string {
   const base = frontendUrl.replace(/\/$/, "");
   const route = path.replace(/^\//, "");
+
+  // If localhost, use path-based routing (http://localhost:3000/agencySlug/route)
+  if (base.includes("localhost") || base.includes("127.0.0.1")) {
+    if (agencySlug && !route.startsWith(agencySlug)) {
+      return `${base}/${agencySlug}${route ? `/${route}` : ""}`;
+    }
+    return `${base}/${route}`;
+  }
+
+  // Production subdomain url: https://agencySlug.client-agos.calcie.fun/route
+  if (agencySlug) {
+    try {
+      const parsedUrl = new URL(base);
+      const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || parsedUrl.hostname;
+      // Strip any existing subdomain from parsedUrl.hostname if it matches rootDomain
+      const hostBase = rootDomain.includes("calcie.fun") ? "client-agos.calcie.fun" : rootDomain;
+      const cleanRoute = route.startsWith(`${agencySlug}/`)
+        ? route.slice(agencySlug.length + 1)
+        : route === agencySlug
+          ? ""
+          : route;
+      return `${parsedUrl.protocol}//${agencySlug}.${hostBase}${cleanRoute ? `/${cleanRoute}` : ""}`;
+    } catch {
+      // Fallback if parsing fails
+      return `${base}/${route}`;
+    }
+  }
+
   return `${base}/${route}`;
 }
 

@@ -10,6 +10,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentUser } from "@packages/security/decorators/current-user.decorator";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
+import { RequirePermissions } from "@packages/security/decorators/require-permissions.decorator";
 import { CampaignService } from "./campaign.service";
 import { CampaignStatusActionDto } from "./dto/campaign-status-action.dto";
 import {
@@ -33,6 +34,7 @@ export class CampaignController {
   constructor(private readonly campaignService: CampaignService) {}
 
   @Post()
+  @RequirePermissions("CAMPAIGN_CREATE")
   @ApiOperation({
     summary:
       "Create a campaign planning contract with deliverables and publishing schedule drafts",
@@ -75,6 +77,7 @@ export class CampaignController {
   }
 
   @Post(":id/publishing-schedules")
+  @RequirePermissions("PUBLISHING_CREATE")
   @ApiOperation({ summary: "Create a publishing slot" })
   createPublishingSchedule(
     @Param("id") id: string,
@@ -85,6 +88,7 @@ export class CampaignController {
   }
 
   @Patch(":id/publishing-schedules/:scheduleId")
+  @RequirePermissions("PUBLISHING_UPDATE")
   @ApiOperation({ summary: "Update or reschedule a publishing slot" })
   updatePublishingSchedule(
     @Param("id") id: string,
@@ -101,6 +105,7 @@ export class CampaignController {
   }
 
   @Post(":id/publishing-schedules/:scheduleId/cancel")
+  @RequirePermissions("PUBLISHING_CANCEL")
   @ApiOperation({ summary: "Cancel a publishing slot" })
   cancelPublishingSchedule(
     @Param("id") id: string,
@@ -117,6 +122,7 @@ export class CampaignController {
   }
 
   @Post(":id/publishing-schedules/:scheduleId/mark-published")
+  @RequirePermissions("PUBLISHING_MARK_PUBLISHED")
   @ApiOperation({ summary: "Mark a publishing slot as published" })
   markPublishingSchedulePublished(
     @Param("id") id: string,
@@ -133,6 +139,7 @@ export class CampaignController {
   }
 
   @Post(":id/publishing-schedules/:scheduleId/generate-production")
+  @RequirePermissions("CONTENT_CREATE")
   @ApiOperation({
     summary:
       "Generate a content asset and first workflow task from a publishing slot",
@@ -190,6 +197,7 @@ export class CampaignController {
   }
 
   @Patch(":id")
+  @RequirePermissions("CAMPAIGN_UPDATE")
   @ApiOperation({ summary: "Update the full campaign planning model" })
   update(
     @Param("id") id: string,

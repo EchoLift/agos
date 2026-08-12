@@ -9,6 +9,7 @@ import { logout } from "@/lib/auth";
 import { getProfile, Profile } from "@/lib/api/me";
 import { activateAgency, Agency, getMyMemberships } from "@/lib/api/organization";
 import { visibleWorkspaceNavItems } from "@/lib/workspace-access";
+import { getWorkspaceUrl } from "@/lib/workspace-url";
 import { clearAgencyScopedUiState } from "@/lib/workspace-cache";
 import GlobalSearch from "@/components/GlobalSearch";
 import MobileWorkspaceNav from "@/components/MobileWorkspaceNav";
@@ -68,8 +69,12 @@ export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) 
     clearAgencyScopedUiState(previousAgencyId, response.activeAgencyId);
     setAgencies((items) => items.map((item) => (item.id === response.agency.id ? { ...item, ...response.agency } : item)));
     setIsMenuOpen(false);
-    router.push(`/${response.agency.slug}`);
-    router.refresh();
+    const targetUrl = getWorkspaceUrl(response.agency.slug);
+    if (typeof window !== "undefined") {
+      window.location.href = targetUrl;
+    } else {
+      router.push(`/${response.agency.slug}`);
+    }
   };
 
   const confirmLogout = () => {

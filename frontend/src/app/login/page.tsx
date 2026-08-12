@@ -9,6 +9,7 @@ import {
   isDevFallbackEnabled,
 } from "@/lib/google-auth";
 import { getMyMemberships } from "@/lib/api/organization";
+import { getWorkspaceUrl } from "@/lib/workspace-url";
 
 const getCurrentAgency = (memberships: { currentAgency: { slug: string } | null; agencies: Array<{ slug: string }> }) => {
   return memberships.currentAgency ?? memberships.agencies[0] ?? null;
@@ -33,7 +34,7 @@ export default function LoginPage() {
         const memberships = await getMyMemberships();
         const currentAgency = getCurrentAgency(memberships);
         if (currentAgency) {
-          router.push(`/${currentAgency.slug}`);
+          window.location.href = getWorkspaceUrl(currentAgency.slug);
         } else {
           router.push("/create-agency");
         }
@@ -57,7 +58,7 @@ export default function LoginPage() {
       .then((memberships) => {
         const currentAgency = getCurrentAgency(memberships);
         if (currentAgency) {
-          router.push(`/${currentAgency.slug}`);
+          window.location.href = getWorkspaceUrl(currentAgency.slug);
         } else {
           router.push("/create-agency");
         }

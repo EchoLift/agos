@@ -87,7 +87,7 @@ export default function WorkspaceDashboard() {
   );
 
   const progress = activation?.progress ?? 0;
-  const showDashboard = activation?.steps.client ?? false;
+  const showDashboard = isMyWork ? true : (activation?.steps.client ?? false);
   const myTasks = dashboardData?.myTasks ?? [];
   const dueTodayCount = myTasks.filter((task) => isToday(task.deadlineAt)).length;
   const waitingReviewCount = myTasks.filter((task) => /WAITING|REVIEW|APPROVAL/.test(task.status) || /REVIEW|APPROVAL/.test(task.stage || "")).length;
