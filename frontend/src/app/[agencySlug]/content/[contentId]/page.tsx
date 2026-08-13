@@ -65,7 +65,7 @@ export default function ContentDetailPage() {
         <div className="flex items-center gap-4">
           <button
             type="button"
-            onClick={() => router.push(`/${agencySlug}/content`)}
+            onClick={() => router.push(`/content`)}
             className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white"
           >
             ←

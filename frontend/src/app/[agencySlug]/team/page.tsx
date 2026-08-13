@@ -211,7 +211,7 @@ export default function TeamPage() {
           </Link>
         </div>
         <Link
-          href={`/${agencySlug}/team/new`}
+          href={`/team/new`}
           className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-indigo-500 px-3 text-sm font-semibold text-white hover:bg-indigo-400 sm:px-5"
         >
           Invite Member
@@ -252,7 +252,7 @@ export default function TeamPage() {
             <h3 className="mt-4 text-sm font-semibold text-white">No team members</h3>
             <p className="mt-1 text-sm text-zinc-500">Get started by inviting your team.</p>
             <Link
-              href={`/${agencySlug}/team/new`}
+              href={`/team/new`}
               className="mt-6 rounded-full bg-indigo-500/10 px-4 py-2 text-sm font-semibold text-indigo-400 hover:bg-indigo-500/20"
             >
               Invite Member
@@ -313,80 +313,80 @@ export default function TeamPage() {
               ))}
             </div>
             <div className="hidden overflow-hidden lg:block">
-            <table className="w-full text-left text-sm text-zinc-400">
-              <thead className="border-b border-zinc-800/50 text-xs uppercase tracking-wider text-zinc-500">
-                <tr>
-                  <th className="pb-4 font-medium">Name / Email</th>
-                  <th className="pb-4 font-medium">Role</th>
-                  <th className="pb-4 font-medium">Status</th>
-                  <th className="pb-4 font-medium">Joined</th>
-                  <th className="pb-4 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/50">
-                {filteredMembers.map((member) => (
-                  <tr key={member.id} className="transition-colors hover:bg-zinc-900/30">
-                    <td className="py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 overflow-hidden rounded-full bg-zinc-800 flex items-center justify-center">
-                          {member.avatarUrl ? (
-                            <img src={member.avatarUrl} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <span className="text-xs font-medium text-zinc-400">
-                              {(member.name || member.email || "?").charAt(0).toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-medium text-zinc-200">{member.name || "Unknown"}</div>
-                          <div className="max-w-xl truncate text-xs text-zinc-500">{member.email || member.mobileNumber || "No contact"}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4">
-                      <div className="flex max-w-xs flex-wrap gap-1.5">
-                        {(member.roles?.length ? member.roles : [{ id: member.roleId, name: member.roleName, key: member.roleName.toUpperCase() }]).map((role) => (
-                          <span
-                            key={role.id}
-                            className="rounded-full border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-200"
-                          >
-                            {role.name}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="py-4">
-                      <span className={statusPillClasses(member.status, "sm")}>
-                        {member.status}
-                      </span>
-                    </td>
-                    <td className="py-4">
-                      {new Date(member.joinedAt).toLocaleDateString()}
-                    </td>
-                    <td className="py-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          disabled={busyMemberId === member.id || (!canChangeRoles && !canUseSelfRoleTestingOverride(member))}
-                          onClick={() => requestRoleChange(member)}
-                          className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Edit roles
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busyMemberId === member.id}
-                          onClick={() => handleRemove(member)}
-                          className="rounded-full border border-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </td>
+              <table className="w-full text-left text-sm text-zinc-400">
+                <thead className="border-b border-zinc-800/50 text-xs uppercase tracking-wider text-zinc-500">
+                  <tr>
+                    <th className="pb-4 font-medium">Name / Email</th>
+                    <th className="pb-4 font-medium">Role</th>
+                    <th className="pb-4 font-medium">Status</th>
+                    <th className="pb-4 font-medium">Joined</th>
+                    <th className="pb-4 text-right font-medium">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/50">
+                  {filteredMembers.map((member) => (
+                    <tr key={member.id} className="transition-colors hover:bg-zinc-900/30">
+                      <td className="py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 overflow-hidden rounded-full bg-zinc-800 flex items-center justify-center">
+                            {member.avatarUrl ? (
+                              <img src={member.avatarUrl} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <span className="text-xs font-medium text-zinc-400">
+                                {(member.name || member.email || "?").charAt(0).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-medium text-zinc-200">{member.name || "Unknown"}</div>
+                            <div className="max-w-xl truncate text-xs text-zinc-500">{member.email || member.mobileNumber || "No contact"}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4">
+                        <div className="flex max-w-xs flex-wrap gap-1.5">
+                          {(member.roles?.length ? member.roles : [{ id: member.roleId, name: member.roleName, key: member.roleName.toUpperCase() }]).map((role) => (
+                            <span
+                              key={role.id}
+                              className="rounded-full border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-200"
+                            >
+                              {role.name}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-4">
+                        <span className={statusPillClasses(member.status, "sm")}>
+                          {member.status}
+                        </span>
+                      </td>
+                      <td className="py-4">
+                        {new Date(member.joinedAt).toLocaleDateString()}
+                      </td>
+                      <td className="py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            disabled={busyMemberId === member.id || (!canChangeRoles && !canUseSelfRoleTestingOverride(member))}
+                            onClick={() => requestRoleChange(member)}
+                            className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Edit roles
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busyMemberId === member.id}
+                            onClick={() => handleRemove(member)}
+                            className="rounded-full border border-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </>
         )}
@@ -419,11 +419,10 @@ export default function TeamPage() {
                     return (
                       <label
                         key={role.id}
-                        className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2 text-sm transition ${
-                          isChecked
+                        className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2 text-sm transition ${isChecked
                             ? "border-indigo-500/60 bg-indigo-500/10 text-white"
                             : "border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:bg-zinc-900"
-                        } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+                          } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
                       >
                         <input
                           type="checkbox"

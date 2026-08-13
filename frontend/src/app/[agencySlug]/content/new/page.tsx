@@ -37,11 +37,11 @@ export default function NewContentPage() {
     try {
       const selectedCampaign = campaigns.find(c => c.id === data.campaignId);
       if (!selectedCampaign) throw new Error("Invalid campaign selected");
-      
+
       data.clientId = selectedCampaign.clientId;
-      
+
       await createContentAsset(agencyId, data);
-      router.push(`/${agencySlug}/content`);
+      router.push(`/content`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create content asset.");
       setIsSubmitting(false);
@@ -51,7 +51,7 @@ export default function NewContentPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <div className="flex items-center gap-4">
-        <button 
+        <button
           onClick={() => router.back()}
           className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white"
         >
@@ -121,8 +121,8 @@ export default function NewContentPage() {
           )}
 
           <div className="flex justify-end gap-3 pt-4">
-            <Link 
-              href={`/${agencySlug}/content`}
+            <Link
+              href={`/content`}
               className="rounded-full border border-zinc-800 px-6 py-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
             >
               Cancel

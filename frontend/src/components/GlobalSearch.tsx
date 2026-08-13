@@ -32,13 +32,11 @@ const helpResults: SearchResult[] = [
 
 export default function GlobalSearch({
   agency,
-  agencySlug,
   userId,
   open,
   onOpenChange,
 }: {
   agency: Agency | null;
-  agencySlug: string;
   userId?: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -50,14 +48,14 @@ export default function GlobalSearch({
   const [loading, setLoading] = useState(false);
   const navKeys = useMemo(() => allowedNavKeys(agency, userId), [agency, userId]);
   const pageResults = useMemo<SearchResult[]>(
-    () => visibleWorkspaceNavItems(agency, agencySlug, userId).map((item) => ({
+    () => visibleWorkspaceNavItems(agency, userId).map((item) => ({
       id: `page-${item.key}`,
       type: "PAGE",
       title: item.label,
       subtitle: "Page",
       href: item.hrefValue,
     })),
-    [agency, agencySlug, userId],
+    [agency, userId],
   );
 
   useEffect(() => {
@@ -91,31 +89,31 @@ export default function GlobalSearch({
         requests.push(getClients(agency.id).then((items) => items
           .filter((item) => `${item.name} ${item.displayName ?? ""} ${item.industry ?? ""}`.toLowerCase().includes(needle))
           .slice(0, 6)
-          .map((item) => ({ id: item.id, type: "CLIENT" as const, title: item.displayName || item.name, subtitle: item.industry || "Client", href: `/${agencySlug}/clients/${item.id}` }))));
+          .map((item) => ({ id: item.id, type: "CLIENT" as const, title: item.displayName || item.name, subtitle: item.industry || "Client", href: `/clients/${item.id}` }))));
       }
       if (navKeys.has("campaigns")) {
         requests.push(getCampaigns(agency.id).then((items) => items
           .filter((item) => `${item.name} ${item.client?.name ?? ""}`.toLowerCase().includes(needle))
           .slice(0, 6)
-          .map((item) => ({ id: item.id, type: "CAMPAIGN" as const, title: item.name, subtitle: item.client?.name || "Campaign", href: `/${agencySlug}/campaigns/${item.id}` }))));
+          .map((item) => ({ id: item.id, type: "CAMPAIGN" as const, title: item.name, subtitle: item.client?.name || "Campaign", href: `/campaigns/${item.id}` }))));
       }
       if (navKeys.has("content")) {
         requests.push(getContentAssets(agency.id).then((items) => items
           .filter((item) => `${item.displayCode ?? ""} ${item.title} ${item.stage ?? ""}`.toLowerCase().includes(needle))
           .slice(0, 6)
-          .map((item) => ({ id: item.id, type: "CONTENT" as const, title: `${item.displayCode ?? item.type} - ${item.title}`, subtitle: item.stage || "Content", href: `/${agencySlug}/content/${item.id}` }))));
+          .map((item) => ({ id: item.id, type: "CONTENT" as const, title: `${item.displayCode ?? item.type} - ${item.title}`, subtitle: item.stage || "Content", href: `/content/${item.id}` }))));
       }
       if (navKeys.has("gigs")) {
         requests.push(getWorkOrders(agency.id).then((items) => items
           .filter((item) => `${item.title} ${item.client?.name ?? ""} ${item.workType}`.toLowerCase().includes(needle))
           .slice(0, 6)
-          .map((item) => ({ id: item.id, type: "GIG" as const, title: item.title, subtitle: `${item.workType} · ${item.client?.name ?? "No client"}`, href: `/${agencySlug}/gigs/${item.id}` }))));
+          .map((item) => ({ id: item.id, type: "GIG" as const, title: item.title, subtitle: `${item.workType} · ${item.client?.name ?? "No client"}`, href: `/gigs/${item.id}` }))));
       }
       if (navKeys.has("workflow")) {
         requests.push(getWorkflowBoard(agency.id, { search: query.trim() }).then((board) => board.columns
           .flatMap((column) => column.items)
           .slice(0, 8)
-          .map((item) => ({ id: item.contentAssetId, type: "WORKFLOW" as const, title: `${item.displayCode} - ${item.title}`, subtitle: `${item.clientName} · ${item.stage}`, href: `/${agencySlug}/workflow/${item.contentAssetId}` }))));
+          .map((item) => ({ id: item.contentAssetId, type: "WORKFLOW" as const, title: `${item.displayCode} - ${item.title}`, subtitle: `${item.clientName} · ${item.stage}`, href: `/workflow/${item.contentAssetId}` }))));
       }
       if (navKeys.has("calendar")) {
         requests.push(getCalendarEvents(agency.id, { scope: "MY_SCHEDULE" }).then((calendar) => calendar.events
@@ -127,19 +125,19 @@ export default function GlobalSearch({
             title: item.title,
             subtitle: `${item.eventType.replaceAll("_", " ")} · ${new Date(item.startsAt).toLocaleString()}`,
             href: item.contentAsset
-              ? `/${agencySlug}/workflow/${item.contentAsset.id}`
+              ? `/workflow/${item.contentAsset.id}`
               : item.workOrder
-                ? `/${agencySlug}/gigs/${item.workOrder.id}`
+                ? `/gigs/${item.workOrder.id}`
                 : item.campaign
-                  ? `/${agencySlug}/campaigns/${item.campaign.id}`
-                  : `/${agencySlug}/calendar`,
+                  ? `/campaigns/${item.campaign.id}`
+                  : `/calendar`,
           }))));
       }
       if (navKeys.has("team")) {
         requests.push(getMembers(agency.id).then((items) => items
           .filter((item) => `${item.name ?? ""} ${item.email ?? ""} ${item.roleName}`.toLowerCase().includes(needle))
           .slice(0, 6)
-          .map((item) => ({ id: item.id, type: "MEMBER" as const, title: item.name || "Team member", subtitle: item.roles?.map((role) => role.name).join(", ") || item.roleName, href: `/${agencySlug}/team` }))));
+          .map((item) => ({ id: item.id, type: "MEMBER" as const, title: item.name || "Team member", subtitle: item.roles?.map((role) => role.name).join(", ") || item.roleName, href: `/team` }))));
       }
 
       const settled = await Promise.allSettled(requests);
@@ -152,7 +150,7 @@ export default function GlobalSearch({
       active = false;
       window.clearTimeout(timer);
     };
-  }, [agency?.id, agencySlug, navKeys, open, query]);
+  }, [agency?.id, navKeys, open, query]);
 
   if (!open) return null;
 

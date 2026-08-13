@@ -100,7 +100,7 @@ export default function WorkflowDetailPage() {
         <div className="flex min-w-0 items-center gap-2 lg:gap-4">
           <button
             type="button"
-            onClick={() => router.push(`/${agencySlug}/workflow`)}
+            onClick={() => router.push(`/workflow`)}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white lg:rounded-full"
           >
             ←
@@ -191,7 +191,7 @@ export default function WorkflowDetailPage() {
                   <ClientContext
                     client={asset.clientSummary}
                     fallbackName={asset.clientSummary?.name || asset.clientId}
-                    onView={() => router.push(`/${agencySlug}/clients/${asset.clientId}`)}
+                    onView={() => router.push(`/clients/${asset.clientId}`)}
                   />
                 </section>
                 <LatestSubmissionCard submission={asset.latestSubmission} />

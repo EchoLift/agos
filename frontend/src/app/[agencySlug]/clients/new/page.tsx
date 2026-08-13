@@ -37,7 +37,7 @@ export default function NewClientPage() {
 
     try {
       await createClient(agencyId, normalizeClientPayload(data));
-      router.push(`/${agencySlug}/clients`);
+      router.push("/clients");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create client.");
       setIsSubmitting(false);
@@ -67,7 +67,7 @@ export default function NewClientPage() {
         {error ? <div className="rounded-xl bg-red-500/10 p-4 text-sm text-red-400">{error}</div> : null}
 
         <ClientFormActions>
-          <Link href={`/${agencySlug}/clients`} className="rounded-full border border-zinc-800 px-6 py-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white">
+          <Link href={`/clients`} className="rounded-full border border-zinc-800 px-6 py-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white">
             Cancel
           </Link>
           <button type="submit" className="rounded-full bg-indigo-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60" disabled={!formState.isValid || isSubmitting}>

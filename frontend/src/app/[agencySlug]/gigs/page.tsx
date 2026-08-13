@@ -60,7 +60,7 @@ export default function GigsPage() {
           </Link>
         </div>
         {canCreate ? (
-          <Link href={`/${agencySlug}/gigs/new`} className="flex min-h-11 items-center rounded-md bg-indigo-500 px-4 text-sm font-semibold text-white hover:bg-indigo-400 lg:rounded-full lg:px-5">
+          <Link href={`/gigs/new`} className="flex min-h-11 items-center rounded-md bg-indigo-500 px-4 text-sm font-semibold text-white hover:bg-indigo-400 lg:rounded-full lg:px-5">
             New Gig
           </Link>
         ) : null}
@@ -108,7 +108,7 @@ export default function GigsPage() {
             {filtered.map((gig) => (
               <Link
                 key={gig.id}
-                href={`/${agencySlug}/gigs/${gig.id}`}
+                href={`/gigs/${gig.id}`}
                 className="relative grid min-h-24 gap-2 rounded-md p-3 transition hover:bg-zinc-900/50 md:grid-cols-[1fr_160px_180px_150px] md:rounded-none md:py-4"
               >
                 <div>

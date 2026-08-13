@@ -9,14 +9,14 @@ import { getRoles, inviteMember, Role } from "@/lib/api/team";
 export default function InviteMemberPage() {
   const router = useRouter();
   const { agencyId, agencySlug } = useAgency();
-  
+
   const [roles, setRoles] = useState<Role[]>([]);
   const [email, setEmail] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
   const [rolesError, setRolesError] = useState("");
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -56,7 +56,7 @@ export default function InviteMemberPage() {
         roleId: primaryRoleId,
         roleIds: selectedRoleIds,
       });
-      router.push(`/${agencySlug}/team`);
+      router.push(`/team`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to invite member");
       setIsSubmitting(false);
@@ -83,7 +83,7 @@ export default function InviteMemberPage() {
           </p>
         </div>
         <Link
-          href={`/${agencySlug}/team`}
+          href={`/team`}
           className="rounded-full border border-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-900 hover:text-white"
         >
           Close
@@ -171,7 +171,7 @@ export default function InviteMemberPage() {
             </button>
             <button
               type="button"
-              onClick={() => router.push(`/${agencySlug}/team`)}
+              onClick={() => router.push(`/team`)}
               className="mt-3 w-full rounded-full border border-zinc-800 px-4 py-3 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-900 hover:text-white"
             >
               Back to team

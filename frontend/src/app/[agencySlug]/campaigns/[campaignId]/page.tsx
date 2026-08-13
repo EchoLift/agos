@@ -220,7 +220,7 @@ export default function CampaignDetailPage() {
         <div className="flex items-center gap-4">
           <button
             type="button"
-            onClick={() => router.push(`/${agencySlug}/campaigns`)}
+            onClick={() => router.push(`/campaigns`)}
             className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white"
           >
             ←
@@ -731,7 +731,7 @@ function CampaignAgenda({
                     {slot.contentAsset ? (
                       <button
                         type="button"
-                        onClick={() => router.push(`/${agencySlug}/workflow/${slot.contentAsset!.id}`)}
+                        onClick={() => router.push(`/workflow/${slot.contentAsset!.id}`)}
                         className="mt-2 text-left text-sm font-semibold text-indigo-400 transition hover:text-indigo-300"
                       >
                         {slot.contentAsset.displayCode} · {slot.contentAsset.title}
@@ -775,7 +775,7 @@ function CampaignContentSection({ campaign, agencySlug }: { campaign: Campaign; 
             <button
               key={asset.id}
               type="button"
-              onClick={() => router.push(`/${agencySlug}/workflow/${asset.id}`)}
+              onClick={() => router.push(`/workflow/${asset.id}`)}
               className="rounded-2xl border border-zinc-800 p-4 text-left transition hover:border-indigo-500/40 hover:bg-zinc-900/60"
             >
               <div className="flex items-center justify-between gap-3">

@@ -14,7 +14,7 @@ export default function RootRedirect() {
         token = await refreshAccessToken();
       }
 
-      if (!token) return;
+      if (!token) return
 
       try {
         const memberships = await getMyMemberships();
