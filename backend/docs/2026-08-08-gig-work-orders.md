@@ -4,7 +4,7 @@ Date: August 8, 2026
 
 ## Purpose
 
-AGOS now supports a second operating mode beside campaign production.
+AGENCIE now supports a second operating mode beside campaign production.
 
 Campaign production is for structured monthly retainers, publishing schedules, and multi-craft workflows. Gig work is for direct assignments such as:
 

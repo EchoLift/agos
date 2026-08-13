@@ -527,9 +527,9 @@ async function deleteDemoDataset(preserveAgency: boolean) {
   const authUserIds = authUsers.map((user) => user.id);
   const demoUsers = authUserIds.length
     ? await prisma.user.findMany({
-        where: { authUserId: { in: authUserIds } },
-        select: { id: true },
-      })
+      where: { authUserId: { in: authUserIds } },
+      select: { id: true },
+    })
     : [];
   const demoUserIds = demoUsers.map((user) => user.id);
 
@@ -539,55 +539,55 @@ async function deleteDemoDataset(preserveAgency: boolean) {
     const demoCampaignNames = CAMPAIGNS.map((campaign) => campaign.name);
     const scopedClients = preserveAgency
       ? await prisma.client.findMany({
-          where: { agencyId, name: { in: demoClientNames } },
-          select: { id: true },
-        })
+        where: { agencyId, name: { in: demoClientNames } },
+        select: { id: true },
+      })
       : [];
     const scopedClientIds = scopedClients.map((client) => client.id);
     const scopedCampaigns = preserveAgency
       ? await prisma.campaign.findMany({
-          where: {
-            agencyId,
-            OR: [
-              { name: { in: demoCampaignNames } },
-              ...(scopedClientIds.length > 0 ? [{ clientId: { in: scopedClientIds } }] : []),
-            ],
-          },
-          select: { id: true },
-        })
+        where: {
+          agencyId,
+          OR: [
+            { name: { in: demoCampaignNames } },
+            ...(scopedClientIds.length > 0 ? [{ clientId: { in: scopedClientIds } }] : []),
+          ],
+        },
+        select: { id: true },
+      })
       : [];
     const scopedCampaignIds = scopedCampaigns.map((campaign) => campaign.id);
     const scopedContentAssets = preserveAgency
       ? await prisma.contentAsset.findMany({
-          where: {
-            agencyId,
-            OR: [
-              ...(scopedCampaignIds.length > 0 ? [{ campaignId: { in: scopedCampaignIds } }] : []),
-              ...(scopedClientIds.length > 0 ? [{ clientId: { in: scopedClientIds } }] : []),
-            ],
-          },
-          select: { id: true },
-        })
+        where: {
+          agencyId,
+          OR: [
+            ...(scopedCampaignIds.length > 0 ? [{ campaignId: { in: scopedCampaignIds } }] : []),
+            ...(scopedClientIds.length > 0 ? [{ clientId: { in: scopedClientIds } }] : []),
+          ],
+        },
+        select: { id: true },
+      })
       : [];
     const scopedContentAssetIds = scopedContentAssets.map((asset) => asset.id);
     const scopedWorkflowInstances = preserveAgency
       ? await prisma.workflowInstance.findMany({
-          where: {
-            agencyId,
-            ...(scopedContentAssetIds.length > 0 ? { contentAssetId: { in: scopedContentAssetIds } } : { id: '__none__' }),
-          },
-          select: { id: true },
-        })
+        where: {
+          agencyId,
+          ...(scopedContentAssetIds.length > 0 ? { contentAssetId: { in: scopedContentAssetIds } } : { id: '__none__' }),
+        },
+        select: { id: true },
+      })
       : [];
     const scopedWorkflowInstanceIds = scopedWorkflowInstances.map((workflow) => workflow.id);
     const scopedWorkflowTasks = preserveAgency
       ? await prisma.workflowTask.findMany({
-          where: {
-            agencyId,
-            ...(scopedWorkflowInstanceIds.length > 0 ? { workflowInstanceId: { in: scopedWorkflowInstanceIds } } : { id: '__none__' }),
-          },
-          select: { id: true },
-        })
+        where: {
+          agencyId,
+          ...(scopedWorkflowInstanceIds.length > 0 ? { workflowInstanceId: { in: scopedWorkflowInstanceIds } } : { id: '__none__' }),
+        },
+        select: { id: true },
+      })
       : [];
     const scopedWorkflowTaskIds = scopedWorkflowTasks.map((task) => task.id);
     const contentFilter = preserveAgency
@@ -629,23 +629,23 @@ async function deleteDemoDataset(preserveAgency: boolean) {
         agencyId,
         notification: preserveAgency
           ? {
-              OR: [
-                ...(demoUserIds.length > 0 ? [{ userId: { in: demoUserIds } }] : []),
-                { eventType: { in: ['DemoDigest', 'TaskAssigned', 'PublishingSlotPublished', 'CampaignTeamMemberAssigned'] } },
-              ],
-            }
+            OR: [
+              ...(demoUserIds.length > 0 ? [{ userId: { in: demoUserIds } }] : []),
+              { eventType: { in: ['DemoDigest', 'TaskAssigned', 'PublishingSlotPublished', 'CampaignTeamMemberAssigned'] } },
+            ],
+          }
           : undefined,
       },
     });
     await prisma.notification.deleteMany({
       where: preserveAgency
         ? {
-            agencyId,
-            OR: [
-              ...(demoUserIds.length > 0 ? [{ userId: { in: demoUserIds } }] : []),
-              { eventType: { in: ['DemoDigest', 'TaskAssigned', 'PublishingSlotPublished', 'CampaignTeamMemberAssigned'] } },
-            ],
-          }
+          agencyId,
+          OR: [
+            ...(demoUserIds.length > 0 ? [{ userId: { in: demoUserIds } }] : []),
+            { eventType: { in: ['DemoDigest', 'TaskAssigned', 'PublishingSlotPublished', 'CampaignTeamMemberAssigned'] } },
+          ],
+        }
         : { agencyId },
     });
     await prisma.fileAsset.deleteMany({ where: contentFilter });
@@ -671,12 +671,12 @@ async function deleteDemoDataset(preserveAgency: boolean) {
     await prisma.publishingSchedule.deleteMany({
       where: preserveAgency
         ? {
-            agencyId,
-            OR: [
-              ...(scopedCampaignIds.length > 0 ? [{ campaignId: { in: scopedCampaignIds } }] : []),
-              ...(scopedContentAssetIds.length > 0 ? [{ contentAssetId: { in: scopedContentAssetIds } }] : []),
-            ],
-          }
+          agencyId,
+          OR: [
+            ...(scopedCampaignIds.length > 0 ? [{ campaignId: { in: scopedCampaignIds } }] : []),
+            ...(scopedContentAssetIds.length > 0 ? [{ contentAssetId: { in: scopedContentAssetIds } }] : []),
+          ],
+        }
         : { agencyId },
     });
     await prisma.campaignTeamAssignment.deleteMany({ where: campaignFilter });
@@ -741,26 +741,26 @@ async function deleteDemoDataset(preserveAgency: boolean) {
     await prisma.auditEvent.deleteMany({
       where: preserveAgency
         ? {
-            agencyId,
-            OR: [
-              ...(scopedCampaignIds.length > 0 ? [{ entityId: { in: scopedCampaignIds } }] : []),
-              ...(scopedContentAssetIds.length > 0 ? [{ entityId: { in: scopedContentAssetIds } }] : []),
-              { requestId: { startsWith: 'demo-' } },
-            ],
-          }
+          agencyId,
+          OR: [
+            ...(scopedCampaignIds.length > 0 ? [{ entityId: { in: scopedCampaignIds } }] : []),
+            ...(scopedContentAssetIds.length > 0 ? [{ entityId: { in: scopedContentAssetIds } }] : []),
+            { requestId: { startsWith: 'demo-' } },
+          ],
+        }
         : { agencyId },
     });
     await prisma.outboxEvent.deleteMany({
       where: preserveAgency
         ? {
-            agencyId,
-            OR: [
-              ...(scopedCampaignIds.length > 0 ? [{ aggregateId: { in: scopedCampaignIds } }] : []),
-              ...(scopedContentAssetIds.length > 0 ? [{ aggregateId: { in: scopedContentAssetIds } }] : []),
-              ...(scopedWorkflowInstanceIds.length > 0 ? [{ aggregateId: { in: scopedWorkflowInstanceIds } }] : []),
-              { correlationId: { startsWith: 'demo-' } },
-            ],
-          }
+          agencyId,
+          OR: [
+            ...(scopedCampaignIds.length > 0 ? [{ aggregateId: { in: scopedCampaignIds } }] : []),
+            ...(scopedContentAssetIds.length > 0 ? [{ aggregateId: { in: scopedContentAssetIds } }] : []),
+            ...(scopedWorkflowInstanceIds.length > 0 ? [{ aggregateId: { in: scopedWorkflowInstanceIds } }] : []),
+            { correlationId: { startsWith: 'demo-' } },
+          ],
+        }
         : { agencyId },
     });
     if (!preserveAgency) {
@@ -986,28 +986,28 @@ async function createTeam(
     });
     const membership = existingMembership
       ? await prisma.membership.update({
-          where: { id: existingMembership.id },
-          data: {
-            roleId: primaryRole.id,
-            status: MembershipStatus.ACTIVE,
-            deletedAt: null,
-            roles: {
-              deleteMany: {},
-              create: roleIds.map((roleId) => ({ roleId })),
-            },
+        where: { id: existingMembership.id },
+        data: {
+          roleId: primaryRole.id,
+          status: MembershipStatus.ACTIVE,
+          deletedAt: null,
+          roles: {
+            deleteMany: {},
+            create: roleIds.map((roleId) => ({ roleId })),
           },
+        },
       })
       : await prisma.membership.create({
-          data: {
-            agencyId,
-            userId: user.id,
-            roleId: primaryRole.id,
-            status: MembershipStatus.ACTIVE,
-            roles: {
-              create: roleIds.map((roleId) => ({ roleId })),
-            },
+        data: {
+          agencyId,
+          userId: user.id,
+          roleId: primaryRole.id,
+          status: MembershipStatus.ACTIVE,
+          roles: {
+            create: roleIds.map((roleId) => ({ roleId })),
           },
-        });
+        },
+      });
 
     memberships.set(person.key, { id: membership.id, userId: user.id, roleKeys: [...person.roles] });
 
@@ -1515,7 +1515,7 @@ async function createWorkflowForAsset(params: {
         deadlineAt: params.state === 'OVERDUE' && stage === targetStage ? addDays(startOfToday(), -2, 18) : taskDeadline,
         acceptedAt:
           stage === ContentStage.EDITOR_INTAKE &&
-          (taskStatus === TaskStatus.WAITING_HANDOFF_ACCEPTANCE || taskStatus === TaskStatus.COMPLETED)
+            (taskStatus === TaskStatus.WAITING_HANDOFF_ACCEPTANCE || taskStatus === TaskStatus.COMPLETED)
             ? addHours(taskDeadline, -5)
             : undefined,
         completedAt: taskStatus === TaskStatus.COMPLETED ? addHours(taskDeadline, -2) : undefined,
@@ -1905,7 +1905,7 @@ async function main() {
   const reset = process.argv.includes('--reset');
   const existingAgency = await prisma.agency.findUnique({ where: { slug: DEMO_AGENCY.slug } });
   const preserveAgency = Boolean(existingAgency);
-  console.log(`${reset ? 'Resetting' : 'Seeding'} AGOS demo data for agency slug: ${DEMO_AGENCY.slug}`);
+  console.log(`${reset ? 'Resetting' : 'Seeding'} AGENCIE demo data for agency slug: ${DEMO_AGENCY.slug}`);
   console.log('Window: rolling 15 days before today through 15 days after today.');
   if (preserveAgency) {
     console.log(`Preserving existing agency and OAuth memberships: ${existingAgency?.displayName || existingAgency?.name}`);

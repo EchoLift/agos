@@ -34,7 +34,7 @@ export default function HelpHeader() {
           <ArrowLeft className="h-5 w-5" aria-hidden="true" />
         </button>
         <Link href="/help" className="truncate rounded-lg bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
-          AGOS Help
+          AGENCIE Help
         </Link>
       </div>
       {!isAuthenticated ? (

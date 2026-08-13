@@ -92,7 +92,7 @@ Visibility preferences are stored locally in:
 
 This is a display preference only. Backend permission filtering remains authoritative.
 
-`@ilamy/calendar` is used only as a rendering layer. AGOS still owns:
+`@ilamy/calendar` is used only as a rendering layer. AGENCIE still owns:
 
 - role-aware event filtering
 - tenant isolation

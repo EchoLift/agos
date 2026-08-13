@@ -44,3 +44,5 @@ yarn-error.log*
 
 # Nested repository metadata from local development copies
 frontend/.git/
+.vercel
+.env*

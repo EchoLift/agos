@@ -12,7 +12,7 @@ status: AVAILABLE
 
 ## What It Does
 
-Appearance lets you choose how AGOS looks on your device.
+Appearance lets you choose how AGENCIE looks on your device.
 
 ## Where To Find It
 

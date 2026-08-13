@@ -78,7 +78,7 @@ export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) 
   };
 
   const confirmLogout = () => {
-    const confirmed = window.confirm("Logout from AGOS?");
+    const confirmed = window.confirm("Logout from AGENCIE?");
     if (confirmed) {
       logout();
     }
@@ -108,7 +108,7 @@ export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) 
               type="button"
               onClick={() => setIsSearchOpen(true)}
               className="flex min-h-11 items-center rounded-md px-3 text-sm text-zinc-400 transition hover:bg-zinc-900 hover:text-white"
-              aria-label="Search AGOS"
+              aria-label="Search AGENCIE"
             >
               <Search aria-hidden="true" className="h-5 w-5 lg:hidden" />
               <span className="hidden lg:inline">
@@ -130,59 +130,59 @@ export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) 
                 )}
               </button>
 
-          {isMenuOpen ? (
-            <div className="fixed inset-x-2 top-16 max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/40 md:absolute md:inset-x-auto md:right-0 md:top-auto md:mt-3 md:w-80">
-              <div className="border-b border-zinc-800 p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-indigo-500/15 text-sm font-semibold text-indigo-200">
-                    {profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" /> : initials}
+              {isMenuOpen ? (
+                <div className="fixed inset-x-2 top-16 max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/40 md:absolute md:inset-x-auto md:right-0 md:top-auto md:mt-3 md:w-80">
+                  <div className="border-b border-zinc-800 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-indigo-500/15 text-sm font-semibold text-indigo-200">
+                        {profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" /> : initials}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-white">{profileName}</div>
+                        <div className="truncate text-xs uppercase tracking-wider text-zinc-500">{roleLabel} • {displayName}</div>
+                        <div className="truncate text-xs text-zinc-500">{profile?.email || "Email unavailable"}</div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-white">{profileName}</div>
-                    <div className="truncate text-xs uppercase tracking-wider text-zinc-500">{roleLabel} • {displayName}</div>
-                    <div className="truncate text-xs text-zinc-500">{profile?.email || "Email unavailable"}</div>
+
+                  <div className="border-b border-zinc-800 p-2">
+                    <MenuLink href={`/${agencySlug}/settings/profile`} label="My Profile" onClick={() => setIsMenuOpen(false)} />
+                    <MenuLink href={`/${agencySlug}/settings/status`} label="Status" onClick={() => setIsMenuOpen(false)} />
+                    <MenuLink href={`/${agencySlug}/settings/appearance`} label="Appearance" onClick={() => setIsMenuOpen(false)} />
+                    <div className="flex min-h-11 cursor-not-allowed items-center rounded-md px-3 text-sm text-zinc-600">Notifications</div>
+                  </div>
+
+                  <div className="border-b border-zinc-800 p-2">
+                    <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-600">Switch Workspace</div>
+                    {agencies.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => switchWorkspace(item)}
+                        className="flex min-h-11 w-full items-center justify-between rounded-md px-3 text-left text-sm text-zinc-300 transition hover:bg-zinc-900 hover:text-white"
+                      >
+                        <span>{item.displayName || item.name}</span>
+                        {item.id === agency?.id ? <span className="text-xs text-indigo-300">Active</span> : null}
+                      </button>
+                    ))}
+                    <MenuLink href="/create-agency" label="+ Create another agency" onClick={() => setIsMenuOpen(false)} />
+                    {isOwner ? (
+                      <MenuLink href={`/${agencySlug}/settings/agency`} label="Agency Settings" onClick={() => setIsMenuOpen(false)} />
+                    ) : null}
+                  </div>
+
+                  <div className="p-2">
+                    <MenuLink href="/help" label="Help & Support" onClick={() => setIsMenuOpen(false)} />
+                    <button
+                      type="button"
+                      onClick={confirmLogout}
+                      className="min-h-11 w-full rounded-md px-3 text-left text-sm font-semibold text-red-300 transition hover:bg-red-500/10"
+                    >
+                      Logout
+                    </button>
                   </div>
                 </div>
-              </div>
-
-              <div className="border-b border-zinc-800 p-2">
-                <MenuLink href={`/${agencySlug}/settings/profile`} label="My Profile" onClick={() => setIsMenuOpen(false)} />
-                <MenuLink href={`/${agencySlug}/settings/status`} label="Status" onClick={() => setIsMenuOpen(false)} />
-                <MenuLink href={`/${agencySlug}/settings/appearance`} label="Appearance" onClick={() => setIsMenuOpen(false)} />
-                <div className="flex min-h-11 cursor-not-allowed items-center rounded-md px-3 text-sm text-zinc-600">Notifications</div>
-              </div>
-
-              <div className="border-b border-zinc-800 p-2">
-                <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-600">Switch Workspace</div>
-                {agencies.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => switchWorkspace(item)}
-                    className="flex min-h-11 w-full items-center justify-between rounded-md px-3 text-left text-sm text-zinc-300 transition hover:bg-zinc-900 hover:text-white"
-                  >
-                    <span>{item.displayName || item.name}</span>
-                    {item.id === agency?.id ? <span className="text-xs text-indigo-300">Active</span> : null}
-                  </button>
-                ))}
-                <MenuLink href="/create-agency" label="+ Create another agency" onClick={() => setIsMenuOpen(false)} />
-                {isOwner ? (
-                  <MenuLink href={`/${agencySlug}/settings/agency`} label="Agency Settings" onClick={() => setIsMenuOpen(false)} />
-                ) : null}
-              </div>
-
-              <div className="p-2">
-                <MenuLink href="/help" label="Help & Support" onClick={() => setIsMenuOpen(false)} />
-                <button
-                  type="button"
-                  onClick={confirmLogout}
-                  className="min-h-11 w-full rounded-md px-3 text-left text-sm font-semibold text-red-300 transition hover:bg-red-500/10"
-                >
-                  Logout
-                </button>
-              </div>
-            </div>
-          ) : null}
+              ) : null}
             </div>
           </div>
         </div>
@@ -197,9 +197,8 @@ function WorkspaceNavLink({ href, label, isActive }: { href: string; label: stri
   return (
     <Link
       href={href}
-      className={`rounded-md px-3 py-2 transition ${
-        isActive ? "bg-indigo-500/15 text-indigo-200" : "hover:bg-zinc-900 hover:text-white"
-      }`}
+      className={`rounded-md px-3 py-2 transition ${isActive ? "bg-indigo-500/15 text-indigo-200" : "hover:bg-zinc-900 hover:text-white"
+        }`}
     >
       {label}
     </Link>

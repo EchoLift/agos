@@ -11,7 +11,7 @@ status: AVAILABLE
 
 ## What This Is
 
-A client in AGOS is more than a name. It is a playbook for the creative team: audience, brand voice, goals, social links, approval preferences, and internal notes.
+A client in AGENCIE is more than a name. It is a playbook for the creative team: audience, brand voice, goals, social links, approval preferences, and internal notes.
 
 ## Fastest Flow
 

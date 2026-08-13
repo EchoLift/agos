@@ -1,11 +1,11 @@
 # Transactional Email Delivery Architecture
 
 ## Overview
-This document details the transactional email delivery slice integrated into the AGOS Notification architecture. Email serves as an asynchronous, secondary delivery channel behind in-app notifications.
+This document details the transactional email delivery slice integrated into the AGENCIE Notification architecture. Email serves as an asynchronous, secondary delivery channel behind in-app notifications.
 
 ## Key Architectural Principles
 
-1. **Isolation**: Business modules call `NotificationService.notify(...)`. Email delivery happens asynchronously in the background worker via RabbitMQ and outbox events. Email API failures never roll back AGOS business operations.
+1. **Isolation**: Business modules call `NotificationService.notify(...)`. Email delivery happens asynchronously in the background worker via RabbitMQ and outbox events. Email API failures never roll back AGENCIE business operations.
 2. **Channel Policy Ownership**: `NotificationModule` owns event-to-channel policy (`eventType` → `IN_APP` / `EMAIL`). High-value operational events trigger `EMAIL` delivery records; generic or celebratory events remain `IN_APP` only.
 3. **Reference-Only Payloads**: Outbox and RabbitMQ event payloads contain references ONLY (`deliveryId`, `invitationId`, `agencyId`). No raw recipient email addresses, decrypted emails, or credentials are place in event streams.
 4. **Authoritative DB Resolution**: The background worker loads the delivery/invitation record from the database and resolves recipient emails:
@@ -29,10 +29,10 @@ This document details the transactional email delivery slice integrated into the
 | Variable | Description | Example |
 |---|---|---|
 | `RESEND_API_KEY` | Primary email provider API key | `re_123456789...` |
-| `RESEND_FROM_EMAIL` | Verified sender address for Resend | `AGOS <notifications@calcie.fun>` |
+| `RESEND_FROM_EMAIL` | Verified sender address for Resend | `AGENCIE <notifications@calcie.fun>` |
 | `SENDGRID_API_KEY` | Fallback email provider API key | `SG.123456789...` |
 | `SENDGRID_FROM_EMAIL` | Sender address for SendGrid | `notifications@calcie.fun` |
-| `SENDGRID_FROM_NAME` | Sender display name for SendGrid | `AGOS` |
+| `SENDGRID_FROM_NAME` | Sender display name for SendGrid | `AGENCIE` |
 | `FRONTEND_URL` | Base URL for deep links | `https://client-agos.calcie.fun` |
 
 ## High-Value Email Events (V1 Scope)

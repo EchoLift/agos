@@ -11,7 +11,7 @@ status: AVAILABLE
 
 ## How Invitations Work
 
-You invite someone by email and assign roles. When they login with that email, AGOS connects the invitation to their user account.
+You invite someone by email and assign roles. When they login with that email, AGENCIE connects the invitation to their user account.
 
 ## Why It Matters
 

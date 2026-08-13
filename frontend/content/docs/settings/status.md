@@ -20,4 +20,4 @@ Open the profile menu and choose Status.
 
 ## Good Use
 
-Use status as a lightweight signal. AGOS is designed to track work, not spy on people.
+Use status as a lightweight signal. AGENCIE is designed to track work, not spy on people.

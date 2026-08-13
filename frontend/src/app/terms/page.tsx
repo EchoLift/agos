@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — AGOS",
+  title: "Terms of Service — AGENCIE",
   description:
-    "Terms of Service for AGOS — Creative Agency Operations Platform.",
+    "Terms of Service for AGENCIE — Creative Agency Operations Platform.",
 };
 
 export default function TermsPage() {
@@ -18,7 +18,7 @@ export default function TermsPage() {
             className="flex items-center gap-2 text-sm font-semibold text-foreground/80 transition-colors hover:text-foreground"
           >
             <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-base font-bold tracking-tight text-transparent">
-              AGOS
+              AGENCIE
             </span>
           </Link>
           <Link
@@ -50,14 +50,14 @@ export default function TermsPage() {
         <section className="rounded-2xl border border-border/50 bg-card p-8 space-y-4">
           <h2 className="text-lg font-semibold text-foreground">1. Agreement to Terms</h2>
           <p>
-            By accessing or using AGOS ("AGOS", "we", "our", or "us"), an operating platform for digital marketing and creative agencies, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the platform.
+            By accessing or using "AGENCIE", "we", "our", or "us"), an operating platform for digital marketing and creative agencies, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the platform.
           </p>
         </section>
 
         <section className="rounded-2xl border border-border/50 bg-card p-8 space-y-4">
           <h2 className="text-lg font-semibold text-foreground">2. Description of Platform</h2>
           <p>
-            AGOS provides agency management tools including client tracking, campaign planning, workflow management, content pipeline tracking, approvals, and optional integrations such as Google Calendar synchronization.
+            AGENCIE provides agency management tools including client tracking, campaign planning, workflow management, content pipeline tracking, approvals, and optional integrations such as Google Calendar synchronization.
           </p>
         </section>
 
@@ -71,14 +71,14 @@ export default function TermsPage() {
         <section className="rounded-2xl border border-border/50 bg-card p-8 space-y-4">
           <h2 className="text-lg font-semibold text-foreground">4. Acceptable Use</h2>
           <p>
-            You agree not to misuse AGOS services, attempt unauthorized access to other agencies or workspaces, or upload malicious code or harmful data.
+            You agree not to misuse AGENCIE services, attempt unauthorized access to other agencies or workspaces, or upload malicious code or harmful data.
           </p>
         </section>
 
         <section className="rounded-2xl border border-border/50 bg-card p-8 space-y-4">
           <h2 className="text-lg font-semibold text-foreground">5. Third-Party Integrations</h2>
           <p>
-            AGOS offers optional integrations with third-party services such as Google Calendar. Use of third-party features is subject to the respective third party's terms and privacy policies.
+            AGENCIE offers optional integrations with third-party services such as Google Calendar. Use of third-party features is subject to the respective third party's terms and privacy policies.
           </p>
         </section>
 
@@ -97,7 +97,7 @@ export default function TermsPage() {
       <footer className="border-t border-border/40 py-10">
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 px-6 text-center sm:flex-row sm:justify-between">
           <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-sm font-bold tracking-tight text-transparent">
-            AGOS
+            AGENCIE
           </span>
           <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} EchoLift. All rights reserved.

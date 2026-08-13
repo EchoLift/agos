@@ -1,6 +1,6 @@
 ---
 title: Profile
-description: Manage your personal AGOS profile.
+description: Manage your personal AGENCIE profile.
 category: Settings
 order: 1
 roles:

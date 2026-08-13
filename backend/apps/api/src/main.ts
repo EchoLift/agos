@@ -21,8 +21,8 @@ async function bootstrap() {
       const allowed =
         !origin ||
         origin === corsOrigin ||
-        origin === "https://client-agos.calcie.fun" ||
-        /^https:\/\/[a-z0-9-]+\.client-agos\.calcie\.fun$/i.test(origin) ||
+        origin === "https://app.agencie.in" ||
+        /^https:\/\/[a-z0-9-]+\.agencie\.in$/i.test(origin) ||
         origin.startsWith("http://localhost:");
 
       if (allowed) {

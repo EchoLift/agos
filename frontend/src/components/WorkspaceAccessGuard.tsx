@@ -39,7 +39,7 @@ export default function WorkspaceAccessGuard({ children }: { children: ReactNode
         <p className="text-sm uppercase tracking-[0.25em] text-zinc-500">Access limited</p>
         <h1 className="mt-3 text-2xl font-semibold text-white">This view is not part of your workspace.</h1>
         <p className="mt-3 text-sm leading-6 text-zinc-400">
-          AGOS keeps each role focused. You can still use the pages that match your current responsibilities.
+          AGENCIE keeps each role focused. You can still use the pages that match your current responsibilities.
         </p>
         <Link
           href={`/${slug}`}

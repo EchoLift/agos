@@ -1,6 +1,6 @@
 ---
 title: Multiple agencies
-description: Use one login across more than one AGOS workspace.
+description: Use one login across more than one AGENCIE workspace.
 category: Team & Access
 order: 4
 roles:

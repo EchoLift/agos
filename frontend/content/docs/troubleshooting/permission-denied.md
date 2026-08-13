@@ -1,6 +1,6 @@
 ---
 title: Permission denied
-description: Why AGOS blocks some actions.
+description: Why AGENCIE blocks some actions.
 category: Troubleshooting
 order: 5
 roles:
@@ -12,7 +12,7 @@ status: AVAILABLE
 
 ## Why It Happens
 
-AGOS only allows actions when your current agency role has permission.
+AGENCIE only allows actions when your current agency role has permission.
 
 Examples:
 

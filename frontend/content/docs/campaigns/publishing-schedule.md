@@ -27,7 +27,7 @@ Each slot can have a platform, time, status, linked content, notes, and publishi
 
 ## What Happens Next
 
-When a slot is linked to content, AGOS can show whether the content is ready, at risk, missed, or published.
+When a slot is linked to content, AGENCIE can show whether the content is ready, at risk, missed, or published.
 
 ## Mark Published
 

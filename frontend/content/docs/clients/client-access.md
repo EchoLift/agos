@@ -11,7 +11,7 @@ status: PLANNED
 
 ## Current Status
 
-AGOS has client-related role modeling, but a full client portal is not ready for daily use.
+AGENCIE has client-related role modeling, but a full client portal is not ready for daily use.
 
 ## What Clients Should Eventually See
 

@@ -30,6 +30,6 @@ Writers, DOPs, editors, designers, social media managers, and managers use My Wo
 
 ## What Happens Next
 
-Open a task from My Work, complete the available action, and AGOS moves the item forward.
+Open a task from My Work, complete the available action, and AGENCIE moves the item forward.
 
 If your My Work is empty but you expected tasks, check whether the current task owner is actually you, not just someone with the same role.

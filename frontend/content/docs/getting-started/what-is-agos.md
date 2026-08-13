@@ -1,6 +1,6 @@
 ---
-title: What is AGOS?
-description: Understand how AGOS helps an agency run client content work.
+title: What is AGENCIE?
+description: Understand how AGENCIE helps an agency run client content work.
 category: Getting Started
 order: 1
 roles:
@@ -11,13 +11,13 @@ status: AVAILABLE
 
 ## What It Solves
 
-AGOS replaces the daily agency mess of WhatsApp follow-ups, spreadsheets, scattered Drive links, and unclear ownership.
+AGENCIE replaces the daily agency mess of WhatsApp follow-ups, spreadsheets, scattered Drive links, and unclear ownership.
 
 It is built around one simple idea: every piece of work should have an owner, a deadline, a current state, and a clear next action.
 
 ## How The Product Thinks
 
-AGOS has two ways to run work:
+AGENCIE has two ways to run work:
 
 - **Campaigns** for structured client plans such as 8 reels per week.
 - **Gigs** for direct assignments such as 5 scripts by Friday.

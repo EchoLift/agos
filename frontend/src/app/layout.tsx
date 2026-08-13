@@ -4,14 +4,14 @@ import ThemeController from "@/components/ThemeController";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AGOS - Operating System for Marketing Agencies",
+  title: "AGENCIE - Operating System for Marketing Agencies",
   description:
-    "AGOS is a creative agency operations platform for managing clients, campaigns, content production, team assignments, approvals, deadlines, and delivery in one workspace.",
+    "AGENCIE is a creative agency operations platform for managing clients, campaigns, content production, team assignments, approvals, deadlines, and delivery in one workspace.",
   openGraph: {
-    title: "AGOS - Operating System for Marketing Agencies",
+    title: "AGENCIE - Operating System for Marketing Agencies",
     description:
-      "AGOS is a creative agency operations platform for managing clients, campaigns, content production, team assignments, approvals, deadlines, and delivery in one workspace.",
-    siteName: "AGOS",
+      "AGENCIE is a creative agency operations platform for managing clients, campaigns, content production, team assignments, approvals, deadlines, and delivery in one workspace.",
+    siteName: "AGENCIE",
   },
 };
 

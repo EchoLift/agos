@@ -1,6 +1,6 @@
 # 2026-08-01 - Integration Deep Links
 
-AGOS screens should not render operational records as dead cards.
+AGENCIE screens should not render operational records as dead cards.
 
 ## Rule
 
