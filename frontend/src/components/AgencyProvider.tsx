@@ -42,11 +42,16 @@ export default function AgencyProvider({ slug, children }: { slug: string; child
         }
         setIsLoading(false);
       })
-      .catch((err) => {
-        if (isMounted) {
-          setError(err.message || "Failed to load agency.");
-          setIsLoading(false);
-        }
+      .catch((err: unknown) => {
+        if (!isMounted) return;
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load agency.",
+        );
+
+        setIsLoading(false);
       });
 
     return () => {
