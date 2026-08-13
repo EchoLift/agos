@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+
 import { parseSubdomainFromHost } from "@/lib/workspace-url";
 
-// Root paths that live outside [agencySlug]
 const ROOT_ROUTES = new Set([
   "",
   "/",
@@ -18,9 +18,11 @@ const ROOT_ROUTES = new Set([
 export function middleware(req: NextRequest) {
   const url = req.nextUrl;
   const host = req.headers.get("host");
-  const subdomain = parseSubdomainFromHost(host);
 
-  // Skip static files, api routes, _next internals
+  const subdomain =
+    parseSubdomainFromHost(host);
+
+  // Skip static files, API routes and Next internals.
   if (
     url.pathname.startsWith("/_next") ||
     url.pathname.startsWith("/api") ||
@@ -29,81 +31,125 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-
+  /*
+   * Agency workspace subdomain:
+   *
+   * https://socia-expert.agencie.in/campaigns
+   *
+   * internally becomes:
+   *
+   * /socia-expert/campaigns
+   */
   if (subdomain) {
-    if (url.pathname === "/login" || url.pathname === "/create-agency") {
+    // Login must NEVER render on agency subdomains.
+    if (
+      url.pathname === "/login" ||
+      url.pathname === "/create-agency"
+    ) {
       const appUrl =
-        process.env.NEXT_PUBLIC_APP_URL || "https://app.agencie.in";
+        process.env.NEXT_PUBLIC_APP_URL ||
+        "https://app.agencie.in";
 
-      const loginUrl = new URL("/login", appUrl);
+      const loginUrl =
+        new URL("/login", appUrl);
 
-      const requestedReturnTo = url.searchParams.get("returnTo");
+      const requestedReturnTo =
+        url.searchParams.get("returnTo");
 
-      const returnTo =
-        requestedReturnTo || `${url.protocol}//${host}/`;
+      const currentUrl =
+        `${url.protocol}//${host}${url.pathname === "/login" ? "/" : url.pathname}`;
 
-      loginUrl.searchParams.set("returnTo", returnTo);
-      
-      return NextResponse.redirect(loginUrl, 307);
+      loginUrl.searchParams.set(
+        "returnTo",
+        requestedReturnTo || currentUrl,
+      );
+
+      return NextResponse.redirect(
+        loginUrl,
+        307,
+      );
     }
 
     const newPath =
-      `/${subdomain}${url.pathname === "/" ? "" : url.pathname}`;
+      `/${subdomain}` +
+      `${url.pathname === "/" ? "" : url.pathname}`;
 
-    return NextResponse.rewrite(new URL(newPath, req.url));
+    const rewriteUrl =
+      new URL(newPath, req.url);
+
+    rewriteUrl.search = url.search;
+
+    return NextResponse.rewrite(
+      rewriteUrl,
+    );
   }
 
-  // 2. Production legacy path redirect
-  // e.g. https://app.agencie.in/socia-expert/campaigns
-  // -> https://socia-expert.agencie.in/campaigns
-  //
-  // Only redirect if NOT on localhost.
-  const hostname = (host || "").split(":")[0].toLowerCase();
+  /*
+   * Production legacy path:
+   *
+   * app.agencie.in/socia-expert/campaigns
+   *
+   * becomes:
+   *
+   * socia-expert.agencie.in/campaigns
+   */
+  const hostname =
+    (host || "")
+      .split(":")[0]
+      .toLowerCase();
 
   const isLocal =
     hostname === "localhost" ||
     hostname.endsWith(".localhost") ||
-    /^\d+\.\d+\.\d+\.\d+$/.test(hostname);
+    /^\d+\.\d+\.\d+\.\d+$/.test(
+      hostname,
+    );
 
-  if (!isLocal && process.env.NODE_ENV === "production") {
-    const segments = url.pathname.split("/").filter(Boolean);
+  if (
+    !isLocal &&
+    process.env.NODE_ENV === "production"
+  ) {
+    const segments =
+      url.pathname
+        .split("/")
+        .filter(Boolean);
 
     if (segments.length > 0) {
       const maybeSlug = segments[0];
 
       const isRootRoute =
-        ROOT_ROUTES.has(`/${maybeSlug}`) || maybeSlug.startsWith("help");
+        ROOT_ROUTES.has(`/${maybeSlug}`) ||
+        maybeSlug.startsWith("help");
 
       if (!isRootRoute) {
-        const remainingPath = segments.slice(1).join("/");
+        const remainingPath =
+          segments.slice(1).join("/");
 
         const rootDomain =
-          process.env.NEXT_PUBLIC_ROOT_DOMAIN || "agencie.in";
+          process.env.NEXT_PUBLIC_ROOT_DOMAIN ||
+          "agencie.in";
 
-        const protocol = req.nextUrl.protocol || "https:";
+        const protocol =
+          req.nextUrl.protocol || "https:";
 
         const targetUrl =
           `${protocol}//${maybeSlug}.${rootDomain}` +
           `${remainingPath ? `/${remainingPath}` : ""}` +
           `${url.search}`;
 
-        return NextResponse.redirect(new URL(targetUrl), 307);
+        return NextResponse.redirect(
+          new URL(targetUrl),
+          307,
+        );
       }
     }
   }
 
-  // Dev mode (localhost:3000) or root routes -> normal Next.js routing
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for:
-     * - _next/static
-     * - _next/image
-     * - favicon.ico
-     */
     "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };
