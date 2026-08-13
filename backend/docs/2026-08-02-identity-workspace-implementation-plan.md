@@ -1,4 +1,4 @@
-# AGOS Identity And Workspace Implementation Plan
+# AGENCIE Identity And Workspace Implementation Plan
 
 Date: 2026-08-02
 

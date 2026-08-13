@@ -16,7 +16,7 @@ Open the profile menu and choose another workspace under Switch Workspace.
 
 ## What Happens Next
 
-AGOS validates that you are a member of that agency and updates the active workspace.
+AGENCIE validates that you are a member of that agency and updates the active workspace.
 
 ## What Can Go Wrong
 

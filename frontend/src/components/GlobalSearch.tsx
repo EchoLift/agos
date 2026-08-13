@@ -25,7 +25,7 @@ interface SearchResult {
 const helpResults: SearchResult[] = [
   { id: "help-getting-started", type: "HELP", title: "Getting started", subtitle: "Set up your agency and first client", href: "/help/getting-started/what-is-agos" },
   { id: "help-workflow", type: "HELP", title: "How Workflow works", subtitle: "Submissions, handoffs, reviews, and approvals", href: "/help/daily-operations/workflow" },
-  { id: "help-calendar", type: "HELP", title: "How AGOS Calendar works", subtitle: "Role-aware deadlines and publishing", href: "/help/daily-operations/calendar" },
+  { id: "help-calendar", type: "HELP", title: "How AGENCIE Calendar works", subtitle: "Role-aware deadlines and publishing", href: "/help/daily-operations/calendar" },
   { id: "help-gigs", type: "HELP", title: "When to use Gigs", subtitle: "Assign one-off work without a campaign", href: "/help/gigs/when-to-use-gigs" },
   { id: "help-roles", type: "HELP", title: "Roles and access", subtitle: "Understand workspace permissions", href: "/help/team-access/roles" },
 ];
@@ -174,7 +174,7 @@ export default function GlobalSearch({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Search AGOS">
+    <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Search AGENCIE">
       <button className="absolute inset-0 cursor-default" aria-label="Close search" onClick={() => onOpenChange(false)} />
       <section className="relative flex h-full w-full flex-col bg-zinc-950 md:mx-auto md:mt-[8vh] md:h-auto md:max-h-[76vh] md:max-w-2xl md:rounded-lg md:border md:border-zinc-800 md:shadow-2xl">
         <div className="flex items-center gap-2 border-b border-zinc-800 p-3">
@@ -182,7 +182,7 @@ export default function GlobalSearch({
             ref={inputRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search AGOS..."
+            placeholder="Search AGENCIE..."
             className="min-h-11 min-w-0 flex-1 rounded-md border border-zinc-800 bg-zinc-900 px-3 text-base text-white outline-none focus:border-indigo-500"
           />
           <button type="button" onClick={() => onOpenChange(false)} className="min-h-11 rounded-md px-3 text-sm text-zinc-300 hover:bg-zinc-900">Close</button>

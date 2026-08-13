@@ -1,4 +1,4 @@
-AGOS Implementation Plan: Workflow Detail Drawer + Actions
+AGENCIE Implementation Plan: Workflow Detail Drawer + Actions
 
 Status
 
@@ -34,7 +34,7 @@ Workflow advances
         ↓
 Board, dashboard and history update
 
-This is the first frontend slice where AGOS becomes an actual operating system rather than a respectable collection of forms. Humanity has endured enough CRUD pages pretending to be products.
+This is the first frontend slice where AGENCIE becomes an actual operating system rather than a respectable collection of forms. Humanity has endured enough CRUD pages pretending to be products.
 
 ⸻
 

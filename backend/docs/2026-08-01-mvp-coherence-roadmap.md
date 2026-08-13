@@ -1,12 +1,12 @@
-# AGOS MVP Coherence Roadmap
+# AGENCIE MVP Coherence Roadmap
 
 Last updated: August 8, 2026
 
 ## Purpose
 
-This document captures the next implementation plan after the architecture audit. AGOS has a strong backend spine, but the MVP risk is now coherence: Workflow, Calendar, Dashboard, My Work, Notifications, Campaign, and Activity must stop interpreting production state independently.
+This document captures the next implementation plan after the architecture audit. AGENCIE has a strong backend spine, but the MVP risk is now coherence: Workflow, Calendar, Dashboard, My Work, Notifications, Campaign, and Activity must stop interpreting production state independently.
 
-The next phase should not expand AGOS horizontally. It should make the existing production loop consistent, secure, and effortless.
+The next phase should not expand AGENCIE horizontally. It should make the existing production loop consistent, secure, and effortless.
 
 ## Product Principle
 
@@ -24,7 +24,7 @@ Every other screen is a projection:
 
 A task should have one production state, one current owner, one deadline, one activity history, and one next required action.
 
-AGOS now supports two entry points into work:
+AGENCIE now supports two entry points into work:
 
 - **Campaign Production**: structured client campaigns, content assets, workflow tasks, and publishing schedules.
 - **Gig / Work Orders**: direct one-off assignments such as scripts, edits, shoots, thumbnails, or overflow work without requiring a campaign team.
@@ -231,7 +231,7 @@ Published
 
 ## MVP Readiness Target
 
-AGOS is MVP-ready when one real agency can:
+AGENCIE is MVP-ready when one real agency can:
 
 1. Create a lightweight client.
 2. Create or duplicate a campaign.

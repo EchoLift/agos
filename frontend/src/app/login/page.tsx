@@ -127,7 +127,7 @@ export default function LoginPage() {
               Continue with Google
             </p>
             <h1 className="mt-4 text-4xl font-semibold text-white">
-              Sign in to AGOS
+              Sign in to AGENCIE
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-7 text-zinc-400">
               One click and we&apos;ll take you straight to agency setup. No

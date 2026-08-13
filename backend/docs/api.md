@@ -2,7 +2,7 @@
 
 Last updated: August 8, 2026
 
-This document mirrors the REST endpoints currently implemented in the AGOS NestJS API. Base path is `/api/v1`.
+This document mirrors the REST endpoints currently implemented in the AGENCIE NestJS API. Base path is `/api/v1`.
 
 ## Global Conventions
 
@@ -91,7 +91,7 @@ Google-only accounts return `401` with a sign-in-with-Google message.
 
 `POST /auth/google`
 
-Primary login and registration path. The frontend sends a Google Identity Services ID token; the backend verifies it, links or creates the auth user, creates a session, and returns an AGOS access token.
+Primary login and registration path. The frontend sends a Google Identity Services ID token; the backend verifies it, links or creates the auth user, creates a session, and returns an AGENCIE access token.
 
 Request:
 

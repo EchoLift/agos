@@ -18,7 +18,7 @@ Create one client, one campaign, one publishing slot, then generate production f
 1. Create a campaign for the client.
 2. Add a publishing slot.
 3. Generate production from the slot.
-4. AGOS creates a content asset and workflow.
+4. AGENCIE creates a content asset and workflow.
 5. The writer receives the first task.
 6. The work moves through review, shoot, editor intake, editing, review, and publishing readiness.
 

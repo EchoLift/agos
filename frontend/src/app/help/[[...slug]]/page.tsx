@@ -8,7 +8,7 @@ import MarkdownContent from "@/components/help/MarkdownContent";
 import { getAllDocs, getDocBySlug, getDocsNavigation } from "@/lib/docs";
 
 export const metadata = {
-  title: "Help Center • AGOS",
+  title: "Help Center • AGENCIE",
   description: "Self-service product documentation for agency owners and creative teams.",
 };
 
@@ -91,7 +91,7 @@ function HelpOverview({ navigation }: { navigation: ReturnType<typeof getDocsNav
   return (
     <div className="mx-auto max-w-5xl">
       <p className="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">Self-service docs</p>
-      <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground">Run AGOS without a training call.</h1>
+      <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground">Run AGENCIE without a training call.</h1>
       <p className="mt-4 max-w-3xl text-lg leading-8 text-muted-foreground">
         Start with setup, then learn how clients, campaigns, gigs, workflow, and calendar connect inside one agency operating system.
       </p>

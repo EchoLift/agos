@@ -2,13 +2,13 @@
 
 **Status:** Core activation flow implemented locally
 
-**Goal:** A brand-new agency founder can discover AGOS, create their workspace, and manage their first client in under 5 minutes.
+**Goal:** A brand-new agency founder can discover AGENCIE, create their workspace, and manage their first client in under 5 minutes.
 
 ---
 
 ## Product Philosophy
 
-### AGOS is the product.
+### AGENCIE is the product.
 The agency is the brand.
 
 There are two completely different experiences.
@@ -245,10 +245,10 @@ Content
 Workflow
 ```
 
-Only Settings mentions AGOS.
+Only Settings mentions AGENCIE.
 
 ```
-Powered by AGOS
+Powered by AGENCIE
 ```
 
 ---
@@ -484,7 +484,7 @@ Dashboard • Social Expert
 
 Settings
 ```
-Powered by AGOS
+Powered by AGENCIE
 ```
 
 Documentation
@@ -494,7 +494,7 @@ Agency OS Docs
 
 Support
 ```
-AGOS Support
+AGENCIE Support
 ```
 
 ---
@@ -510,7 +510,7 @@ workspace.socialexpert.com
 ↓
 CNAME
 ↓
-AGOS
+AGENCIE
 ```
 
 ### White Label

@@ -52,7 +52,7 @@ const features = [
   {
     title: "Google Calendar",
     description:
-      "Sync eligible AGOS assignments and deadlines to a connected Google Calendar.",
+      "Sync eligible AGENCIE assignments and deadlines to a connected Google Calendar.",
   },
   {
     title: "Secure platform",
@@ -107,9 +107,9 @@ const howItWorksSteps = [
 
 const faqItems = [
   {
-    question: "Who is AGOS for?",
+    question: "Who is AGENCIE for?",
     answer:
-      "AGOS is built for creative agencies, social media agencies, content studios, production teams, freelance collectives, and other teams that manage recurring client content and approvals.",
+      "AGENCIE is built for creative agencies, social media agencies, content studios, production teams, freelance collectives, and other teams that manage recurring client content and approvals.",
   },
   {
     question: "Is it ready for daily use?",
@@ -153,7 +153,7 @@ export default function Home() {
       />
       <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-8">
         <div className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-lg font-bold tracking-tight text-transparent">
-          AGOS
+          AGENCIE
         </div>
         <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
           <a href="#problem" className="transition hover:text-foreground">
@@ -179,17 +179,17 @@ export default function Home() {
             <p className="mb-4 inline-flex rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-sm font-medium uppercase tracking-widest text-indigo-300">
               Creative Agency Operations Platform
             </p>
-            {/* Primary H1 Heading — explicitly AGOS for Google OAuth verification & branding */}
+            {/* Primary H1 Heading — explicitly AGENCIE for Google OAuth verification & branding */}
             <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
               <span className="block bg-gradient-to-r from-indigo-300 via-violet-300 to-indigo-400 bg-clip-text text-transparent text-6xl font-extrabold sm:text-7xl lg:text-8xl mb-2">
-                AGOS
+                AGENCIE
               </span>
               <span className="block text-2xl font-semibold tracking-tight text-foreground sm:text-3xl mt-2">
                 Run your creative agency without WhatsApp, Notion, and Excel.
               </span>
             </h1>
             <p className="mt-5 text-base font-medium leading-relaxed text-foreground/90">
-              AGOS is a multi-tenant agency operating system designed for marketing and creative teams to manage work orders, deadlines, workflows, approvals, and Google Calendar event syncs.
+              AGENCIE is a multi-tenant agency operating system designed for marketing and creative teams to manage work orders, deadlines, workflows, approvals, and Google Calendar event syncs.
             </p>
             <p className="mt-3 text-base leading-7 text-muted-foreground">
               Plan campaigns, assign work to writers, designers, editors and
@@ -245,23 +245,23 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── What AGOS does ── */}
+        {/* ── What AGENCIE does ── */}
         <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
           <div className="rounded-3xl border border-border bg-card p-8 lg:p-12">
             <div className="max-w-2xl">
               <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                What AGOS does
+                What AGENCIE does
               </p>
               <h2 className="mt-3 text-3xl font-semibold text-foreground">
                 One workspace for the entire creative agency workflow.
               </h2>
               <p className="mt-4 text-base leading-7 text-muted-foreground">
-                AGOS connects clients, campaigns, content deliverables, team
+                AGENCIE connects clients, campaigns, content deliverables, team
                 assignments, production workflows, approvals, schedules, and
                 publishing so everyone knows what they need to do next.
               </p>
               <p className="mt-3 text-base leading-7 text-muted-foreground">
-                AGOS replaces fragmented agency coordination with a structured
+                AGENCIE replaces fragmented agency coordination with a structured
                 workflow where client work, ownership, deadlines, production
                 status, reviews, and approvals stay connected.
               </p>
@@ -300,7 +300,7 @@ export default function Home() {
                 ))}
               </ul>
               <p className="mt-6 text-sm leading-7 text-muted-foreground">
-                AGOS replaces fragmented agency coordination with a structured
+                AGENCIE replaces fragmented agency coordination with a structured
                 workflow where client work, ownership, deadlines, production
                 status, reviews, and approvals stay connected.
               </p>
@@ -320,12 +320,12 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── How AGOS works ── */}
+        {/* ── How AGENCIE works ── */}
         <section id="how-it-works" className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
           <div className="rounded-3xl border border-border bg-card p-8 lg:p-12">
             <div className="max-w-2xl">
               <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                How AGOS works
+                How AGENCIE works
               </p>
               <h2 className="mt-3 text-3xl font-semibold text-foreground">
                 From client brief to published content.
@@ -441,22 +441,22 @@ export default function Home() {
                   Works with Google
                 </div>
                 <h2 className="text-3xl font-semibold text-foreground">
-                  Your AGOS schedule, inside Google Calendar.
+                  Your AGENCIE schedule, inside Google Calendar.
                 </h2>
                 <p className="mt-4 text-base leading-7 text-muted-foreground">
                   Sign in securely with Google and connect Google Calendar to
-                  keep your AGOS work schedule available wherever you work.
+                  keep your AGENCIE work schedule available wherever you work.
                 </p>
                 <p className="mt-3 text-base leading-7 text-muted-foreground">
-                  When Google Calendar integration is enabled, AGOS can create a
-                  dedicated AGOS calendar and sync eligible assigned work,
+                  When Google Calendar integration is enabled, AGENCIE can create a
+                  dedicated AGENCIE calendar and sync eligible assigned work,
                   deadlines, shoots, reviews, and publishing schedules to it.
-                  AGOS creates and manages calendar events only after you
+                  AGENCIE creates and manages calendar events only after you
                   explicitly connect your Google account.
                 </p>
                 <p className="mt-4 text-sm text-muted-foreground">
                   Google Calendar connection is optional and can be disconnected
-                  from AGOS at any time.
+                  from AGENCIE at any time.
                 </p>
               </div>
               <div className="flex flex-col gap-4 self-center lg:w-56">
@@ -599,7 +599,7 @@ export default function Home() {
           <div className="grid gap-10 sm:grid-cols-[1fr_auto_auto]">
             <div>
               <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-lg font-bold tracking-tight text-transparent">
-                AGOS
+                AGENCIE
               </span>
               <p className="mt-2 max-w-xs text-sm leading-6 text-muted-foreground">
                 Creative agency operations platform for campaigns, production,
@@ -655,7 +655,7 @@ export default function Home() {
             </div>
           </div>
           <div className="mt-10 border-t border-border pt-6 text-sm text-muted-foreground">
-            © 2026 AGOS. All rights reserved.
+            © 2026 AGENCIE. All rights reserved.
           </div>
         </div>
       </footer>

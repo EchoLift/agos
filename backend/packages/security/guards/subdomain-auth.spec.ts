@@ -39,7 +39,7 @@ describe("Subdomain Security & Membership Authorization", () => {
 
     const req = {
       headers: {
-        host: "socia-expert.client-agos.calcie.fun", // Attacker sends hostname matching target agency
+        host: "socia-expert.agencie.in", // Attacker sends hostname matching target agency
         "x-agency-id": "agency-1",
       },
       user: {
@@ -72,7 +72,7 @@ describe("Subdomain Security & Membership Authorization", () => {
 
     const req: any = {
       headers: {
-        host: "any-subdomain.client-agos.calcie.fun",
+        host: "any-subdomain.agencie.in",
         "x-agency-id": "agency-1",
       },
       user: {

@@ -1,6 +1,6 @@
 # Development Methodology
 
-AGOS is built by following two complementary methodologies:
+AGENCIE is built by following two complementary methodologies:
 
 - Lean Startup
 - Kanban
@@ -197,9 +197,9 @@ When writing code:
 If there is uncertainty, prefer the simplest implementation that satisfies today's requirements while keeping tomorrow's evolution possible.
 
 
-# AGOS Design Philosophy
+# AGENCIE Design Philosophy
 
-AGOS is not a generic project management platform.
+AGENCIE is not a generic project management platform.
 
 It is an operating system for creative agencies.
 
@@ -218,4 +218,4 @@ When deciding whether to build a feature, ask:
 
 "Does this help an agency deliver content faster with less operational overhead?"
 
-If not, reconsider whether it belongs in AGOS.
+If not, reconsider whether it belongs in AGENCIE.

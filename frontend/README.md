@@ -8,7 +8,7 @@ This is the standalone Next.js frontend for Agency OS. It currently covers the c
 
 The frontend now includes:
 
-- A marketing landing page for AGOS with a polished hero and product narrative.
+- A marketing landing page for AGENCIE with a polished hero and product narrative.
 - A `/login` experience that exchanges a Google credential with the backend auth endpoint.
 - A local development fallback so the auth experience can be tested even before a real Google client ID exists.
 - A `/create-agency` flow that captures the agency name, normalizes the slug, and routes the founder into their workspace.

@@ -1,6 +1,6 @@
 # Routing Overview
 
-This document summarizes routing behavior across the AGOS frontend and backend, with the goal of helping developers understand how auth, tenant selection, and workspace navigation are resolved.
+This document summarizes routing behavior across the AGENCIE frontend and backend, with the goal of helping developers understand how auth, tenant selection, and workspace navigation are resolved.
 
 ## Frontend routes
 

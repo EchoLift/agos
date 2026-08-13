@@ -12,7 +12,7 @@ export class ResendProvider implements EmailProvider {
   readonly name = "RESEND";
   private readonly logger = new Logger(ResendProvider.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly config: ConfigService) { }
 
   isConfigured(): boolean {
     const apiKey = this.config.get<string>("RESEND_API_KEY");
@@ -23,7 +23,7 @@ export class ResendProvider implements EmailProvider {
     const apiKey = this.config.get<string>("RESEND_API_KEY");
     const defaultFrom =
       this.config.get<string>("RESEND_FROM_EMAIL") ??
-      "AGOS <notifications@calcie.fun>";
+      "AGENCIE <notifications@calcie.fun>";
 
     if (!apiKey) {
       this.logger.warn("Resend API key is not configured");

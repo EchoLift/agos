@@ -1,6 +1,6 @@
 ---
 title: Roles
-description: Understand what roles unlock inside AGOS.
+description: Understand what roles unlock inside AGENCIE.
 category: Team & Access
 order: 2
 roles:
@@ -25,8 +25,8 @@ status: AVAILABLE
 
 ## Access
 
-AGOS uses roles to decide which pages, actions, and work views a person can access.
+AGENCIE uses roles to decide which pages, actions, and work views a person can access.
 
 ## Important Rule
 
-Changing a role changes the person’s AGOS experience. Their navigation, available buttons, workflow actions, and calendar scope may change.
+Changing a role changes the person’s AGENCIE experience. Their navigation, available buttons, workflow actions, and calendar scope may change.

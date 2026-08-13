@@ -12,7 +12,7 @@ export class SendGridProvider implements EmailProvider {
   readonly name = "SENDGRID";
   private readonly logger = new Logger(SendGridProvider.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly config: ConfigService) { }
 
   isConfigured(): boolean {
     const apiKey = this.config.get<string>("SENDGRID_API_KEY");
@@ -25,7 +25,7 @@ export class SendGridProvider implements EmailProvider {
       this.config.get<string>("SENDGRID_FROM_EMAIL") ??
       "notifications@calcie.fun";
     const defaultFromName =
-      this.config.get<string>("SENDGRID_FROM_NAME") ?? "AGOS";
+      this.config.get<string>("SENDGRID_FROM_NAME") ?? "AGENCIE";
 
     if (!apiKey) {
       this.logger.warn("SendGrid API key is not configured");

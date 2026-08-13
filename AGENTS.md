@@ -2,7 +2,7 @@
 
 ## Repo Overview
 
-AGOS is a **multi-tenant SaaS platform for creative agencies** — an operating system for content production. Monorepo with an independent NestJS backend and Next.js frontend. No root-level package.json or workspace manager.
+AGENCIE is a **multi-tenant SaaS platform for creative agencies** — an operating system for content production. Monorepo with an independent NestJS backend and Next.js frontend. No root-level package.json or workspace manager.
 
 ## Structure
 

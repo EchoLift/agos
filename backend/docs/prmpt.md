@@ -1,7 +1,7 @@
 # Wildcard Subdomain Agency Workspace Architecture Plan (Amended)
 
 ## Overview
-Transition AGOS agency workspaces from path-based URLs (`https://client-agos.calcie.fun/{agencySlug}`) to wildcard subdomain URLs (`https://{agencySlug}.client-agos.calcie.fun`), while preserving path-based routing for local development (`http://localhost:3000/{agencySlug}`) and maintaining strict membership-based authorization on the NestJS backend.
+Transition AGENCIE agency workspaces from path-based URLs (`https://client-agos.calcie.fun/{agencySlug}`) to wildcard subdomain URLs (`https://{agencySlug}.client-agos.calcie.fun`), while preserving path-based routing for local development (`http://localhost:3000/{agencySlug}`) and maintaining strict membership-based authorization on the NestJS backend.
 
 ---
 

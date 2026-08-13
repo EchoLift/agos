@@ -11,7 +11,7 @@ status: AVAILABLE
 
 ## When To Use It
 
-Use Team when you need writers, DOPs, editors, designers, managers, or social media managers to receive work inside AGOS.
+Use Team when you need writers, DOPs, editors, designers, managers, or social media managers to receive work inside AGENCIE.
 
 ## How To Invite
 
@@ -23,11 +23,11 @@ Use Team when you need writers, DOPs, editors, designers, managers, or social me
 
 ## First Login
 
-When the employee logs in with the same email, AGOS claims the invitation and adds them to the workspace.
+When the employee logs in with the same email, AGENCIE claims the invitation and adds them to the workspace.
 
 ## Role Changes
 
 Owners and managers can update roles, with protection around owner access. A person can have multiple roles, such as Writer and Editor.
 
 > [!TIP] Keep It Simple
-> Give people only the roles they need. AGOS changes the navigation and work views based on those roles.
+> Give people only the roles they need. AGENCIE changes the navigation and work views based on those roles.

@@ -24,4 +24,4 @@ Approve completes the gig. Request changes returns it to the assignee with feedb
 
 ## Good Feedback
 
-Write exactly what should change. The goal is to avoid another follow-up conversation outside AGOS.
+Write exactly what should change. The goal is to avoid another follow-up conversation outside AGENCIE.

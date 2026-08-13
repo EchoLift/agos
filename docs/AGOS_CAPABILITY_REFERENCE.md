@@ -1,8 +1,8 @@
-# AGOS Capability Reference
+# AGENCIE Capability Reference
 
 Audit date: 2026-08-10
 
-This is the internal product truth for AGOS. Owner-facing help pages should be written from this reference, but should not expose implementation details such as database table names, event payloads, or internal service names.
+This is the internal product truth for AGENCIE. Owner-facing help pages should be written from this reference, but should not expose implementation details such as database table names, event payloads, or internal service names.
 
 ## Status Legend
 
@@ -111,7 +111,7 @@ Limitations: standalone `ClientContact` backend exists, but owner-facing contact
 
 Status: `AVAILABLE`
 
-Owner/manager creates a campaign, adds deliverables and publishing slots, then generates production from publishing slots. AGOS creates content and workflow work from the publishing commitment.
+Owner/manager creates a campaign, adds deliverables and publishing slots, then generates production from publishing slots. AGENCIE creates content and workflow work from the publishing commitment.
 
 Limitations: recurring automation is partial; owners may still create or adjust slots manually.
 
@@ -186,7 +186,7 @@ Limitations: no direct social-platform publishing or Google Calendar sync.
 Recommended public help structure:
 
 - Getting Started
-  - What is AGOS?
+  - What is AGENCIE?
   - Create your agency
   - Add your team
   - Add your first client

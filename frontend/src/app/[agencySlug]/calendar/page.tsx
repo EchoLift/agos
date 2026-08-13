@@ -235,7 +235,7 @@ export default function CalendarPage() {
             Work assigned to you appears here like a meeting invite, with broader schedules available when your role permits it.
           </p>
           <Link href="/help/daily-operations/calendar" className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200">
-            How AGOS Calendar works
+            How AGENCIE Calendar works
           </Link>
         </div>
         <button type="button" onClick={resetDefaults} className="min-h-11 rounded-md border border-zinc-800 px-3 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-900 lg:rounded-full">

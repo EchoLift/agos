@@ -107,7 +107,7 @@ export class NotificationDeliveryProcessor {
     }
 
     const frontendUrl =
-      this.config.get<string>("FRONTEND_URL") || "https://client-agos.calcie.fun";
+      this.config.get<string>("FRONTEND_URL") || "https://app.agencie.in";
 
     const rendered = renderEmailTemplate(notification.eventType, {
       recipientName: user.name || "Team Member",
@@ -222,7 +222,7 @@ export class NotificationDeliveryProcessor {
     }
 
     const frontendUrl =
-      this.config.get<string>("FRONTEND_URL") || "https://client-agos.calcie.fun";
+      this.config.get<string>("FRONTEND_URL") || "https://app.agencie.in";
 
     const rendered = renderEmailTemplate("MemberInvited", {
       recipientName: "Team Member",
@@ -327,7 +327,7 @@ export class NotificationDeliveryProcessor {
           agencyId: invitation.agencyId,
           userId: null,               // Invited user may not have a registered account yet
           title: `You're invited to join ${invitation.agency.name}`,
-          body: `Accept your invitation to become a member of ${invitation.agency.name} on AGOS.`,
+          body: `Accept your invitation to become a member of ${invitation.agency.name} on AGENCIE.`,
           eventType: DomainEvents.MemberInvited,
         },
       });

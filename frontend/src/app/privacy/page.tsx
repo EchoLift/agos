@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — AGOS",
+  title: "Privacy Policy — AGENCIE",
   description:
-    "Learn how AGOS collects, uses, stores, protects, and shares your information when you use our platform.",
+    "Learn how AGENCIE collects, uses, stores, protects, and shares your information when you use our platform.",
 };
 
 const sections = [
@@ -14,10 +14,10 @@ const sections = [
     title: "Information We Collect",
     content: (
       <>
-        <p>AGOS may collect the following categories of information.</p>
+        <p>AGENCIE may collect the following categories of information.</p>
 
         <h3>Account Information</h3>
-        <p>When you create or access an AGOS account, we may collect:</p>
+        <p>When you create or access an AGENCIE account, we may collect:</p>
         <ul>
           <li>Name</li>
           <li>Email address</li>
@@ -28,8 +28,8 @@ const sections = [
           <li>Profile preferences</li>
         </ul>
         <p>
-          AGOS uses a universal identity model in which one verified email
-          address may be associated with one AGOS user identity across multiple
+          AGENCIE uses a universal identity model in which one verified email
+          address may be associated with one AGENCIE user identity across multiple
           agency workspaces.
         </p>
       </>
@@ -42,7 +42,7 @@ const sections = [
     content: (
       <>
         <p>
-          When you participate in an agency workspace, AGOS may process:
+          When you participate in an agency workspace, AGENCIE may process:
         </p>
         <ul>
           <li>Agency name</li>
@@ -70,7 +70,7 @@ const sections = [
     content: (
       <>
         <p>
-          Depending on how an agency uses AGOS, we may process information
+          Depending on how an agency uses AGENCIE, we may process information
           including:
         </p>
         <ul>
@@ -100,7 +100,7 @@ const sections = [
     title: "Work, Workflow, and Calendar Information",
     content: (
       <>
-        <p>AGOS may process operational information including:</p>
+        <p>AGENCIE may process operational information including:</p>
         <ul>
           <li>Work Orders or Gigs</li>
           <li>Workflow assignments</li>
@@ -117,7 +117,7 @@ const sections = [
           <li>Work status and deadlines</li>
         </ul>
         <p>
-          AGOS uses this information to help agencies coordinate production and
+          AGENCIE uses this information to help agencies coordinate production and
           to show users the work relevant to their role and permissions.
         </p>
       </>
@@ -129,9 +129,9 @@ const sections = [
     title: "Google Account Information",
     content: (
       <>
-        <p>AGOS supports Sign in with Google.</p>
+        <p>AGENCIE supports Sign in with Google.</p>
         <p>
-          When you sign in using Google, AGOS may receive information permitted
+          When you sign in using Google, AGENCIE may receive information permitted
           by the Google authentication scopes you approve, such as:
         </p>
         <ul>
@@ -141,9 +141,9 @@ const sections = [
           <li>Profile image</li>
         </ul>
         <p>
-          AGOS uses this information to authenticate your identity and associate
-          your Google account with your AGOS user account. Signing in with
-          Google does not automatically grant AGOS access to your Google
+          AGENCIE uses this information to authenticate your identity and associate
+          your Google account with your AGENCIE user account. Signing in with
+          Google does not automatically grant AGENCIE access to your Google
           Calendar.
         </p>
       </>
@@ -155,17 +155,17 @@ const sections = [
     title: "Google Calendar Integration",
     content: (
       <>
-        <p>AGOS may offer an optional Google Calendar integration.</p>
+        <p>AGENCIE may offer an optional Google Calendar integration.</p>
         <p>
           Google Calendar access is requested separately from Google login and
           only after you explicitly choose to connect Google Calendar.
         </p>
         <p>
-          When connected, AGOS may use Google Calendar API permissions to create
-          and manage an AGOS-specific calendar and the events created by AGOS
+          When connected, AGENCIE may use Google Calendar API permissions to create
+          and manage an AGENCIE-specific calendar and the events created by AGENCIE
           within that calendar.
         </p>
-        <p>AGOS may synchronize relevant work such as:</p>
+        <p>AGENCIE may synchronize relevant work such as:</p>
         <ul>
           <li>Assigned work or gigs</li>
           <li>Workflow deadlines</li>
@@ -173,16 +173,16 @@ const sections = [
           <li>Editing deadlines</li>
           <li>Review deadlines</li>
           <li>Publishing schedules</li>
-          <li>Other work-related events you are authorized to view in AGOS</li>
+          <li>Other work-related events you are authorized to view in AGENCIE</li>
         </ul>
         <p>
-          AGOS does not use Google Calendar as an authorization system. Before
-          synchronizing an event, AGOS applies its own workspace, membership,
+          AGENCIE does not use Google Calendar as an authorization system. Before
+          synchronizing an event, AGENCIE applies its own workspace, membership,
           role, and resource-access rules.
         </p>
         <p>
           Google Calendar integration is optional and may be disconnected from
-          AGOS settings.
+          AGENCIE settings.
         </p>
       </>
     ),
@@ -195,31 +195,31 @@ const sections = [
       <>
         <p>
           Information received from Google APIs is used only to provide
-          user-facing AGOS functionality requested by the user.
+          user-facing AGENCIE functionality requested by the user.
         </p>
         <p>We may use Google user data to:</p>
         <ul>
-          <li>Authenticate your AGOS account</li>
+          <li>Authenticate your AGENCIE account</li>
           <li>Display basic profile information</li>
           <li>Connect your Google Calendar</li>
-          <li>Create and update AGOS-generated Google Calendar events</li>
+          <li>Create and update AGENCIE-generated Google Calendar events</li>
           <li>
-            Keep AGOS work deadlines synchronized with your connected Google
+            Keep AGENCIE work deadlines synchronized with your connected Google
             Calendar
           </li>
           <li>Identify the connected Google account</li>
           <li>Maintain and troubleshoot the integration</li>
         </ul>
         <p>
-          AGOS does not use Google user data for advertising. AGOS does not sell
-          Google user data. AGOS does not use Google user data to build
-          advertising profiles. AGOS does not transfer Google user data to third
+          AGENCIE does not use Google user data for advertising. AGENCIE does not sell
+          Google user data. AGENCIE does not use Google user data to build
+          advertising profiles. AGENCIE does not transfer Google user data to third
           parties except where necessary to provide the requested service,
           comply with law, protect users, or operate infrastructure under
           appropriate confidentiality and security obligations.
         </p>
         <p>
-          AGOS's use and transfer of information received from Google APIs will
+          AGENCIE's use and transfer of information received from Google APIs will
           comply with the{" "}
           <a
             href="https://developers.google.com/terms/api-services-user-data-policy"
@@ -240,13 +240,13 @@ const sections = [
     content: (
       <>
         <p>
-          When you connect Google Calendar, AGOS may receive OAuth credentials
+          When you connect Google Calendar, AGENCIE may receive OAuth credentials
           required to maintain the integration.
         </p>
         <p>Where applicable:</p>
         <ul>
           <li>Refresh tokens are encrypted before storage.</li>
-          <li>OAuth credentials are not exposed to the AGOS frontend.</li>
+          <li>OAuth credentials are not exposed to the AGENCIE frontend.</li>
           <li>
             OAuth credentials are not intentionally written to application logs.
           </li>
@@ -261,9 +261,9 @@ const sections = [
         </ul>
         <p>
           You may disconnect Google Calendar at any time. When disconnected,
-          AGOS stops future synchronization and removes or revokes stored
+          AGENCIE stops future synchronization and removes or revokes stored
           authorization credentials where applicable. Disconnecting Google
-          Calendar does not delete your AGOS account or your AGOS business data.
+          Calendar does not delete your AGENCIE account or your AGENCIE business data.
         </p>
       </>
     ),
@@ -275,19 +275,19 @@ const sections = [
     content: (
       <>
         <p>
-          AGOS may normalize email addresses by trimming surrounding whitespace
+          AGENCIE may normalize email addresses by trimming surrounding whitespace
           and converting letters to lowercase.
         </p>
         <p>This is used to:</p>
         <ul>
-          <li>Prevent duplicate AGOS identities</li>
+          <li>Prevent duplicate AGENCIE identities</li>
           <li>Match invited users with existing accounts</li>
           <li>Associate pending agency memberships</li>
           <li>Allow one account to access multiple agency workspaces</li>
           <li>Prevent duplicate employee or client identities</li>
         </ul>
         <p>
-          AGOS does not intentionally remove Gmail dots, strip plus aliases, or
+          AGENCIE does not intentionally remove Gmail dots, strip plus aliases, or
           perform provider-specific email rewriting unless this behavior is
           explicitly introduced and disclosed.
         </p>
@@ -300,7 +300,7 @@ const sections = [
     title: "Notifications",
     content: (
       <>
-        <p>AGOS may generate notifications relating to:</p>
+        <p>AGENCIE may generate notifications relating to:</p>
         <ul>
           <li>Work assignments</li>
           <li>Submissions</li>
@@ -313,7 +313,7 @@ const sections = [
         </ul>
         <p>
           Depending on the features available and enabled, notifications may be
-          delivered in-app or through connected communication services. AGOS
+          delivered in-app or through connected communication services. AGENCIE
           will disclose additional notification integrations if they are
           introduced.
         </p>
@@ -327,10 +327,10 @@ const sections = [
     content: (
       <>
         <p>
-          AGOS may allow users to attach external links, including links to
+          AGENCIE may allow users to attach external links, including links to
           services such as Google Drive or other content platforms.
         </p>
-        <p>AGOS may store:</p>
+        <p>AGENCIE may store:</p>
         <ul>
           <li>Link URL</li>
           <li>File or resource title</li>
@@ -340,7 +340,7 @@ const sections = [
           <li>Metadata required to display the link</li>
         </ul>
         <p>
-          AGOS does not necessarily host the underlying file. External services
+          AGENCIE does not necessarily host the underlying file. External services
           are governed by their own privacy policies and terms.
         </p>
       </>
@@ -352,13 +352,13 @@ const sections = [
     title: "How We Share Information",
     content: (
       <>
-        <p>AGOS does not sell personal information.</p>
+        <p>AGENCIE does not sell personal information.</p>
         <p>
           We may share information only when reasonably necessary for purposes
           such as:
         </p>
         <ul>
-          <li>Providing AGOS services</li>
+          <li>Providing AGENCIE services</li>
           <li>Hosting and cloud infrastructure</li>
           <li>Database services</li>
           <li>Authentication</li>
@@ -367,12 +367,12 @@ const sections = [
           <li>Legal compliance</li>
           <li>Preventing fraud or abuse</li>
           <li>
-            Protecting the rights and safety of AGOS, our users, or others
+            Protecting the rights and safety of AGENCIE, our users, or others
           </li>
         </ul>
         <p>
           Service providers may process information only as necessary to provide
-          services to AGOS and subject to appropriate contractual or security
+          services to AGENCIE and subject to appropriate contractual or security
           obligations.
         </p>
       </>
@@ -385,12 +385,12 @@ const sections = [
     content: (
       <>
         <p>
-          Agencies using AGOS may provide information about employees,
+          Agencies using AGENCIE may provide information about employees,
           freelancers, clients, campaigns, and business operations.
         </p>
         <p>In many cases, the agency determines:</p>
         <ul>
-          <li>What information is entered into AGOS</li>
+          <li>What information is entered into AGENCIE</li>
           <li>Which users receive access</li>
           <li>What roles users receive</li>
           <li>Which clients or campaigns users can access</li>
@@ -409,11 +409,11 @@ const sections = [
     title: "Multi-Agency Privacy",
     content: (
       <>
-        <p>A single AGOS user may belong to multiple agencies.</p>
+        <p>A single AGENCIE user may belong to multiple agencies.</p>
         <p>
-          AGOS separates access by agency membership and permissions. Being
+          AGENCIE separates access by agency membership and permissions. Being
           authorized to access Agency A does not automatically provide access to
-          Agency B. AGOS applies agency-scoped access controls to reduce the
+          Agency B. AGENCIE applies agency-scoped access controls to reduce the
           risk of cross-agency data exposure.
         </p>
         <p>
@@ -430,7 +430,7 @@ const sections = [
     content: (
       <>
         <p>
-          AGOS uses technical and organizational safeguards intended to protect
+          AGENCIE uses technical and organizational safeguards intended to protect
           information. Depending on the information and system involved, these
           may include:
         </p>
@@ -448,7 +448,7 @@ const sections = [
           <li>Restricted production configuration</li>
         </ul>
         <p>
-          No system can guarantee absolute security, but AGOS works to protect
+          No system can guarantee absolute security, but AGENCIE works to protect
           user information from unauthorized access, alteration, disclosure, or
           destruction.
         </p>
@@ -462,7 +462,7 @@ const sections = [
     content: (
       <>
         <p>
-          AGOS retains information for as long as reasonably necessary to:
+          AGENCIE retains information for as long as reasonably necessary to:
         </p>
         <ul>
           <li>Provide the service</li>
@@ -474,7 +474,7 @@ const sections = [
         </ul>
         <p>
           Retention periods may vary depending on the type of information and
-          the agency's use of AGOS. Where appropriate, deleted or archived
+          the agency's use of AGENCIE. Where appropriate, deleted or archived
           records may remain in backups or audit records for a limited period.
         </p>
       </>
@@ -487,7 +487,7 @@ const sections = [
     content: (
       <>
         <p>
-          Users may request deletion of their AGOS account or eligible personal
+          Users may request deletion of their AGENCIE account or eligible personal
           information.
         </p>
         <p>Some information may need to be retained where:</p>
@@ -503,9 +503,9 @@ const sections = [
           </li>
         </ul>
         <p>
-          Where possible, AGOS will remove, anonymize, or unlink personal
+          Where possible, AGENCIE will remove, anonymize, or unlink personal
           information that is no longer required. For Google integrations, users
-          may also revoke AGOS access through their Google Account permissions.
+          may also revoke AGENCIE access through their Google Account permissions.
         </p>
       </>
     ),
@@ -524,11 +524,11 @@ const sections = [
             You will no longer receive normal access to that workspace.
           </li>
           <li>
-            AGOS will stop providing newly restricted workspace information
+            AGENCIE will stop providing newly restricted workspace information
             through connected integrations where applicable.
           </li>
           <li>
-            Your global AGOS account may remain active if you belong to other
+            Your global AGENCIE account may remain active if you belong to other
             agencies.
           </li>
         </ul>
@@ -546,7 +546,7 @@ const sections = [
     content: (
       <>
         <p>
-          AGOS uses cookies and similar technologies where necessary to:
+          AGENCIE uses cookies and similar technologies where necessary to:
         </p>
         <ul>
           <li>Maintain authenticated sessions</li>
@@ -556,7 +556,7 @@ const sections = [
         </ul>
         <p>
           Authentication cookies may be configured as secure and HTTP-only where
-          supported. AGOS does not require advertising cookies to provide its
+          supported. AGENCIE does not require advertising cookies to provide its
           core platform functionality.
         </p>
       </>
@@ -569,7 +569,7 @@ const sections = [
     content: (
       <>
         <p>
-          AGOS may use third-party infrastructure and service providers such as:
+          AGENCIE may use third-party infrastructure and service providers such as:
         </p>
         <ul>
           <li>Cloud hosting providers</li>
@@ -581,7 +581,7 @@ const sections = [
         </ul>
         <p>
           These providers process information according to their own terms,
-          privacy policies, and agreements with AGOS. We aim to use providers
+          privacy policies, and agreements with AGENCIE. We aim to use providers
           appropriate for the type and sensitivity of information processed.
         </p>
       </>
@@ -593,9 +593,9 @@ const sections = [
     title: "International Processing",
     content: (
       <p>
-        AGOS infrastructure or service providers may process information in
+        AGENCIE infrastructure or service providers may process information in
         countries different from the country where you live. Where required,
-        AGOS will take reasonable steps to use appropriate safeguards for
+        AGENCIE will take reasonable steps to use appropriate safeguards for
         cross-border processing.
       </p>
     ),
@@ -606,8 +606,8 @@ const sections = [
     title: "Children's Privacy",
     content: (
       <p>
-        AGOS is intended for professional and business use and is not designed
-        for children. We do not knowingly provide AGOS services to children
+        AGENCIE is intended for professional and business use and is not designed
+        for children. We do not knowingly provide AGENCIE services to children
         where prohibited by applicable law.
       </p>
     ),
@@ -618,7 +618,7 @@ const sections = [
     title: "Changes to This Privacy Policy",
     content: (
       <p>
-        We may update this Privacy Policy as AGOS evolves. If we materially
+        We may update this Privacy Policy as AGENCIE evolves. If we materially
         change how we access, use, store, or share personal information or
         Google user data, we will update this policy and provide appropriate
         notice where required. The effective date at the top of this page
@@ -644,7 +644,7 @@ const sections = [
           <li>
             Request correction or deletion of eligible personal information
           </li>
-          <li>Contact AGOS regarding privacy concerns</li>
+          <li>Contact AGENCIE regarding privacy concerns</li>
         </ul>
       </>
     ),
@@ -656,11 +656,11 @@ const sections = [
     content: (
       <>
         <p>
-          For privacy questions, data requests, or concerns relating to AGOS,
+          For privacy questions, data requests, or concerns relating to AGENCIE,
           contact:
         </p>
         <p>
-          <strong>AGOS / EchoLift (Parent)</strong>
+          <strong>AGENCIE / EchoLift (Parent)</strong>
           <br />
           Email:{" "}
           <a href="mailto:echoliftagency@gmail.com">
@@ -669,11 +669,11 @@ const sections = [
           <br />
           Website:{" "}
           <a
-            href="https://client-agos.calcie.fun"
+            href="https://app.agencie.in"
             target="_blank"
             rel="noopener noreferrer"
           >
-            https://client-agos.calcie.fun
+            https://app.agencie.in
           </a>
         </p>
       </>
@@ -693,7 +693,7 @@ export default function PrivacyPage() {
           >
             {/* Wordmark */}
             <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent text-base font-bold tracking-tight">
-              AGOS
+              AGENCIE
             </span>
           </Link>
           <Link
@@ -727,14 +727,14 @@ export default function PrivacyPage() {
             <time dateTime="2026-08-12">August 12, 2026</time>
           </p>
           <p className="mx-auto mt-6 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            AGOS ("AGOS", "we", "our", or "us") is an operating platform for
+            AGENCIE ("AGENCIE", "we", "our", or "us") is an operating platform for
             digital marketing and creative agencies. This Privacy Policy explains
-            how AGOS collects, uses, stores, protects, and shares information
+            how AGENCIE collects, uses, stores, protects, and shares information
             when you use our website, applications, integrations, and related
             services.
           </p>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            By using AGOS, you acknowledge the practices described in this
+            By using AGENCIE, you acknowledge the practices described in this
             Privacy Policy.
           </p>
         </div>
@@ -791,9 +791,8 @@ export default function PrivacyPage() {
                 >
                   {/* Section card */}
                   <div
-                    className={`rounded-2xl border border-border/50 bg-card p-8 transition-colors group-target:border-indigo-500/40 group-target:bg-indigo-500/5${
-                      i < sections.length - 1 ? " mb-4" : ""
-                    }`}
+                    className={`rounded-2xl border border-border/50 bg-card p-8 transition-colors group-target:border-indigo-500/40 group-target:bg-indigo-500/5${i < sections.length - 1 ? " mb-4" : ""
+                      }`}
                   >
                     <div className="mb-4 flex items-center gap-3">
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-indigo-500/15 font-mono text-xs font-bold text-indigo-400">
@@ -825,7 +824,7 @@ export default function PrivacyPage() {
                     </h2>
                   </div>
                   <p className="text-sm leading-7 text-muted-foreground">
-                    AGOS's use and transfer to any other app of information
+                    AGENCIE's use and transfer to any other app of information
                     received from Google APIs will adhere to the{" "}
                     <a
                       href="https://developers.google.com/terms/api-services-user-data-policy"
@@ -848,7 +847,7 @@ export default function PrivacyPage() {
       <footer className="border-t border-border/40 py-10">
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 px-6 text-center sm:flex-row sm:justify-between">
           <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-sm font-bold tracking-tight text-transparent">
-            AGOS
+            AGENCIE
           </span>
           <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} EchoLift. All rights reserved.

@@ -1,8 +1,8 @@
-# AGOS (Agency Operating System)
+# AGENCIE (Agency Operating System)
 
 ## Vision
 
-AGOS is a multi-tenant SaaS platform that helps creative agencies manage their entire content production lifecycle.
+AGENCIE is a multi-tenant SaaS platform that helps creative agencies manage their entire content production lifecycle.
 
 The goal is to replace fragmented workflows spread across:
 
@@ -14,7 +14,7 @@ The goal is to replace fragmented workflows spread across:
 
 with one workflow-driven platform.
 
-AGOS is not a social media scheduler.
+AGENCIE is not a social media scheduler.
 
 It is an Operating System for Creative Agencies.
 
@@ -36,7 +36,7 @@ Typical team:
 
 The founder currently manages everything manually.
 
-AGOS removes operational chaos without adding enterprise complexity.
+AGENCIE removes operational chaos without adding enterprise complexity.
 
 ---
 
@@ -532,7 +532,7 @@ agency.agos.com
 
 Inside application:
 
-Never display "AGOS" prominently.
+Never display "AGENCIE" prominently.
 
 Display agency name.
 
@@ -556,7 +556,7 @@ Workflow
 
 Settings shows:
 
-Powered by AGOS
+Powered by AGENCIE
 
 ---
 
@@ -654,7 +654,7 @@ No shared mutable state.
 
 Agency owner should be able to:
 
-Discover AGOS
+Discover AGENCIE
 
 ↓
 
@@ -716,7 +716,7 @@ Manual follow-ups
 
 or micromanagement.
 
-AGOS should become the operating system of a creative agency.
+AGENCIE should become the operating system of a creative agency.
 
 ---
 

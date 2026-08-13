@@ -1,10 +1,10 @@
-# AGOS Mobile Experience Phase 1
+# AGENCIE Mobile Experience Phase 1
 
 Date: 2026-08-12
 
 ## Objective
 
-Make AGOS usable as an operational product on phones without replacing or weakening the existing desktop experience. Mobile uses the same APIs, tenant context, permissions, and workflow commands as desktop.
+Make AGENCIE usable as an operational product on phones without replacing or weakening the existing desktop experience. Mobile uses the same APIs, tenant context, permissions, and workflow commands as desktop.
 
 ## Route And Persona Audit
 

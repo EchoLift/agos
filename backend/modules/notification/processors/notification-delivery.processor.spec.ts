@@ -63,7 +63,7 @@ describe("NotificationDeliveryProcessor", () => {
     };
     config = {
       get: jest.fn().mockImplementation((key: string) => {
-        if (key === "FRONTEND_URL") return "https://client-agos.calcie.fun";
+        if (key === "FRONTEND_URL") return "https://app.agencie.in";
         return undefined;
       }),
     };

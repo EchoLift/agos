@@ -1,6 +1,6 @@
 ---
 title: Notifications
-description: Understand what AGOS currently notifies and what is still planned.
+description: Understand what AGENCIE currently notifies and what is still planned.
 category: Daily Operations
 order: 6
 roles:
@@ -14,7 +14,7 @@ status: PARTIAL
 
 ## Current Status
 
-AGOS stores in-app notification records for selected workflow and assignment events.
+AGENCIE stores in-app notification records for selected workflow and assignment events.
 
 ## What Is Partial
 
