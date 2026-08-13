@@ -12,23 +12,33 @@ const RESERVED_SUBDOMAINS = new Set([
   "mail",
 ]);
 
-export function isReservedSubdomain(subdomain: string): boolean {
-  return RESERVED_SUBDOMAINS.has(subdomain.toLowerCase().trim());
+export function isReservedSubdomain(
+  subdomain: string,
+): boolean {
+  return RESERVED_SUBDOMAINS.has(
+    subdomain.toLowerCase().trim(),
+  );
 }
 
 /**
  * Extracts agency slug from Host header or window.location.host in production.
- * Returns null if on localhost, IP address, root domain, or a reserved subdomain.
+ *
+ * Examples:
+ * socia-expert.agencie.in -> socia-expert
+ * app.agencie.in          -> null
+ * agencie.in              -> null
+ * localhost:3000          -> null
  */
 export function parseSubdomainFromHost(
   host: string | null | undefined,
 ): string | null {
   if (!host) return null;
 
-  // Strip port if present
-  const hostname = host.split(":")[0].toLowerCase().trim();
+  const hostname = host
+    .split(":")[0]
+    .toLowerCase()
+    .trim();
 
-  // If localhost, IP, or dev host, no subdomain routing
   if (
     hostname === "localhost" ||
     hostname.endsWith(".localhost") ||
@@ -38,17 +48,15 @@ export function parseSubdomainFromHost(
   }
 
   const rootDomain = (
-    process.env.NEXT_PUBLIC_ROOT_DOMAIN || "agencie.in"
+    process.env.NEXT_PUBLIC_ROOT_DOMAIN ||
+    "agencie.in"
   ).toLowerCase();
 
-  // Check if host ends with .rootDomain
   if (hostname.endsWith(`.${rootDomain}`)) {
     const parts = hostname
       .slice(0, -(rootDomain.length + 1))
       .split(".");
 
-    // Only single-level agency subdomains:
-    // socia-expert.agencie.in
     if (
       parts.length === 1 &&
       parts[0] &&
@@ -61,11 +69,23 @@ export function parseSubdomainFromHost(
   return null;
 }
 
+/**
+ * Returns the central AGENCIE application URL.
+ *
+ * Production:
+ * https://app.agencie.in
+ *
+ * Development:
+ * http://localhost:3000
+ */
 export function getRootDomainUrl(): string {
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
 
-    if (hostname === "localhost" || hostname.endsWith(".localhost")) {
+    if (
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost")
+    ) {
       return `http://${window.location.host}`;
     }
 
@@ -84,13 +104,21 @@ export function getRootDomainUrl(): string {
 }
 
 /**
- * Generates an environment-aware full workspace URL.
+ * Generates a full workspace URL.
  *
  * Dev:
- * http://localhost:3000/socia-expert/campaigns
+ * getWorkspaceUrl("socia-expert")
+ * -> http://localhost:3000/socia-expert
+ *
+ * getWorkspaceUrl("socia-expert", "campaigns")
+ * -> http://localhost:3000/socia-expert/campaigns
  *
  * Production:
- * https://socia-expert.agencie.in/campaigns
+ * getWorkspaceUrl("socia-expert")
+ * -> https://socia-expert.agencie.in
+ *
+ * getWorkspaceUrl("socia-expert", "campaigns")
+ * -> https://socia-expert.agencie.in/campaigns
  */
 export function getWorkspaceUrl(
   agencySlug: string,
@@ -102,7 +130,8 @@ export function getWorkspaceUrl(
       ? `/${path}`
       : "";
 
-  const isDev = process.env.NODE_ENV !== "production";
+  const isDev =
+    process.env.NODE_ENV !== "production";
 
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname;
@@ -112,29 +141,44 @@ export function getWorkspaceUrl(
       hostname.endsWith(".localhost") ||
       isDev
     ) {
-      return `http://${window.location.host}${cleanPath}`;
+      return `http://${window.location.host}/${agencySlug}${cleanPath}`;
     }
 
     const protocol = window.location.protocol;
-    const rootDomain =
-      process.env.NEXT_PUBLIC_ROOT_DOMAIN || "agencie.in";
 
-    return `${protocol}/.${rootDomain}${cleanPath}`;
+    const rootDomain =
+      process.env.NEXT_PUBLIC_ROOT_DOMAIN ||
+      "agencie.in";
+
+    return `${protocol}//${agencySlug}.${rootDomain}${cleanPath}`;
   }
 
   if (isDev) {
-    return `http://localhost:3000${cleanPath}`;
+    return `http://localhost:3000/${agencySlug}${cleanPath}`;
   }
 
   const rootDomain =
-    process.env.NEXT_PUBLIC_ROOT_DOMAIN || "agencie.in";
+    process.env.NEXT_PUBLIC_ROOT_DOMAIN ||
+    "agencie.in";
 
-  return `https:/.${rootDomain}${cleanPath}`;
+  return `https://${agencySlug}.${rootDomain}${cleanPath}`;
 }
 
 /**
- * Returns a relative href if already on the agency subdomain.
- * Otherwise returns the environment-aware workspace URL.
+ * Returns a relative href when already inside the requested workspace.
+ *
+ * Example:
+ *
+ * Current:
+ * https://socia-expert.agencie.in
+ *
+ * getWorkspaceHref("socia-expert", "/campaigns")
+ * -> /campaigns
+ *
+ * If switching workspace:
+ *
+ * getWorkspaceHref("infinitum-media", "/campaigns")
+ * -> https://infinitum-media.agencie.in/campaigns
  */
 export function getWorkspaceHref(
   agencySlug: string,
@@ -147,14 +191,18 @@ export function getWorkspaceHref(
       : "";
 
   if (typeof window !== "undefined") {
-    const currentSubdomain = parseSubdomainFromHost(
-      window.location.host,
-    );
+    const currentSubdomain =
+      parseSubdomainFromHost(
+        window.location.host,
+      );
 
     if (currentSubdomain === agencySlug) {
       return cleanPath || "/";
     }
   }
 
-  return getWorkspaceUrl(agencySlug, cleanPath);
+  return getWorkspaceUrl(
+    agencySlug,
+    cleanPath,
+  );
 }
