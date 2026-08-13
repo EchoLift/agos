@@ -1,6 +1,6 @@
 const STORAGE_KEYS = {
-  accessToken: "agos_access_token",
-  accessTokenExpiresAt: "agos_access_token_expires_at",
+  accessToken: "agencie_access_token",
+  accessTokenExpiresAt: "agencie_access_token_expires_at",
 };
 
 export function getApiBaseUrl() {
@@ -101,7 +101,52 @@ export async function logout() {
     // Ignore logout network errors.
   }
   clearAccessToken();
-  if (typeof window !== "undefined") {
-    window.location.href = "/login";
+  redirectToCentralLogin()
+}
+
+export function redirectToCentralLogin() {
+  if (typeof window === "undefined") return;
+
+  const isLocal =
+    window.location.hostname === "localhost" ||
+    window.location.hostname.endsWith(".localhost");
+
+  window.location.href = isLocal
+    ? "/login"
+    : `${APP_URL}/login`;
+}
+
+const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+export function getCentralLoginUrl(returnTo?: string) {
+  if (typeof window === "undefined") {
+    return `${APP_URL}/login`;
   }
+
+  const isLocal =
+    window.location.hostname === "localhost" ||
+    window.location.hostname.endsWith(".localhost");
+
+  if (isLocal) {
+    return "/login";
+  }
+
+  const loginUrl = new URL("/login", APP_URL);
+
+  if (returnTo) {
+    loginUrl.searchParams.set("returnTo", returnTo);
+  }
+
+  return loginUrl.toString();
+}
+
+export function redirectToLogin() {
+  if (typeof window === "undefined") return;
+
+  const returnTo =
+    `${window.location.origin}${window.location.pathname}` +
+    `${window.location.search}${window.location.hash}`;
+
+  window.location.href = getCentralLoginUrl(returnTo);
 }

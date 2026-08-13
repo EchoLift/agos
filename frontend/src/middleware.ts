@@ -29,16 +29,26 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 1. Subdomain-based request
-  // e.g. socia-expert.agencie.in/campaigns
+
   if (subdomain) {
-    // Root-level flows stay root-level even if requested from a tenant subdomain.
     if (url.pathname === "/login" || url.pathname === "/create-agency") {
-      return NextResponse.next();
+      const appUrl =
+        process.env.NEXT_PUBLIC_APP_URL || "https://app.agencie.in";
+
+      const loginUrl = new URL("/login", appUrl);
+
+      const requestedReturnTo = url.searchParams.get("returnTo");
+
+      const returnTo =
+        requestedReturnTo || `${url.protocol}//${host}/`;
+
+      loginUrl.searchParams.set("returnTo", returnTo);
+      
+      return NextResponse.redirect(loginUrl, 307);
     }
 
-    // Rewrite /path -> /[subdomain]/path
-    const newPath = `/${subdomain}${url.pathname === "/" ? "" : url.pathname}`;
+    const newPath =
+      `/${subdomain}${url.pathname === "/" ? "" : url.pathname}`;
 
     return NextResponse.rewrite(new URL(newPath, req.url));
   }

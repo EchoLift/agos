@@ -1,28 +1,39 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { getAccessToken } from "@/lib/auth";
+import { getAccessToken, refreshAccessToken } from "@/lib/auth";
 import { getMyMemberships } from "@/lib/api/organization";
+import { getWorkspaceUrl } from "@/lib/workspace-url";
 
 export default function RootRedirect() {
-  const router = useRouter();
-
   useEffect(() => {
-    const token = getAccessToken();
-    if (!token) return;
+    async function redirectToWorkspace() {
+      let token = getAccessToken();
 
-    getMyMemberships()
-      .then((memberships) => {
-        const currentAgency = memberships.currentAgency ?? memberships.agencies[0] ?? null;
+      if (!token) {
+        token = await refreshAccessToken();
+      }
+
+      if (!token) return;
+
+      try {
+        const memberships = await getMyMemberships();
+
+        const currentAgency =
+          memberships.currentAgency ??
+          memberships.agencies[0] ??
+          null;
+
         if (currentAgency) {
-          router.replace(`/${currentAgency.slug}`);
+          window.location.href = getWorkspaceUrl(currentAgency.slug);
         }
-      })
-      .catch(() => {
-        // Ignore failures here; unauthenticated users stay on landing page.
-      });
-  }, [router]);
+      } catch {
+        // Leave unauthenticated users on the landing page.
+      }
+    }
+
+    void redirectToWorkspace();
+  }, []);
 
   return null;
 }
