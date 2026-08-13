@@ -191,15 +191,15 @@ export default function CalendarPage() {
 
   const openCalendarEvent = (event: CalendarEvent) => {
     if (event.workOrder?.id) {
-      router.push(`/${agencySlug}/gigs/${event.workOrder.id}`);
+      router.push(`/gigs/${event.workOrder.id}`);
       return;
     }
     if (event.contentAsset?.id) {
-      router.push(`/${agencySlug}/workflow/${event.contentAsset.id}`);
+      router.push(`/workflow/${event.contentAsset.id}`);
       return;
     }
     if (event.campaign?.id) {
-      router.push(`/${agencySlug}/campaigns/${event.campaign.id}`);
+      router.push(`/campaigns/${event.campaign.id}`);
     }
   };
 

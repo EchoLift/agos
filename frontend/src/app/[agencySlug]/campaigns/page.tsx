@@ -62,8 +62,8 @@ export default function CampaignsPage() {
             Learn how campaigns work
           </Link>
         </div>
-        <button 
-          onClick={() => router.push(`/${agencySlug}/campaigns/new`)}
+        <button
+          onClick={() => router.push(`/campaigns/new`)}
           className="rounded-full bg-indigo-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400"
         >
           Create Campaign
@@ -96,8 +96,8 @@ export default function CampaignsPage() {
             </div>
             <h3 className="mt-4 text-lg font-semibold text-white">No campaigns yet</h3>
             <p className="mt-2 text-sm text-zinc-400">Launch your first campaign for a client.</p>
-            <button 
-              onClick={() => router.push(`/${agencySlug}/campaigns/new`)}
+            <button
+              onClick={() => router.push(`/campaigns/new`)}
               className="mt-6 rounded-full bg-zinc-800 px-5 py-2 text-sm font-semibold text-white transition hover:bg-zinc-700"
             >
               Create Campaign
@@ -120,7 +120,7 @@ export default function CampaignsPage() {
                 {filteredCampaigns.map((campaign) => (
                   <tr
                     key={campaign.id}
-                    onClick={() => router.push(`/${agencySlug}/campaigns/${campaign.id}`)}
+                    onClick={() => router.push(`/campaigns/${campaign.id}`)}
                     className="cursor-pointer transition-colors hover:bg-zinc-900/30"
                   >
                     <td className="py-4 pr-6 font-medium text-zinc-200">{campaign.name}</td>
@@ -135,7 +135,7 @@ export default function CampaignsPage() {
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
-                          router.push(`/${agencySlug}/campaigns/${campaign.id}`);
+                          router.push(`/campaigns/${campaign.id}`);
                         }}
                         className="text-indigo-400 hover:text-indigo-300"
                       >

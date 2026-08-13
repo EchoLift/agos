@@ -94,7 +94,7 @@ export default function NewCampaignPage() {
       for (const draft of teamDrafts) {
         await assignCampaignTeamMember(agencyId, campaign.id, draft);
       }
-      router.push(`/${agencySlug}/campaigns/${campaign.id}`);
+      router.push(`/campaigns/${campaign.id}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create campaign.");
       setIsSubmitting(false);
@@ -141,7 +141,7 @@ export default function NewCampaignPage() {
 
         <div className="flex justify-end gap-3 pt-2">
           <Link
-            href={`/${agencySlug}/campaigns`}
+            href={`/campaigns`}
             className="rounded-full border border-zinc-800 px-6 py-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
           >
             Cancel

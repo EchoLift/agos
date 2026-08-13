@@ -298,7 +298,7 @@ export default function WorkflowPage() {
             <ClientContextCard
               client={selectedItem.clientSummary}
               fallbackName={selectedItem.clientName}
-              onView={() => router.push(`/${agencySlug}/clients/${selectedItem.clientId}`)}
+              onView={() => router.push(`/clients/${selectedItem.clientId}`)}
             />
 
             <WorkflowActionPanel
@@ -313,7 +313,7 @@ export default function WorkflowPage() {
             <div className="mt-6 flex justify-end">
               <button
                 type="button"
-                onClick={() => router.push(`/${agencySlug}/workflow/${selectedItem.contentAssetId}`)}
+                onClick={() => router.push(`/workflow/${selectedItem.contentAssetId}`)}
                 className="min-h-11 rounded-md bg-indigo-500 px-5 text-sm font-semibold text-white transition hover:bg-indigo-400 lg:rounded-full"
               >
                 Open full details

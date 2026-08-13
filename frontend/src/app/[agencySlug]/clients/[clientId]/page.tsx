@@ -53,7 +53,7 @@ export default function ClientDetailPage() {
     <div className="mx-auto max-w-5xl space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <button type="button" onClick={() => router.push(`/${agencySlug}/clients`)} className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white">←</button>
+          <button type="button" onClick={() => router.push(`/clients`)} className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white">←</button>
           <div>
             <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">Client Playbook</p>
             <h1 className="mt-1 text-3xl font-semibold text-white">{playbook?.client.name || (isLoading ? "Loading..." : "Client")}</h1>

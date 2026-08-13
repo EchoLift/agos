@@ -7,14 +7,22 @@ import { Search } from "lucide-react";
 import { useAgency } from "@/components/AgencyProvider";
 import { logout } from "@/lib/auth";
 import { getProfile, Profile } from "@/lib/api/me";
-import { activateAgency, Agency, getMyMemberships } from "@/lib/api/organization";
+import {
+  activateAgency,
+  Agency,
+  getMyMemberships,
+} from "@/lib/api/organization";
 import { visibleWorkspaceNavItems } from "@/lib/workspace-access";
 import { getWorkspaceUrl } from "@/lib/workspace-url";
 import { clearAgencyScopedUiState } from "@/lib/workspace-cache";
 import GlobalSearch from "@/components/GlobalSearch";
 import MobileWorkspaceNav from "@/components/MobileWorkspaceNav";
 
-export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) {
+export default function WorkspaceHeader({
+  agencySlug,
+}: {
+  agencySlug: string;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const { agency, agencyDisplayName } = useAgency();
@@ -24,7 +32,7 @@ export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) 
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const navItems = visibleWorkspaceNavItems(agency, agencySlug, profile?.id);
+  const navItems = visibleWorkspaceNavItems(agency, profile?.id);
 
   useEffect(() => {
     let isMounted = true;
@@ -46,15 +54,21 @@ export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) 
 
   useEffect(() => {
     const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!menuRef.current || menuRef.current.contains(event.target as Node)) return;
+      if (!menuRef.current || menuRef.current.contains(event.target as Node))
+        return;
       setIsMenuOpen(false);
     };
     document.addEventListener("mousedown", closeOnOutsideClick);
     return () => document.removeEventListener("mousedown", closeOnOutsideClick);
   }, []);
 
-  const roleLabel = agency?.roles?.map((role) => role.key).join(", ") || agency?.role || "Member";
-  const isOwner = agency?.roles?.some((role) => role.key === "OWNER") || agency?.role === "OWNER";
+  const roleLabel =
+    agency?.roles?.map((role) => role.key).join(", ") ||
+    agency?.role ||
+    "Member";
+  const isOwner =
+    agency?.roles?.some((role) => role.key === "OWNER") ||
+    agency?.role === "OWNER";
   const profileName = profile?.name || "My Profile";
   const initials = profileName
     .split(" ")
@@ -65,16 +79,19 @@ export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) 
 
   const switchWorkspace = async (targetAgency: Agency) => {
     const previousAgencyId = agency?.id;
+
     const response = await activateAgency(targetAgency.id);
+
     clearAgencyScopedUiState(previousAgencyId, response.activeAgencyId);
-    setAgencies((items) => items.map((item) => (item.id === response.agency.id ? { ...item, ...response.agency } : item)));
+    setAgencies((items) =>
+      items.map((item) =>
+        item.id === response.agency.id ? { ...item, ...response.agency } : item,
+      ),
+    );
+
     setIsMenuOpen(false);
-    const targetUrl = getWorkspaceUrl(response.agency.slug);
-    if (typeof window !== "undefined") {
-      window.location.href = targetUrl;
-    } else {
-      router.push(`/${response.agency.slug}`);
-    }
+
+    window.location.href = getWorkspaceUrl(response.agency.slug);
   };
 
   const confirmLogout = () => {
@@ -99,7 +116,10 @@ export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) 
                 key={item.label}
                 href={item.hrefValue}
                 label={item.label}
-                isActive={isActivePath(pathname, item.hrefValue, agencySlug)}
+                isActive={isActivePath(
+                  pathname,
+                  item.hrefValue,
+                )}
               />
             ))}
           </nav>
@@ -113,7 +133,9 @@ export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) 
               <Search aria-hidden="true" className="h-5 w-5 lg:hidden" />
               <span className="hidden lg:inline">
                 Search
-                <kbd className="ml-2 rounded border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-500">⌘K</kbd>
+                <kbd className="ml-2 rounded border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-500">
+                  ⌘K
+                </kbd>
               </span>
             </button>
             <div className="relative" ref={menuRef}>
@@ -124,7 +146,11 @@ export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) 
                 aria-label="Open profile menu"
               >
                 {profile?.avatarUrl ? (
-                  <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={profile.avatarUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
                   initials
                 )}
@@ -135,25 +161,55 @@ export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) 
                   <div className="border-b border-zinc-800 p-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-indigo-500/15 text-sm font-semibold text-indigo-200">
-                        {profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" /> : initials}
+                        {profile?.avatarUrl ? (
+                          <img
+                            src={profile.avatarUrl}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          initials
+                        )}
                       </div>
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-white">{profileName}</div>
-                        <div className="truncate text-xs uppercase tracking-wider text-zinc-500">{roleLabel} • {displayName}</div>
-                        <div className="truncate text-xs text-zinc-500">{profile?.email || "Email unavailable"}</div>
+                        <div className="truncate text-sm font-semibold text-white">
+                          {profileName}
+                        </div>
+                        <div className="truncate text-xs uppercase tracking-wider text-zinc-500">
+                          {roleLabel} • {displayName}
+                        </div>
+                        <div className="truncate text-xs text-zinc-500">
+                          {profile?.email || "Email unavailable"}
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   <div className="border-b border-zinc-800 p-2">
-                    <MenuLink href={`/${agencySlug}/settings/profile`} label="My Profile" onClick={() => setIsMenuOpen(false)} />
-                    <MenuLink href={`/${agencySlug}/settings/status`} label="Status" onClick={() => setIsMenuOpen(false)} />
-                    <MenuLink href={`/${agencySlug}/settings/appearance`} label="Appearance" onClick={() => setIsMenuOpen(false)} />
-                    <div className="flex min-h-11 cursor-not-allowed items-center rounded-md px-3 text-sm text-zinc-600">Notifications</div>
+                    <MenuLink
+                      href={`/settings/profile`}
+                      label="My Profile"
+                      onClick={() => setIsMenuOpen(false)}
+                    />
+                    <MenuLink
+                      href={`/settings/status`}
+                      label="Status"
+                      onClick={() => setIsMenuOpen(false)}
+                    />
+                    <MenuLink
+                      href={`/settings/appearance`}
+                      label="Appearance"
+                      onClick={() => setIsMenuOpen(false)}
+                    />
+                    <div className="flex min-h-11 cursor-not-allowed items-center rounded-md px-3 text-sm text-zinc-600">
+                      Notifications
+                    </div>
                   </div>
 
                   <div className="border-b border-zinc-800 p-2">
-                    <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-600">Switch Workspace</div>
+                    <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-600">
+                      Switch Workspace
+                    </div>
                     {agencies.map((item) => (
                       <button
                         key={item.id}
@@ -162,17 +218,33 @@ export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) 
                         className="flex min-h-11 w-full items-center justify-between rounded-md px-3 text-left text-sm text-zinc-300 transition hover:bg-zinc-900 hover:text-white"
                       >
                         <span>{item.displayName || item.name}</span>
-                        {item.id === agency?.id ? <span className="text-xs text-indigo-300">Active</span> : null}
+                        {item.id === agency?.id ? (
+                          <span className="text-xs text-indigo-300">
+                            Active
+                          </span>
+                        ) : null}
                       </button>
                     ))}
-                    <MenuLink href="/create-agency" label="+ Create another agency" onClick={() => setIsMenuOpen(false)} />
+                    <MenuLink
+                      href="/create-agency"
+                      label="+ Create another agency"
+                      onClick={() => setIsMenuOpen(false)}
+                    />
                     {isOwner ? (
-                      <MenuLink href={`/${agencySlug}/settings/agency`} label="Agency Settings" onClick={() => setIsMenuOpen(false)} />
+                      <MenuLink
+                        href={`/settings/agency`}
+                        label="Agency Settings"
+                        onClick={() => setIsMenuOpen(false)}
+                      />
                     ) : null}
                   </div>
 
                   <div className="p-2">
-                    <MenuLink href="/help" label="Help & Support" onClick={() => setIsMenuOpen(false)} />
+                    <MenuLink
+                      href="/help"
+                      label="Help & Support"
+                      onClick={() => setIsMenuOpen(false)}
+                    />
                     <button
                       type="button"
                       onClick={confirmLogout}
@@ -187,35 +259,67 @@ export default function WorkspaceHeader({ agencySlug }: { agencySlug: string }) 
           </div>
         </div>
       </header>
-      <MobileWorkspaceNav agency={agency} agencySlug={agencySlug} pathname={pathname} navItems={navItems} />
-      <GlobalSearch agency={agency} agencySlug={agencySlug} userId={profile?.id} open={isSearchOpen} onOpenChange={setIsSearchOpen} />
+      <MobileWorkspaceNav
+        agency={agency}
+        pathname={pathname}
+        navItems={navItems}
+      />
+      <GlobalSearch
+        agency={agency}
+        userId={profile?.id}
+        open={isSearchOpen}
+        onOpenChange={setIsSearchOpen}
+      />
     </>
   );
 }
 
-function WorkspaceNavLink({ href, label, isActive }: { href: string; label: string; isActive: boolean }) {
+function WorkspaceNavLink({
+  href,
+  label,
+  isActive,
+}: {
+  href: string;
+  label: string;
+  isActive: boolean;
+}) {
   return (
     <Link
       href={href}
-      className={`rounded-md px-3 py-2 transition ${isActive ? "bg-indigo-500/15 text-indigo-200" : "hover:bg-zinc-900 hover:text-white"
-        }`}
+      className={`rounded-md px-3 py-2 transition ${
+        isActive
+          ? "bg-indigo-500/15 text-indigo-200"
+          : "hover:bg-zinc-900 hover:text-white"
+      }`}
     >
       {label}
     </Link>
   );
 }
 
-function MenuLink({ href, label, onClick }: { href: string; label: string; onClick: () => void }) {
+function MenuLink({
+  href,
+  label,
+  onClick,
+}: {
+  href: string;
+  label: string;
+  onClick: () => void;
+}) {
   return (
-    <Link href={href} onClick={onClick} className="flex min-h-11 items-center rounded-md px-3 text-sm text-zinc-300 transition hover:bg-zinc-900 hover:text-white">
+    <Link
+      href={href}
+      onClick={onClick}
+      className="flex min-h-11 items-center rounded-md px-3 text-sm text-zinc-300 transition hover:bg-zinc-900 hover:text-white"
+    >
       {label}
     </Link>
   );
 }
 
-function isActivePath(pathname: string, href: string, agencySlug: string) {
-  if (href === `/${agencySlug}`) {
-    return pathname === href;
+function isActivePath(pathname: string, href: string) {
+  if (href === "/") {
+    return pathname === "/";
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);

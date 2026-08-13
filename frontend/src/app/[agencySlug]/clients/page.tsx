@@ -58,8 +58,8 @@ export default function ClientsPage() {
             What belongs in a client playbook?
           </Link>
         </div>
-        <button 
-          onClick={() => router.push(`/${agencySlug}/clients/new`)}
+        <button
+          onClick={() => router.push(`/clients/new`)}
           className="rounded-full bg-indigo-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400"
         >
           Create Client
@@ -92,8 +92,8 @@ export default function ClientsPage() {
             </div>
             <h3 className="mt-4 text-lg font-semibold text-white">No clients yet</h3>
             <p className="mt-2 text-sm text-zinc-400">Add your first client to start organizing campaigns and content.</p>
-            <button 
-              onClick={() => router.push(`/${agencySlug}/clients/new`)}
+            <button
+              onClick={() => router.push(`/clients/new`)}
               className="mt-6 rounded-full bg-zinc-800 px-5 py-2 text-sm font-semibold text-white transition hover:bg-zinc-700"
             >
               Create Client
@@ -125,7 +125,7 @@ export default function ClientsPage() {
                     <td className="py-4 text-right">
                       <button
                         type="button"
-                        onClick={() => router.push(`/${agencySlug}/clients/${client.id}`)}
+                        onClick={() => router.push(`/clients/${client.id}`)}
                         className="text-indigo-400 hover:text-indigo-300"
                       >
                         View

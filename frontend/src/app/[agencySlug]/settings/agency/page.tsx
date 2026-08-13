@@ -29,7 +29,7 @@ export default function AgencySettingsPage() {
             You can still manage your profile, status, and assigned work from this workspace.
           </p>
           <Link
-            href={`/${agencySlug}`}
+            href="/"
             className="mt-5 inline-flex rounded-full border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-900"
           >
             Back to dashboard
@@ -58,14 +58,14 @@ export default function AgencySettingsPage() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Link
-          href={`/${agencySlug}/team`}
+          href={`/team`}
           className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-6 transition hover:bg-zinc-900/30"
         >
           <div className="text-base font-semibold text-white">Team & Roles</div>
           <p className="mt-2 text-sm leading-6 text-zinc-400">Invite members, edit skills, and remove inactive employees.</p>
         </Link>
         <Link
-          href={`/${agencySlug}/settings/appearance`}
+          href={`/settings/appearance`}
           className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-6 transition hover:bg-zinc-900/30"
         >
           <div className="text-base font-semibold text-white">Appearance</div>

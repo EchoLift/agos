@@ -69,7 +69,7 @@ export default function NewGigPage() {
         ...(estimatedHours ? { estimatedHours } : {}),
         ...(rewardAmount ? { rewardAmount, rewardCurrency: form.rewardCurrency || "INR" } : {}),
       });
-      router.push(`/${agencySlug}/gigs/${gig.id}`);
+      router.push(`/gigs/${gig.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create gig");
     } finally {

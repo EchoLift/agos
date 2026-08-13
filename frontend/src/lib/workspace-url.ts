@@ -112,24 +112,24 @@ export function getWorkspaceUrl(
       hostname.endsWith(".localhost") ||
       isDev
     ) {
-      return `http://${window.location.host}/${agencySlug}${cleanPath}`;
+      return `http://${window.location.host}${cleanPath}`;
     }
 
     const protocol = window.location.protocol;
     const rootDomain =
       process.env.NEXT_PUBLIC_ROOT_DOMAIN || "agencie.in";
 
-    return `${protocol}//${agencySlug}.${rootDomain}${cleanPath}`;
+    return `${protocol}/.${rootDomain}${cleanPath}`;
   }
 
   if (isDev) {
-    return `http://localhost:3000/${agencySlug}${cleanPath}`;
+    return `http://localhost:3000${cleanPath}`;
   }
 
   const rootDomain =
     process.env.NEXT_PUBLIC_ROOT_DOMAIN || "agencie.in";
 
-  return `https://${agencySlug}.${rootDomain}${cleanPath}`;
+  return `https:/.${rootDomain}${cleanPath}`;
 }
 
 /**

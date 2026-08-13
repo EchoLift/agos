@@ -118,7 +118,7 @@ export default function GigDetailPage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => router.push(`/${agencySlug}/gigs`)}
+            onClick={() => router.push(`/gigs`)}
             className="flex h-11 w-11 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white lg:rounded-full"
           >
             ←

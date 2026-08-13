@@ -95,28 +95,28 @@ export default function WorkspaceDashboard() {
   const overdueTaskCount = myTasks.filter((task) => isOverdue(task.deadlineAt)).length;
   const metrics = isMyWork
     ? [
-        { label: "Assigned to me", value: myTasks.length, href: "workflow" },
-        { label: "Due today", value: dueTodayCount, href: "calendar" },
-        { label: "Waiting review", value: waitingReviewCount, href: "workflow" },
-        { label: "Returned / overdue", value: returnedCount + overdueTaskCount, href: "workflow" },
-      ]
+      { label: "Assigned to me", value: myTasks.length, href: "workflow" },
+      { label: "Due today", value: dueTodayCount, href: "calendar" },
+      { label: "Waiting review", value: waitingReviewCount, href: "workflow" },
+      { label: "Returned / overdue", value: returnedCount + overdueTaskCount, href: "workflow" },
+    ]
     : [
-        { label: "Active clients", value: dashboardData?.riskSummary.activeClients ?? 0, href: "clients" },
-        { label: "Active campaigns", value: dashboardData?.riskSummary.activeCampaigns ?? 0, href: "campaigns" },
-        { label: "Active content", value: dashboardData?.riskSummary.activeContent ?? 0, href: "content" },
-        { label: "Blocked", value: dashboardData?.riskSummary.blockedItems ?? 0, href: "workflow" },
-      ];
+      { label: "Active clients", value: dashboardData?.riskSummary.activeClients ?? 0, href: "clients" },
+      { label: "Active campaigns", value: dashboardData?.riskSummary.activeCampaigns ?? 0, href: "campaigns" },
+      { label: "Active content", value: dashboardData?.riskSummary.activeContent ?? 0, href: "content" },
+      { label: "Blocked", value: dashboardData?.riskSummary.blockedItems ?? 0, href: "workflow" },
+    ];
 
   const completeStep = (stepId: StepId) => {
     if (stepId === "team") {
-      router.push(`/${agencySlug}/team/new`);
+      router.push(`/team/new`);
       return;
     }
     if (stepId === "client") {
-      router.push(`/${agencySlug}/clients/new`);
+      router.push(`/clients/new`);
       return;
     }
-    router.push(`/${agencySlug}/${stepTemplates.find((step) => step.id === stepId)?.href ?? ""}/new`);
+    router.push(`/${stepTemplates.find((step) => step.id === stepId)?.href ?? ""}/new`);
   };
 
   return (
@@ -151,7 +151,7 @@ export default function WorkspaceDashboard() {
               <button
                 key={card.label}
                 type="button"
-                onClick={() => router.push(`/${agencySlug}/${card.href}`)}
+                onClick={() => router.push(`/${card.href}`)}
                 className="min-h-24 rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 text-left shadow-lg shadow-black/10 transition hover:border-indigo-500/40 hover:bg-zinc-900/70 lg:rounded-3xl lg:p-6 lg:shadow-2xl"
               >
                 <p className="text-sm text-zinc-500">{card.label}</p>
@@ -181,8 +181,8 @@ export default function WorkspaceDashboard() {
                       key={task.id}
                       type="button"
                       onClick={() => {
-                        if (task.workOrderId) router.push(`/${agencySlug}/gigs/${task.workOrderId}`);
-                        else if (task.contentAssetId) router.push(`/${agencySlug}/workflow/${task.contentAssetId}`);
+                        if (task.workOrderId) router.push(`/gigs/${task.workOrderId}`);
+                        else if (task.contentAssetId) router.push(`/workflow/${task.contentAssetId}`);
                       }}
                       className="min-h-20 w-full rounded-md border border-zinc-800 bg-zinc-900/70 p-3 text-left transition hover:border-indigo-500/40 hover:bg-zinc-900 lg:rounded-2xl lg:p-4"
                     >
@@ -199,7 +199,7 @@ export default function WorkspaceDashboard() {
                     </button>
                   ))
                 ) : (
-                    <div className="rounded-md border border-dashed border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-400 lg:rounded-2xl lg:p-6">
+                  <div className="rounded-md border border-dashed border-zinc-800 bg-zinc-900/40 p-4 text-sm text-zinc-400 lg:rounded-2xl lg:p-6">
                     {isMyWork
                       ? "No work is assigned to you right now. When a manager assigns a stage to you, it will appear here."
                       : "No active tasks yet. Create a campaign and content asset to see the first work queue."}
@@ -219,7 +219,7 @@ export default function WorkspaceDashboard() {
                       key={item.id}
                       type="button"
                       disabled={!item.contentAssetId}
-                      onClick={() => item.contentAssetId && router.push(`/${agencySlug}/workflow/${item.contentAssetId}`)}
+                      onClick={() => item.contentAssetId && router.push(`/workflow/${item.contentAssetId}`)}
                       className="min-h-16 w-full rounded-md border border-zinc-800 bg-zinc-900/70 p-3 text-left transition hover:border-indigo-500/40 hover:bg-zinc-900 disabled:cursor-default disabled:hover:border-zinc-800 disabled:hover:bg-zinc-900/70 lg:rounded-2xl lg:p-4"
                     >
                       <p className="text-sm font-semibold text-white">
