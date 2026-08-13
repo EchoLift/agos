@@ -14,7 +14,7 @@ import {
   ApiResponse,
   ApiCookieAuth,
 } from "@nestjs/swagger";
-import { Request, Response } from "express";
+import type { Request, Response, CookieOptions } from "express";
 import { AuthService } from "../services/auth.service";
 import { RegisterDto } from "../dto/register.dto";
 import { LoginDto } from "../dto/login.dto";
@@ -40,7 +40,11 @@ export class AuthController {
   })
   async register(@Body() dto: RegisterDto) {
     await this.authService.register(dto);
-    return { success: true, message: "User registered" };
+
+    return {
+      success: true,
+      message: "User registered",
+    };
   }
 
   @Post("login")
@@ -58,16 +62,22 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { accessToken, refreshToken } = await this.authService.login(dto);
+    const { accessToken, refreshToken } =
+      await this.authService.login(dto);
 
     this.setRefreshTokenCookie(res, refreshToken);
 
-    return { accessToken, expiresIn: 900 }; // 15 mins
+    return {
+      accessToken,
+      expiresIn: 900,
+    };
   }
 
   @Post("google")
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Login or register using a Google ID token" })
+  @ApiOperation({
+    summary: "Login or register using a Google ID token",
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: "Returns access token and sets refresh token cookie",
@@ -80,20 +90,27 @@ export class AuthController {
     @Body() dto: GoogleOAuthDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { accessToken, refreshToken } = await this.authService.googleLogin(
-      dto.token,
-    );
+    const { accessToken, refreshToken } =
+      await this.authService.googleLogin(dto.token);
+
     this.setRefreshTokenCookie(res, refreshToken);
-    return { accessToken, expiresIn: 900 };
+
+    return {
+      accessToken,
+      expiresIn: 900,
+    };
   }
 
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
   @ApiCookieAuth("refreshToken")
-  @ApiOperation({ summary: "Rotate refresh token and get a new access token" })
+  @ApiOperation({
+    summary: "Rotate refresh token and get a new access token",
+  })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: "Returns new access token and updates refresh token cookie",
+    description:
+      "Returns new access token and updates refresh token cookie",
   })
   @ApiResponse({
     status: HttpStatus.UNAUTHORIZED,
@@ -103,50 +120,83 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken = req.cookies?.refreshToken;
+    const refreshToken =
+      req.cookies?.refreshToken;
+
     if (!refreshToken) {
-      throw new UnauthorizedException("Refresh token missing");
+      throw new UnauthorizedException(
+        "Refresh token missing",
+      );
     }
 
-    const { accessToken, refreshToken: newRefreshToken } =
-      await this.authService.refresh(refreshToken);
+    const {
+      accessToken,
+      refreshToken: newRefreshToken,
+    } = await this.authService.refresh(refreshToken);
 
-    this.setRefreshTokenCookie(res, newRefreshToken);
+    this.setRefreshTokenCookie(
+      res,
+      newRefreshToken,
+    );
 
-    return { accessToken, expiresIn: 900 };
+    return {
+      accessToken,
+      expiresIn: 900,
+    };
   }
 
   @Post("logout")
   @HttpCode(HttpStatus.OK)
   @ApiCookieAuth("refreshToken")
-  @ApiOperation({ summary: "Logout and clear session" })
+  @ApiOperation({
+    summary: "Logout and clear session",
+  })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: "Session revoked and cookie cleared",
+    description:
+      "Session revoked and cookie cleared",
   })
-  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const refreshToken = req.cookies?.refreshToken;
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const refreshToken =
+      req.cookies?.refreshToken;
+
     if (refreshToken) {
-      await this.authService.logout(refreshToken);
+      await this.authService.logout(
+        refreshToken,
+      );
     }
 
-    res.clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/api/v1/auth", // Lock to auth paths to minimize exposure
-    });
+    res.clearCookie(
+      "refreshToken",
+      this.getRefreshCookieOptions(),
+    );
 
-    return { success: true };
+    return {
+      success: true,
+    };
   }
 
-  private setRefreshTokenCookie(res: Response, token: string) {
-    res.cookie("refreshToken", token, {
+  private getRefreshCookieOptions(): CookieOptions {
+    return {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure:
+        process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/api/v1/auth",
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    };
+  }
+
+  private setRefreshTokenCookie(
+    res: Response,
+    token: string,
+  ) {
+    res.cookie("refreshToken", token, {
+      ...this.getRefreshCookieOptions(),
+      maxAge:
+        30 * 24 * 60 * 60 * 1000,
     });
   }
 }
