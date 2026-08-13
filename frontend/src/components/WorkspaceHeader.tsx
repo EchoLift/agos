@@ -13,7 +13,7 @@ import {
   getMyMemberships,
 } from "@/lib/api/organization";
 import { visibleWorkspaceNavItems } from "@/lib/workspace-access";
-import { getWorkspaceUrl } from "@/lib/workspace-url";
+import { getWorkspaceUrl, getRootDomainUrl } from "@/lib/workspace-url";
 import { clearAgencyScopedUiState } from "@/lib/workspace-cache";
 import GlobalSearch from "@/components/GlobalSearch";
 import MobileWorkspaceNav from "@/components/MobileWorkspaceNav";
@@ -116,10 +116,7 @@ export default function WorkspaceHeader({
                 key={item.label}
                 href={item.hrefValue}
                 label={item.label}
-                isActive={isActivePath(
-                  pathname,
-                  item.hrefValue,
-                )}
+                isActive={isActivePath(pathname, item.hrefValue)}
               />
             ))}
           </nav>
@@ -226,7 +223,7 @@ export default function WorkspaceHeader({
                       </button>
                     ))}
                     <MenuLink
-                      href="/create-agency"
+                      href={`${getRootDomainUrl()}/create-agency`}
                       label="+ Create another agency"
                       onClick={() => setIsMenuOpen(false)}
                     />
