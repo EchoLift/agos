@@ -1,4 +1,4 @@
-import { getAccessToken, getApiBaseUrl, clearAccessToken, refreshAccessToken } from "./auth";
+import { getAccessToken, getApiBaseUrl, clearAccessToken, refreshAccessToken, redirectToLogin } from "./auth";
 
 interface FetchOptions extends RequestInit {
   agencyId?: string;
@@ -13,9 +13,7 @@ export async function apiClient<T = unknown>(endpoint: string, options: FetchOpt
     // Try to silently refresh the token before forcing a redirect
     token = await refreshAccessToken();
     if (!token) {
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
+      redirectToLogin();
       throw new Error("Authentication required");
     }
   }
@@ -46,9 +44,7 @@ export async function apiClient<T = unknown>(endpoint: string, options: FetchOpt
   if (!response.ok) {
     if (response.status === 401 && requireAuth) {
       clearAccessToken();
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
+      redirectToLogin();
     }
     
     let errorMessage = "An error occurred while fetching data.";
