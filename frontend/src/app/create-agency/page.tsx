@@ -104,11 +104,11 @@ export default function CreateAgencyPage() {
                   className="min-w-0 flex-1 bg-transparent px-4 py-3.5 text-base text-white placeholder-zinc-600 outline-none"
                   placeholder="social-expert"
                 />
-                <span className="flex-shrink-0 pr-4 text-sm text-zinc-500 select-none">.agos.com</span>
+                <span className="flex-shrink-0 pr-4 text-sm text-zinc-500 select-none">.agencie.in</span>
               </div>
               {slug && (
                 <p className="mt-2 text-xs text-zinc-500">
-                  Workspace URL: <span className="text-indigo-400">https://{slug}.agos.com</span>
+                  Workspace URL: <span className="text-indigo-400">https://{slug}.agencie.in</span>
                 </p>
               )}
             </div>

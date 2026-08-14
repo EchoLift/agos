@@ -32,7 +32,7 @@ export function buildDeepLink(
   // If localhost, use path-based routing (http://localhost:3000/agencySlug/route)
   if (base.includes("localhost") || base.includes("127.0.0.1")) {
     if (agencySlug && !route.startsWith(agencySlug)) {
-      return `${base}/${agencySlug}${route ? `/${route}` : ""}`;
+      return `${base}${route ? `/${route}` : ""}`;
     }
     return `${base}/${route}`;
   }
@@ -52,7 +52,7 @@ export function buildDeepLink(
         : route === agencySlug
           ? ""
           : route;
-      return `${parsedUrl.protocol}//${agencySlug}.${rootDomain}${cleanRoute ? `/${cleanRoute}` : ""
+      return `${parsedUrl.protocol}/.${rootDomain}${cleanRoute ? `/${cleanRoute}` : ""
         }`;
     } catch {
       return `${base}/${route}`;
