@@ -33,6 +33,9 @@ export default function WorkspaceHeader({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const navItems = visibleWorkspaceNavItems(agency, profile?.id);
+  const [switchingAgencyId, setSwitchingAgencyId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -78,20 +81,37 @@ export default function WorkspaceHeader({
     .toUpperCase();
 
   const switchWorkspace = async (targetAgency: Agency) => {
-    const previousAgencyId = agency?.id;
+    if (targetAgency.id === agency?.id) {
+      setIsMenuOpen(false);
+      return;
+    }
 
-    const response = await activateAgency(targetAgency.id);
-
-    clearAgencyScopedUiState(previousAgencyId, response.activeAgencyId);
-    setAgencies((items) =>
-      items.map((item) =>
-        item.id === response.agency.id ? { ...item, ...response.agency } : item,
-      ),
-    );
-
+    setSwitchingAgencyId(targetAgency.id);
     setIsMenuOpen(false);
 
-    window.location.href = getWorkspaceUrl(response.agency.slug);
+    try {
+      const previousAgencyId = agency?.id;
+
+      const response = await activateAgency(targetAgency.id);
+
+      clearAgencyScopedUiState(previousAgencyId, response.activeAgencyId);
+
+      setAgencies((items) =>
+        items.map((item) =>
+          item.id === response.agency.id
+            ? { ...item, ...response.agency }
+            : item,
+        ),
+      );
+
+      window.location.href = getWorkspaceUrl(response.agency.slug);
+    } catch (error) {
+      setSwitchingAgencyId(null);
+
+      console.error("Failed to switch workspace", error);
+
+      window.alert("Unable to switch workspace. Please try again.");
+    }
   };
 
   const confirmLogout = () => {
@@ -207,21 +227,31 @@ export default function WorkspaceHeader({
                     <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-600">
                       Switch Workspace
                     </div>
-                    {agencies.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => switchWorkspace(item)}
-                        className="flex min-h-11 w-full items-center justify-between rounded-md px-3 text-left text-sm text-zinc-300 transition hover:bg-zinc-900 hover:text-white"
-                      >
-                        <span>{item.displayName || item.name}</span>
-                        {item.id === agency?.id ? (
-                          <span className="text-xs text-indigo-300">
-                            Active
-                          </span>
-                        ) : null}
-                      </button>
-                    ))}
+                    {agencies.map((item) => {
+                      const isSwitching = switchingAgencyId === item.id;
+
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          disabled={switchingAgencyId !== null}
+                          onClick={() => switchWorkspace(item)}
+                          className="flex min-h-11 w-full items-center justify-between rounded-md px-3 text-left text-sm text-zinc-300 transition hover:bg-zinc-900 hover:text-white disabled:cursor-wait disabled:opacity-60"
+                        >
+                          <span>{item.displayName || item.name}</span>
+
+                          {item.id === agency?.id ? (
+                            <span className="text-xs text-indigo-300">
+                              Active
+                            </span>
+                          ) : isSwitching ? (
+                            <span className="text-xs text-zinc-400">
+                              Switching…
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
                     <MenuLink
                       href={`${getRootDomainUrl()}/create-agency`}
                       label="+ Create another agency"
@@ -249,6 +279,23 @@ export default function WorkspaceHeader({
                     >
                       Logout
                     </button>
+                  </div>
+                </div>
+              ) : null}
+              {switchingAgencyId ? (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#09090b]/90 backdrop-blur-sm">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="h-10 w-10 animate-spin rounded-full border-4 border-zinc-700 border-t-indigo-400" />
+
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-white">
+                        Switching workspace
+                      </p>
+
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Opening your agency…
+                      </p>
+                    </div>
                   </div>
                 </div>
               ) : null}

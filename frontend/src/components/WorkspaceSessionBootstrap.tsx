@@ -64,14 +64,17 @@ export default function WorkspaceSessionBootstrap({
   }, []);
 
   if (!ready) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-zinc-500">
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#09090b]">
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-zinc-800 border-t-indigo-400" />
+        <p className="text-sm text-zinc-400">
           Loading workspace…
         </p>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   return <>{children}</>;
 }
