@@ -1,42 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAgency } from "@/components/AgencyProvider";
-import { getClients, Client } from "@/lib/api/clients";
 import { useRouter } from "next/navigation";
 import { industryOptions } from "@/lib/client-options";
 import { statusPillClasses } from "@/lib/status-style";
 import { getWorkspaceHref } from "@/lib/workspace-url";
+import { useClientsQuery } from "@/lib/query";
 export default function ClientsPage() {
   const { agencyId, agencySlug } = useAgency();
-  const [clients, setClients] = useState<Client[]>([]);
   const [filters, setFilters] = useState({ search: "", industry: "", status: "" });
-  const [isLoading, setIsLoading] = useState(true);
+  const clientsQuery = useClientsQuery(agencyId);
+  const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data]);
+  const isLoading = clientsQuery.isLoading && !clientsQuery.data;
   const router = useRouter();
   const safeAgencySlug = agencySlug ?? "";
-  useEffect(() => {
-    if (!agencyId) return;
-    let isMounted = true;
-
-    getClients(agencyId)
-      .then((data) => {
-        if (isMounted) {
-          setClients(data);
-          setIsLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (isMounted) {
-          console.error(err);
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [agencyId]);
 
   const filteredClients = useMemo(() => {
     const search = filters.search.trim().toLowerCase();
@@ -85,6 +64,8 @@ export default function ClientsPage() {
       <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl shadow-black/20">
         {isLoading ? (
           <div className="text-sm text-zinc-500">Loading clients...</div>
+        ) : clientsQuery.error && !clients.length ? (
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">Failed to load clients.</div>
         ) : clients.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="rounded-full bg-zinc-900/80 p-4">

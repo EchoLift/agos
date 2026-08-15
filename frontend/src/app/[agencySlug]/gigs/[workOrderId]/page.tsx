@@ -1,52 +1,37 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAgency } from "@/components/AgencyProvider";
 import {
   approveWorkOrder,
-  getWorkOrder,
   requestWorkOrderChanges,
   submitWorkOrder,
   WorkOrder,
 } from "@/lib/api/work-orders";
 import { formatLabel, statusPillClasses } from "@/lib/status-style";
 import { getAgencyRoleKeys } from "@/lib/workspace-access";
+import { invalidateWorkspaceQueries, queryKeys, setListItem, useGigQuery } from "@/lib/query";
 
 export default function GigDetailPage() {
   const router = useRouter();
   const params = useParams<{ workOrderId: string }>();
-  const { agencyId, agencySlug, agency } = useAgency();
+  const queryClient = useQueryClient();
+  const { agencyId, agency } = useAgency();
   const roleKeys = useMemo(() => getAgencyRoleKeys(agency), [agency]);
-  const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
+  const workOrderQuery = useGigQuery(agencyId, params.workOrderId);
+  const workOrder = workOrderQuery.data ?? null;
   const [submissionDraft, setSubmissionDraft] = useState({ body: "", externalLink: "" });
   const [reviewComment, setReviewComment] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!agencyId || !params.workOrderId) return;
-    let isMounted = true;
-
-    getWorkOrder(agencyId, params.workOrderId)
-      .then((data) => {
-        if (!isMounted) return;
-        setWorkOrder(data);
-        setError(null);
-      })
-      .catch((err: unknown) => {
-        if (!isMounted) return;
-        setError(err instanceof Error ? err.message : "Failed to load gig.");
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [agencyId, params.workOrderId]);
+  const isLoading = workOrderQuery.isLoading && !workOrder;
+  const firstLoadError = !workOrder && workOrderQuery.error
+    ? workOrderQuery.error instanceof Error
+      ? workOrderQuery.error.message
+      : "Failed to load gig."
+    : null;
 
   const canSubmit = Boolean(
     workOrder &&
@@ -69,7 +54,7 @@ export default function GigDetailPage() {
         body: submissionDraft.body.trim() || undefined,
         externalLink: submissionDraft.externalLink.trim() || undefined,
       });
-      setWorkOrder(updated);
+      cacheWorkOrder(queryClient, agencyId, updated);
       setSubmissionDraft({ body: "", externalLink: "" });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to submit gig.");
@@ -86,7 +71,7 @@ export default function GigDetailPage() {
       const updated = await approveWorkOrder(agencyId, workOrder.id, {
         comment: reviewComment.trim() || undefined,
       });
-      setWorkOrder(updated);
+      cacheWorkOrder(queryClient, agencyId, updated);
       setReviewComment("");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to approve gig.");
@@ -103,7 +88,7 @@ export default function GigDetailPage() {
       const updated = await requestWorkOrderChanges(agencyId, workOrder.id, {
         comment: reviewComment.trim(),
       });
-      setWorkOrder(updated);
+      cacheWorkOrder(queryClient, agencyId, updated);
       setReviewComment("");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to request changes.");
@@ -133,6 +118,8 @@ export default function GigDetailPage() {
       <section className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 shadow-lg shadow-black/10 lg:rounded-3xl lg:p-5 lg:shadow-2xl">
         {isLoading ? (
           <div className="text-sm text-zinc-500">Loading gig...</div>
+        ) : firstLoadError ? (
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{firstLoadError}</div>
         ) : error ? (
           <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>
         ) : workOrder ? (
@@ -270,6 +257,12 @@ function LatestSubmission({ workOrder }: { workOrder: WorkOrder }) {
       </div>
     </section>
   );
+}
+
+function cacheWorkOrder(queryClient: ReturnType<typeof useQueryClient>, agencyId: string, workOrder: WorkOrder) {
+  queryClient.setQueryData(queryKeys.gig(agencyId, workOrder.id), workOrder);
+  queryClient.setQueryData(queryKeys.gigs(agencyId), (current: WorkOrder[] | undefined) => setListItem(current, workOrder));
+  invalidateWorkspaceQueries(queryClient, agencyId, ["gigs", "dashboard", "calendar"]);
 }
 
 function Detail({ label, value }: { label: string; value?: string | null }) {

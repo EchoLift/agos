@@ -18,6 +18,8 @@ import { RequestContextService } from "@packages/request-context/request-context
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import { SYSTEM_ROLES } from "../repositories/organization.repository";
 import { ConfigService } from "@nestjs/config";
+import { EventBusService } from "@packages/events/event-bus.service";
+import { DomainEvents } from "@packages/events/domain-event";
 import * as crypto from "crypto";
 
 @Injectable()
@@ -31,6 +33,7 @@ export class OrganizationService implements OnModuleInit {
     private readonly cryptoService: CryptoService,
     private readonly requestContext: RequestContextService,
     private readonly configService: ConfigService,
+    private readonly eventBus: EventBusService,
   ) {}
 
   async onModuleInit() {
@@ -321,6 +324,104 @@ export class OrganizationService implements OnModuleInit {
     };
   }
 
+  async getInvitations(agencyId: string, actor: IdentityContext) {
+    this.ensureInvitationManager(actor);
+    this.ensureAgencyContext(agencyId, actor);
+
+    const invitations = await this.prisma.invitation.findMany({
+      where: { agencyId },
+      include: this.invitationInclude(),
+      orderBy: { createdAt: "desc" },
+    });
+
+    return invitations.map((invitation) =>
+      this.serializeInvitation(invitation),
+    );
+  }
+
+  async resendInvitation(
+    agencyId: string,
+    invitationId: string,
+    actor: IdentityContext,
+  ) {
+    this.ensureInvitationManager(actor);
+    this.ensureAgencyContext(agencyId, actor);
+
+    const invitation = await this.prisma.invitation.findFirst({
+      where: { id: invitationId, agencyId },
+      include: this.invitationInclude(),
+    });
+
+    if (!invitation) {
+      throw new NotFoundException("Invitation not found.");
+    }
+
+    const status = this.effectiveInvitationStatus(invitation);
+    if (status === "ACCEPTED" || status === "CANCELLED") {
+      throw new BadRequestException(
+        "Only pending or expired invitations can be resent.",
+      );
+    }
+
+    if (status === "EXPIRED") {
+      await this.prisma.invitation.updateMany({
+        where: { id: invitation.id, status: "PENDING" },
+        data: { status: "EXPIRED" },
+      });
+      const email = this.decryptOptional(invitation.emailEncrypted);
+      if (!email) {
+        throw new BadRequestException(
+          "This legacy invitation cannot be resent because its email is unavailable.",
+        );
+      }
+
+      const newInvitation = await this.createReplacementInvitation(
+        agencyId,
+        invitation,
+        email,
+        actor,
+      );
+      return this.serializeInvitation(newInvitation);
+    }
+
+    await this.queueInvitationEmail(invitation);
+    return this.serializeInvitation(invitation);
+  }
+
+  async revokeInvitation(
+    agencyId: string,
+    invitationId: string,
+    actor: IdentityContext,
+  ) {
+    this.ensureInvitationManager(actor);
+    this.ensureAgencyContext(agencyId, actor);
+
+    const invitation = await this.prisma.invitation.findFirst({
+      where: { id: invitationId, agencyId },
+      include: this.invitationInclude(),
+    });
+
+    if (!invitation) {
+      throw new NotFoundException("Invitation not found.");
+    }
+
+    if (invitation.status === "ACCEPTED") {
+      throw new BadRequestException("Accepted invitations cannot be revoked.");
+    }
+
+    if (invitation.status !== "CANCELLED") {
+      await this.prisma.invitation.update({
+        where: { id: invitation.id },
+        data: { status: "CANCELLED" },
+      });
+    }
+
+    return {
+      ...this.serializeInvitation(invitation),
+      status: "CANCELLED",
+    };
+  }
+
   async acceptInvitation(token: string, authUserId: string) {
     const user = await this.userLookup.findByAuthUserId(authUserId);
     if (!user) {
@@ -579,6 +680,165 @@ export class OrganizationService implements OnModuleInit {
         [SYSTEM_ROLES.OWNER, SYSTEM_ROLES.MANAGER].includes(role),
       ) || [SYSTEM_ROLES.OWNER, SYSTEM_ROLES.MANAGER].includes(actor.role ?? "")
     );
+  }
+
+  private ensureInvitationManager(actor: IdentityContext) {
+    const roles = new Set([...(actor.roles ?? []), actor.role ?? ""]);
+    if (!roles.has(SYSTEM_ROLES.OWNER) && !roles.has("ADMIN")) {
+      throw new ForbiddenException(
+        "Only owners and admins can manage invites.",
+      );
+    }
+  }
+
+  private ensureAgencyContext(agencyId: string, actor: IdentityContext) {
+    if (actor.agencyId && actor.agencyId !== agencyId) {
+      throw new ForbiddenException("Active agency context is required.");
+    }
+  }
+
+  private invitationInclude() {
+    return {
+      agency: true,
+      role: { include: { systemRole: true } },
+      roles: { include: { role: { include: { systemRole: true } } } },
+      invitedBy: {
+        include: {
+          user: {
+            include: { authUser: true },
+          },
+        },
+      },
+    };
+  }
+
+  private serializeInvitation(invitation: any) {
+    return {
+      id: invitation.id,
+      agencyId: invitation.agencyId,
+      email: this.decryptOptional(invitation.emailEncrypted),
+      mobileNumber: invitation.mobileNumber,
+      roleId: invitation.roleId,
+      roleName: invitation.role?.displayName ?? null,
+      roles: this.mapInvitationRoles(invitation),
+      invitedBy: invitation.invitedBy
+        ? {
+            membershipId: invitation.invitedBy.id,
+            name: invitation.invitedBy.user?.name ?? null,
+            email: this.decryptOptional(
+              invitation.invitedBy.user?.authUser?.emailEncrypted,
+            ),
+          }
+        : null,
+      sentAt: invitation.createdAt,
+      expiresAt: invitation.expiresAt,
+      status: this.effectiveInvitationStatus(invitation),
+      inviteUrl: this.inviteUrl(invitation.token),
+    };
+  }
+
+  private mapInvitationRoles(invitation: any) {
+    const assigned = invitation.roles?.length
+      ? invitation.roles.map((item: any) => item.role)
+      : [invitation.role];
+
+    return assigned
+      .map((role: any) => ({
+        id: role.id,
+        key: role.systemRole?.key,
+        name: role.displayName,
+      }))
+      .filter((role: any) => Boolean(role.id));
+  }
+
+  private effectiveInvitationStatus(invitation: any) {
+    if (
+      invitation.status === "PENDING" &&
+      invitation.expiresAt &&
+      invitation.expiresAt < new Date()
+    ) {
+      return "EXPIRED";
+    }
+
+    return invitation.status;
+  }
+
+  private async createReplacementInvitation(
+    agencyId: string,
+    invitation: any,
+    email: string,
+    actor: IdentityContext,
+  ) {
+    const roleIds = this.mapInvitationRoles(invitation).map(
+      (role: { id: string }) => role.id,
+    );
+    const token = crypto.randomBytes(24).toString("hex");
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const context = this.requestContext.get();
+    const created = await this.repository.createInvitation(
+      agencyId,
+      invitation.emailHash,
+      invitation.roleId,
+      actor.membershipId ?? invitation.invitedByMembershipId,
+      token,
+      expiresAt,
+      roleIds,
+      invitation.mobileNumber ?? null,
+      context?.correlationId,
+      this.cryptoService.encrypt(email),
+    );
+
+    return this.prisma.invitation.findUniqueOrThrow({
+      where: { id: created.id },
+      include: this.invitationInclude(),
+    });
+  }
+
+  private async queueInvitationEmail(invitation: any) {
+    const { notification, delivery } = await this.prisma.$transaction(
+      async (tx) => {
+        const notification = await tx.notification.create({
+          data: {
+            agencyId: invitation.agencyId,
+            userId: null,
+            title: `You're invited to join ${invitation.agency.name}`,
+            body: `Accept your invitation to become a member of ${invitation.agency.name} on AGENCIE.`,
+            eventType: DomainEvents.MemberInvited,
+          },
+        });
+
+        const delivery = await tx.notificationDelivery.create({
+          data: {
+            agencyId: invitation.agencyId,
+            notificationId: notification.id,
+            invitationId: invitation.id,
+            channel: "EMAIL",
+            status: "QUEUED",
+          },
+        });
+
+        return { notification, delivery };
+      },
+    );
+
+    await this.eventBus.publish(DomainEvents.NotificationQueued, {
+      agencyId: invitation.agencyId,
+      actorId: null,
+      aggregateId: delivery.id,
+      aggregateType: "NotificationDelivery",
+      payload: {
+        deliveryId: delivery.id,
+        notificationId: notification.id,
+        invitationId: invitation.id,
+      },
+    });
+  }
+
+  private inviteUrl(token: string) {
+    const frontendUrl =
+      this.configService.get<string>("FRONTEND_URL") ??
+      "https://app.agencie.in";
+    return `${frontendUrl.replace(/\/$/, "")}/login?invite=${token}`;
   }
 
   private canUseSelfRoleTestingOverride(

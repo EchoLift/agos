@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useParams, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { CampaignPlanForm } from "@/components/CampaignPlanForm";
 import { useAgency } from "@/components/AgencyProvider";
 import {
@@ -37,6 +38,7 @@ import { Client, getClients } from "@/lib/api/clients";
 import { getMembers, Member } from "@/lib/api/team";
 import { publishingPlatformOptions } from "@/lib/campaign-options";
 import { statusPillClasses } from "@/lib/status-style";
+import { invalidateWorkspaceQueries, queryKeys, setListItem } from "@/lib/query";
 
 const assignmentRoleOrder: CampaignAssignmentRole[] = [
   "CAMPAIGN_MANAGER",
@@ -53,6 +55,7 @@ const assignmentRoleOrder: CampaignAssignmentRole[] = [
 export default function CampaignDetailPage() {
   const router = useRouter();
   const params = useParams<{ campaignId: string }>();
+  const queryClient = useQueryClient();
   const { agencyId, agencySlug, agency } = useAgency();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -127,6 +130,7 @@ export default function CampaignDetailPage() {
       });
       hydrateCampaign(updated, reset, setDeliverables, setSchedules);
       setCampaign(updated);
+      cacheCampaign(queryClient, agencyId, updated);
       const [activity, agenda] = await Promise.all([
         getCampaignActivity(agencyId, campaign.id),
         getPublishingSchedules(agencyId, campaign.id),
@@ -153,6 +157,7 @@ export default function CampaignDetailPage() {
       const updated = await activateCampaign(agencyId, campaign.id, campaign.version);
       hydrateCampaign(updated, reset, setDeliverables, setSchedules);
       setCampaign(updated);
+      cacheCampaign(queryClient, agencyId, updated);
       const [activity, agenda] = await Promise.all([
         getCampaignActivity(agencyId, campaign.id),
         getPublishingSchedules(agencyId, campaign.id),
@@ -176,6 +181,7 @@ export default function CampaignDetailPage() {
       const updated = await action();
       hydrateCampaign(updated, reset, setDeliverables, setSchedules);
       setCampaign(updated);
+      if (agencyId) cacheCampaign(queryClient, agencyId, updated);
       if (agencyId && campaign) {
         const [activity, agenda] = await Promise.all([
           getCampaignActivity(agencyId, campaign.id),
@@ -210,6 +216,7 @@ export default function CampaignDetailPage() {
     ]);
     hydrateCampaign(campaignData, reset, setDeliverables, setSchedules);
     setCampaign(campaignData);
+    cacheCampaign(queryClient, agencyId, campaignData);
     setPublishingAgenda(agenda);
     setActivityItems(activity.items);
   };
@@ -1121,4 +1128,10 @@ function inferContentType(slot: PublishingSchedule) {
   if (text.includes("AD")) return "AD";
   if (text.includes("STATIC") || text.includes("POST")) return "STATIC";
   return "REEL";
+}
+
+function cacheCampaign(queryClient: ReturnType<typeof useQueryClient>, agencyId: string, campaign: Campaign) {
+  queryClient.setQueryData(queryKeys.campaign(agencyId, campaign.id), campaign);
+  queryClient.setQueryData(queryKeys.campaigns(agencyId), (current: Campaign[] | undefined) => setListItem(current, campaign));
+  invalidateWorkspaceQueries(queryClient, agencyId, ["campaigns", "dashboard", "calendar", "workflow"]);
 }

@@ -1,22 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { CampaignPlanForm } from "@/components/CampaignPlanForm";
 import { useAgency } from "@/components/AgencyProvider";
 import {
   assignCampaignTeamMember,
+  Campaign,
   CampaignAssignmentRole,
   CampaignDeliverablePlan,
   createCampaign,
   CreateCampaignInput,
   PublishingSchedule,
 } from "@/lib/api/campaigns";
-import { getClients, Client } from "@/lib/api/clients";
-import { getMembers, Member } from "@/lib/api/team";
-import { getWorkspaceHref } from "@/lib/workspace-url";
+import { Member } from "@/lib/api/team";
+import { invalidateWorkspaceQueries, queryKeys, setListItem, useClientsQuery, useTeamQuery } from "@/lib/query";
 
 const defaultDeliverable: CampaignDeliverablePlan = {
   contentType: "REEL",
@@ -44,24 +45,17 @@ type TeamDraft = {
 
 export default function NewCampaignPage() {
   const router = useRouter();
-  const { agencyId, agencySlug } = useAgency();
+  const queryClient = useQueryClient();
+  const { agencyId } = useAgency();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [members, setMembers] = useState<Member[]>([]);
+  const clientsQuery = useClientsQuery(agencyId);
+  const teamQuery = useTeamQuery(agencyId);
+  const clients = clientsQuery.data ?? [];
+  const members = teamQuery.data ?? [];
   const [deliverables, setDeliverables] = useState<CampaignDeliverablePlan[]>([defaultDeliverable]);
   const [schedules, setSchedules] = useState<PublishingSchedule[]>([]);
   const [teamDrafts, setTeamDrafts] = useState<TeamDraft[]>([]);
-
-  useEffect(() => {
-    if (!agencyId) return;
-    Promise.all([getClients(agencyId), getMembers(agencyId)])
-      .then(([clientData, memberData]) => {
-        setClients(clientData);
-        setMembers(memberData);
-      })
-      .catch(console.error);
-  }, [agencyId]);
 
   const { register, handleSubmit, formState } = useForm<CreateCampaignInput>({
     mode: "onChange",
@@ -95,6 +89,9 @@ export default function NewCampaignPage() {
       for (const draft of teamDrafts) {
         await assignCampaignTeamMember(agencyId, campaign.id, draft);
       }
+      queryClient.setQueryData(queryKeys.campaign(agencyId, campaign.id), campaign);
+      queryClient.setQueryData(queryKeys.campaigns(agencyId), (current: Campaign[] | undefined) => setListItem(current, campaign));
+      invalidateWorkspaceQueries(queryClient, agencyId, ["campaigns", "dashboard", "calendar", "workflow"]);
       router.push(`/campaigns/${campaign.id}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create campaign.");

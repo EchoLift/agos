@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { getAccessToken, refreshAccessToken } from "@/lib/auth";
+import {
+  getAccessToken,
+  isAuthTemporarilyUnavailableError,
+  refreshAccessToken,
+} from "@/lib/auth";
 import { getMyMemberships } from "@/lib/api/organization";
 import { getWorkspaceUrl } from "@/lib/workspace-url";
 
@@ -11,10 +15,18 @@ export default function RootRedirect() {
       let token = getAccessToken();
 
       if (!token) {
-        token = await refreshAccessToken();
+        try {
+          token = await refreshAccessToken();
+        } catch (error) {
+          if (isAuthTemporarilyUnavailableError(error)) {
+            return;
+          }
+
+          throw error;
+        }
       }
 
-      if (!token) return
+      if (!token) return;
 
       try {
         const memberships = await getMyMemberships();

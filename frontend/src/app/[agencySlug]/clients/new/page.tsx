@@ -4,13 +4,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 import { ClientFormActions, ClientPlaybookForm, normalizeClientPayload } from "@/components/ClientPlaybookForm";
 import { useAgency } from "@/components/AgencyProvider";
-import { createClient, CreateClientInput } from "@/lib/api/clients";
+import { Client, createClient, CreateClientInput } from "@/lib/api/clients";
+import { invalidateWorkspaceQueries, queryKeys, setListItem } from "@/lib/query";
 
 export default function NewClientPage() {
   const router = useRouter();
-  const { agencyId, agencySlug } = useAgency();
+  const queryClient = useQueryClient();
+  const { agencyId } = useAgency();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +39,9 @@ export default function NewClientPage() {
     setIsSubmitting(true);
 
     try {
-      await createClient(agencyId, normalizeClientPayload(data));
+      const client = await createClient(agencyId, normalizeClientPayload(data));
+      queryClient.setQueryData(queryKeys.clients(agencyId), (current: Client[] | undefined) => setListItem(current, client));
+      invalidateWorkspaceQueries(queryClient, agencyId, ["clients"]);
       router.push("/clients");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create client.");

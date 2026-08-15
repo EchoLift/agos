@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Agency } from "@/lib/api/organization";
 import { getClients } from "@/lib/api/clients";
 import { getCampaigns } from "@/lib/api/campaigns";
@@ -12,6 +13,7 @@ import { getMembers } from "@/lib/api/team";
 import { getCalendarEvents } from "@/lib/api/calendar";
 import { allowedNavKeys, visibleWorkspaceNavItems } from "@/lib/workspace-access";
 import { getWorkspaceHref } from "@/lib/workspace-url";
+import { queryKeys, staleTimes } from "@/lib/query";
 
 type SearchResultType = "PAGE" | "CLIENT" | "CAMPAIGN" | "CONTENT" | "WORKFLOW" | "GIG" | "MEMBER" | "CALENDAR" | "HELP";
 
@@ -45,6 +47,7 @@ export default function GlobalSearch({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [remoteResults, setRemoteResults] = useState<SearchResult[]>([]);
@@ -58,7 +61,7 @@ export default function GlobalSearch({
       subtitle: "Page",
       href: item.hrefValue,
     })),
-    [agency, userId],
+    [agency, agencySlug, userId],
   );
 
   useEffect(() => {
@@ -89,37 +92,63 @@ export default function GlobalSearch({
       const requests: Array<Promise<SearchResult[]>> = [];
 
       if (navKeys.has("clients")) {
-        requests.push(getClients(agency.id).then((items) => items
+        requests.push(queryClient.fetchQuery({
+          queryKey: queryKeys.clients(agency.id),
+          queryFn: () => getClients(agency.id),
+          staleTime: staleTimes.clients,
+        }).then((items) => items
           .filter((item) => `${item.name} ${item.displayName ?? ""} ${item.industry ?? ""}`.toLowerCase().includes(needle))
           .slice(0, 6)
           .map((item) => ({ id: item.id, type: "CLIENT" as const, title: item.displayName || item.name, subtitle: item.industry || "Client", href: `/clients/${item.id}` }))));
       }
       if (navKeys.has("campaigns")) {
-        requests.push(getCampaigns(agency.id).then((items) => items
+        requests.push(queryClient.fetchQuery({
+          queryKey: queryKeys.campaigns(agency.id),
+          queryFn: () => getCampaigns(agency.id),
+          staleTime: staleTimes.campaigns,
+        }).then((items) => items
           .filter((item) => `${item.name} ${item.client?.name ?? ""}`.toLowerCase().includes(needle))
           .slice(0, 6)
           .map((item) => ({ id: item.id, type: "CAMPAIGN" as const, title: item.name, subtitle: item.client?.name || "Campaign", href: `/campaigns/${item.id}` }))));
       }
       if (navKeys.has("content")) {
-        requests.push(getContentAssets(agency.id).then((items) => items
+        requests.push(queryClient.fetchQuery({
+          queryKey: queryKeys.content(agency.id),
+          queryFn: () => getContentAssets(agency.id),
+          staleTime: staleTimes.campaigns,
+        }).then((items) => items
           .filter((item) => `${item.displayCode ?? ""} ${item.title} ${item.stage ?? ""}`.toLowerCase().includes(needle))
           .slice(0, 6)
           .map((item) => ({ id: item.id, type: "CONTENT" as const, title: `${item.displayCode ?? item.type} - ${item.title}`, subtitle: item.stage || "Content", href: `/content/${item.id}` }))));
       }
       if (navKeys.has("gigs")) {
-        requests.push(getWorkOrders(agency.id).then((items) => items
+        requests.push(queryClient.fetchQuery({
+          queryKey: queryKeys.gigs(agency.id),
+          queryFn: () => getWorkOrders(agency.id),
+          staleTime: staleTimes.gigs,
+        }).then((items) => items
           .filter((item) => `${item.title} ${item.client?.name ?? ""} ${item.workType}`.toLowerCase().includes(needle))
           .slice(0, 6)
           .map((item) => ({ id: item.id, type: "GIG" as const, title: item.title, subtitle: `${item.workType} · ${item.client?.name ?? "No client"}`, href: `/gigs/${item.id}` }))));
       }
       if (navKeys.has("workflow")) {
-        requests.push(getWorkflowBoard(agency.id, { search: query.trim() }).then((board) => board.columns
+        const filters = { search: query.trim() };
+        requests.push(queryClient.fetchQuery({
+          queryKey: queryKeys.workflow(agency.id, filters),
+          queryFn: () => getWorkflowBoard(agency.id, filters),
+          staleTime: staleTimes.workflow,
+        }).then((board) => board.columns
           .flatMap((column) => column.items)
           .slice(0, 8)
           .map((item) => ({ id: item.contentAssetId, type: "WORKFLOW" as const, title: `${item.displayCode} - ${item.title}`, subtitle: `${item.clientName} · ${item.stage}`, href: `/workflow/${item.contentAssetId}` }))));
       }
       if (navKeys.has("calendar")) {
-        requests.push(getCalendarEvents(agency.id, { scope: "MY_SCHEDULE" }).then((calendar) => calendar.events
+        const filters = { scope: "MY_SCHEDULE" as const };
+        requests.push(queryClient.fetchQuery({
+          queryKey: queryKeys.calendar(agency.id, filters),
+          queryFn: () => getCalendarEvents(agency.id, filters),
+          staleTime: staleTimes.calendar,
+        }).then((calendar) => calendar.events
           .filter((item) => `${item.title} ${item.campaign?.name ?? ""} ${item.client?.name ?? ""} ${item.contentAsset?.displayCode ?? ""} ${item.workOrder?.title ?? ""}`.toLowerCase().includes(needle))
           .slice(0, 8)
           .map((item) => ({
@@ -137,7 +166,11 @@ export default function GlobalSearch({
           }))));
       }
       if (navKeys.has("team")) {
-        requests.push(getMembers(agency.id).then((items) => items
+        requests.push(queryClient.fetchQuery({
+          queryKey: queryKeys.team(agency.id),
+          queryFn: () => getMembers(agency.id),
+          staleTime: staleTimes.team,
+        }).then((items) => items
           .filter((item) => `${item.name ?? ""} ${item.email ?? ""} ${item.roleName}`.toLowerCase().includes(needle))
           .slice(0, 6)
           .map((item) => ({ id: item.id, type: "MEMBER" as const, title: item.name || "Team member", subtitle: item.roles?.map((role) => role.name).join(", ") || item.roleName, href: getWorkspaceHref(agencySlug, "/team") }))));
@@ -153,7 +186,7 @@ export default function GlobalSearch({
       active = false;
       window.clearTimeout(timer);
     };
-  }, [agency?.id, navKeys, open, query]);
+  }, [agency?.id, agencySlug, navKeys, open, query, queryClient]);
 
   if (!open) return null;
 

@@ -28,7 +28,7 @@ export default function MobileWorkspaceNav({
   agency: Agency | null;
   pathname: string;
   navItems: VisibleNavItem[];
-}){
+}) {
   const [sheet, setSheet] = useState<"create" | "more" | null>(null);
   const home = navItems.find((item) => item.key === "dashboard");
   const campaigns = navItems.find((item) => item.key === "campaigns");
@@ -42,7 +42,11 @@ export default function MobileWorkspaceNav({
   const remaining = navItems.filter((item) => !pinnedKeys.has(item.key));
   const safeAgencySlug = agency?.slug ?? "";
   const createLinks = [
-    { label: "New Gig", href: getWorkspaceHref(safeAgencySlug, "/gigs/new"), visible: visibleKeys.has("gigs") },
+    {
+      label: "New Gig",
+      href: getWorkspaceHref(safeAgencySlug, "/gigs/new"),
+      visible: visibleKeys.has("gigs"),
+    },
     {
       label: "New Campaign",
       href: getWorkspaceHref(safeAgencySlug, "/campaigns/new"),
@@ -65,7 +69,7 @@ export default function MobileWorkspaceNav({
   return (
     <>
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-800 bg-[#09090b]/98 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-12px_32px_rgba(0,0,0,0.08)] backdrop-blur-xl lg:hidden"
         aria-label="Workspace navigation"
       >
         <div
@@ -78,7 +82,7 @@ export default function MobileWorkspaceNav({
             <button
               type="button"
               onClick={() => setSheet("create")}
-              className="flex min-h-14 flex-col items-center justify-center text-indigo-300"
+              className="flex min-h-14 flex-col items-center justify-center text-primary transition hover:text-primary/80"
               aria-label="Quick create"
             >
               <Plus aria-hidden="true" className="h-5 w-5" />
@@ -95,7 +99,7 @@ export default function MobileWorkspaceNav({
           <button
             type="button"
             onClick={() => setSheet("more")}
-            className="flex min-h-14 flex-col items-center justify-center text-zinc-500"
+            className="flex min-h-14 flex-col items-center justify-center text-primary transition hover:text-primary/80"
             aria-label="More navigation"
           >
             <MoreHorizontal aria-hidden="true" className="h-5 w-5" />
@@ -106,7 +110,7 @@ export default function MobileWorkspaceNav({
 
       {sheet ? (
         <div
-          className="fixed inset-0 z-[60] bg-black/60 lg:hidden"
+          className="fixed inset-0 z-[60] bg-black/55 lg:hidden"
           role="dialog"
           aria-modal="true"
         >
@@ -115,15 +119,15 @@ export default function MobileWorkspaceNav({
             aria-label="Close menu"
             onClick={() => setSheet(null)}
           />
-          <section className="absolute inset-x-0 bottom-0 max-h-[78vh] overflow-y-auto rounded-t-lg border-t border-zinc-800 bg-zinc-950 px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+          <section className="absolute inset-x-0 bottom-0 max-h-[78vh] overflow-y-auto rounded-t-lg border-t border-border bg-popover px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 text-popover-foreground shadow-2xl">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-white">
+              <h2 className="text-base font-semibold text-foreground">
                 {sheet === "create" ? "Quick create" : "More"}
               </h2>
               <button
                 type="button"
                 onClick={() => setSheet(null)}
-                className="min-h-11 rounded-md px-3 text-sm text-zinc-400"
+                className="min-h-11 rounded-md px-3 text-sm text-muted-foreground transition hover:bg-accent hover:text-accent-foreground"
               >
                 Close
               </button>
@@ -134,7 +138,7 @@ export default function MobileWorkspaceNav({
                   key={item.label}
                   href={"hrefValue" in item ? item.hrefValue : item.href}
                   onClick={() => setSheet(null)}
-                  className="flex min-h-12 items-center rounded-md border border-zinc-800 bg-zinc-900 px-3 text-sm font-medium text-zinc-200"
+                  className="flex min-h-12 items-center rounded-md border border-border bg-card px-3 text-sm font-medium text-card-foreground transition hover:bg-accent hover:text-accent-foreground"
                 >
                   {item.label}
                 </Link>
@@ -143,7 +147,7 @@ export default function MobileWorkspaceNav({
                 <Link
                   href="/help"
                   onClick={() => setSheet(null)}
-                  className="flex min-h-12 items-center rounded-md border border-zinc-800 bg-zinc-900 px-3 text-sm font-medium text-zinc-200"
+                  className="flex min-h-12 items-center rounded-md border border-border bg-card px-3 text-sm font-medium text-card-foreground transition hover:bg-accent hover:text-accent-foreground"
                 >
                   Help
                 </Link>
@@ -173,7 +177,11 @@ function MobileNavLink({
     <Link
       href={item.hrefValue}
       aria-current={active ? "page" : undefined}
-      className={`flex min-h-14 flex-col items-center justify-center ${active ? "text-indigo-300" : "text-zinc-500"}`}
+      className={`flex min-h-14 flex-col items-center justify-center transition ${
+        active
+          ? "text-primary"
+          : "text-muted-foreground hover:text-foreground"
+      }`}
     >
       <Icon aria-hidden="true" className="h-5 w-5" />
       <span className="mt-1 max-w-[68px] truncate text-[10px] font-medium">

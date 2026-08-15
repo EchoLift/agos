@@ -4,9 +4,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
-  clearAccessToken,
   exchangeGoogleToken,
   getAccessToken,
+  isAuthTemporarilyUnavailableError,
   refreshAccessToken,
 } from "@/lib/auth";
 
@@ -64,6 +64,8 @@ export default function LoginClient() {
 
   const [loading, setLoading] = useState(false);
   const [restoringSession, setRestoringSession] = useState(true);
+  const [sessionRestoreUnavailable, setSessionRestoreUnavailable] =
+    useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
@@ -87,6 +89,11 @@ export default function LoginClient() {
 
     router.replace("/create-agency");
   }, [returnTo, router]);
+
+  const showRecoverableRestoreError = useCallback((message: string) => {
+    setSessionRestoreUnavailable(true);
+    setError(message);
+  }, []);
 
   const handleCredential = useCallback(
     async (idToken: string) => {
@@ -113,6 +120,7 @@ export default function LoginClient() {
     let cancelled = false;
 
     async function restoreSession() {
+      setSessionRestoreUnavailable(false);
       try {
         // First check local access token
         const existingToken = getAccessToken();
@@ -121,30 +129,57 @@ export default function LoginClient() {
           try {
             await redirectAfterLogin();
             return;
-          } catch {
-            clearAccessToken();
+          } catch (error) {
+            if (isAuthTemporarilyUnavailableError(error)) {
+              if (!cancelled) {
+                showRecoverableRestoreError(
+                  "AGENCIE is reconnecting. Your session has not been cleared.",
+                );
+              }
+              return;
+            }
+
+            if (!cancelled && getAccessToken()) {
+              showRecoverableRestoreError(
+                "AGENCIE could not finish restoring your session. Your session has not been cleared.",
+              );
+              return;
+            }
           }
         }
 
         try {
-          const refreshResult = await Promise.race([
-            refreshAccessToken(),
-            new Promise<null>((resolve) =>
-              setTimeout(() => resolve(null), 3000),
-            ),
-          ]);
+          const refreshResult = await refreshAccessToken();
           if (cancelled) return;
 
           if (refreshResult) {
             try {
               await redirectAfterLogin();
               return;
-            } catch {
-              clearAccessToken();
+            } catch (error) {
+              if (isAuthTemporarilyUnavailableError(error)) {
+                showRecoverableRestoreError(
+                  "AGENCIE is reconnecting. Your session has not been cleared.",
+                );
+                return;
+              }
+
+              if (getAccessToken()) {
+                showRecoverableRestoreError(
+                  "AGENCIE could not finish restoring your session. Your session has not been cleared.",
+                );
+                return;
+              }
             }
           }
-        } catch {
-          clearAccessToken();
+        } catch (error) {
+          if (isAuthTemporarilyUnavailableError(error)) {
+            if (!cancelled) {
+              showRecoverableRestoreError(
+                "AGENCIE is waking up. Your session has not been cleared.",
+              );
+            }
+          }
         }
       } finally {
         if (!cancelled) {
@@ -158,7 +193,7 @@ export default function LoginClient() {
     return () => {
       cancelled = true;
     };
-  }, [redirectAfterLogin]);
+  }, [redirectAfterLogin, showRecoverableRestoreError]);
   useEffect(() => {
     // if (restoringSession) return;
 
@@ -221,6 +256,13 @@ export default function LoginClient() {
     await handleCredential(devToken);
   };
 
+  const handleSessionRetry = () => {
+    setRestoringSession(true);
+    setSessionRestoreUnavailable(false);
+    setError(null);
+    window.location.reload();
+  };
+
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100">
       <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6 py-24">
@@ -261,6 +303,16 @@ export default function LoginClient() {
               Checking existing session…
             </p>
           )}
+
+          {sessionRestoreUnavailable ? (
+            <button
+              type="button"
+              onClick={handleSessionRetry}
+              className="mt-4 w-full rounded-full border border-zinc-700 px-6 py-3 text-sm font-semibold text-zinc-200 transition hover:border-indigo-400 hover:text-white"
+            >
+              Retry session restore
+            </button>
+          ) : null}
 
           {loading && !restoringSession && (
             <p className="mt-4 text-center text-sm text-zinc-400">

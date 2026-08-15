@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, Loader2, RefreshCw, Unplug } from "lucide-react";
 import { useAgency } from "@/components/AgencyProvider";
 import {
@@ -10,11 +11,20 @@ import {
   GoogleCalendarStatus,
   syncGoogleCalendar,
 } from "@/lib/api/google-calendar";
-import { getProfile, Profile, updateProfile } from "@/lib/api/me";
+import {
+  queryKeys,
+  useGoogleCalendarStatusQuery,
+  useProfileMutations,
+  useProfileQuery,
+} from "@/lib/query";
 
 export default function ProfileSettingsPage() {
   const { agencySlug } = useAgency();
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const queryClient = useQueryClient();
+  const profileQuery = useProfileQuery();
+  const { updateProfileMutation } = useProfileMutations();
+  const profile = profileQuery.data ?? null;
+  const calendarStatusQuery = useGoogleCalendarStatusQuery();
   const [draft, setDraft] = useState({
     name: "",
     avatarUrl: "",
@@ -34,29 +44,39 @@ export default function ProfileSettingsPage() {
   const [calendarMessage, setCalendarMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    getProfile()
-      .then((data) => {
-        setProfile(data);
-        setDraft({
-          name: data.name || "",
-          avatarUrl: data.avatarUrl || "",
-          mobileNumber: data.mobileNumber || "",
-          timezone: data.timezone || "Asia/Kolkata",
-          language: data.language || "en",
-          jobTitle: data.jobTitle || "",
-          bio: data.bio || "",
-        });
-      })
-      .catch((error) =>
-        setMessage(
-          error instanceof Error ? error.message : "Failed to load profile.",
-        ),
+    if (!profile) return;
+    queueMicrotask(() => {
+      setDraft({
+        name: profile.name || "",
+        avatarUrl: profile.avatarUrl || "",
+        mobileNumber: profile.mobileNumber || "",
+        timezone: profile.timezone || "Asia/Kolkata",
+        language: profile.language || "en",
+        jobTitle: profile.jobTitle || "",
+        bio: profile.bio || "",
+      });
+    });
+  }, [profile]);
+
+  useEffect(() => {
+    if (!profileQuery.error) return;
+    queueMicrotask(() => {
+      setMessage(
+        profileQuery.error instanceof Error
+          ? profileQuery.error.message
+          : "Failed to load profile.",
       );
-  }, []);
+    });
+  }, [profileQuery.error]);
 
   const loadCalendarStatus = useCallback(async () => {
     try {
-      setCalendarStatus(await getGoogleCalendarStatus());
+      setCalendarStatus(
+        await queryClient.fetchQuery({
+          queryKey: queryKeys.googleCalendarStatus(),
+          queryFn: getGoogleCalendarStatus,
+        }),
+      );
     } catch (error) {
       setCalendarMessage(
         error instanceof Error
@@ -64,25 +84,28 @@ export default function ProfileSettingsPage() {
           : "Failed to load Google Calendar status.",
       );
     }
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
-    getGoogleCalendarStatus()
-      .then((status) => setCalendarStatus(status))
-      .catch((error) =>
+    if (calendarStatusQuery.data) {
+      queueMicrotask(() => setCalendarStatus(calendarStatusQuery.data));
+    }
+    if (calendarStatusQuery.error) {
+      queueMicrotask(() => {
         setCalendarMessage(
-          error instanceof Error
-            ? error.message
+          calendarStatusQuery.error instanceof Error
+            ? calendarStatusQuery.error.message
             : "Failed to load Google Calendar status.",
-        ),
-      );
-  }, []);
+        );
+      });
+    }
+  }, [calendarStatusQuery.data, calendarStatusQuery.error]);
 
   const save = async () => {
     setIsSaving(true);
     setMessage(null);
     try {
-      const updated = await updateProfile({
+      await updateProfileMutation.mutateAsync({
         name: draft.name,
         avatarUrl: draft.avatarUrl || null,
         mobileNumber: draft.mobileNumber || null,
@@ -91,7 +114,6 @@ export default function ProfileSettingsPage() {
         jobTitle: draft.jobTitle || null,
         bio: draft.bio || null,
       });
-      setProfile(updated);
       setMessage("Profile saved.");
     } catch (error) {
       setMessage(
@@ -150,6 +172,9 @@ export default function ProfileSettingsPage() {
     try {
       await disconnectGoogleCalendar();
       setCalendarStatus({ connected: false });
+      queryClient.setQueryData(queryKeys.googleCalendarStatus(), {
+        connected: false,
+      });
       setCalendarMessage("Google Calendar disconnected.");
     } catch (error) {
       setCalendarMessage(
@@ -175,7 +200,10 @@ export default function ProfileSettingsPage() {
         </p>
       </div>
 
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-6 shadow-2xl shadow-black/20 sm:p-8">
+      <section
+        id="google-calendar"
+        className="scroll-mt-24 rounded-3xl border border-zinc-800 bg-zinc-950/80 p-6 shadow-2xl shadow-black/20 sm:p-8"
+      >
         <div className="space-y-5">
           <ReadOnly label="Email" value={profile?.email || "Loading..."} />
           <Field
@@ -247,7 +275,7 @@ export default function ProfileSettingsPage() {
             </button>
           </div>
         </div>
-      </div>
+      </section>
 
       <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-6 shadow-2xl shadow-black/20 sm:p-8">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">

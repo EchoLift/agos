@@ -1,24 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAgency } from "@/components/AgencyProvider";
-import { createContentAsset, CreateContentInput } from "@/lib/api/content";
-import { getCampaigns, Campaign } from "@/lib/api/campaigns";
+import { ContentAsset, createContentAsset, CreateContentInput } from "@/lib/api/content";
 import Link from "next/link";
+import { invalidateWorkspaceQueries, queryKeys, setListItem, useCampaignsQuery } from "@/lib/query";
 
 export default function NewContentPage() {
   const router = useRouter();
-  const { agencyId, agencySlug } = useAgency();
+  const queryClient = useQueryClient();
+  const { agencyId } = useAgency();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-
-  useEffect(() => {
-    if (!agencyId) return;
-    getCampaigns(agencyId).then(setCampaigns).catch(console.error);
-  }, [agencyId]);
+  const campaignsQuery = useCampaignsQuery(agencyId);
+  const campaigns = campaignsQuery.data ?? [];
 
   const { register, handleSubmit, formState } = useForm<CreateContentInput>({
     defaultValues: {
@@ -40,7 +38,10 @@ export default function NewContentPage() {
 
       data.clientId = selectedCampaign.clientId;
 
-      await createContentAsset(agencyId, data);
+      const asset = await createContentAsset(agencyId, data);
+      queryClient.setQueryData(queryKeys.contentAsset(agencyId, asset.id), asset);
+      queryClient.setQueryData(queryKeys.content(agencyId), (current: ContentAsset[] | undefined) => setListItem(current, asset));
+      invalidateWorkspaceQueries(queryClient, agencyId, ["content", "workflow", "dashboard", "calendar"]);
       router.push(`/content`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create content asset.");

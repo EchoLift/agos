@@ -93,6 +93,58 @@ export class OrganizationController {
     );
   }
 
+  @Get(":agencyId/invitations")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "List invitations for an agency" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "List of agency invitations",
+  })
+  async getInvitations(
+    @Param("agencyId") agencyId: string,
+    @CurrentUser() user: IdentityContext,
+  ) {
+    return this.organizationService.getInvitations(agencyId, user);
+  }
+
+  @Post(":agencyId/invitations/:invitationId/resend")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Resend an agency invitation" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Invitation email queued",
+  })
+  async resendInvitation(
+    @Param("agencyId") agencyId: string,
+    @Param("invitationId") invitationId: string,
+    @CurrentUser() user: IdentityContext,
+  ) {
+    return this.organizationService.resendInvitation(
+      agencyId,
+      invitationId,
+      user,
+    );
+  }
+
+  @Delete(":agencyId/invitations/:invitationId")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Revoke an agency invitation" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Invitation revoked",
+  })
+  async revokeInvitation(
+    @Param("agencyId") agencyId: string,
+    @Param("invitationId") invitationId: string,
+    @CurrentUser() user: IdentityContext,
+  ) {
+    return this.organizationService.revokeInvitation(
+      agencyId,
+      invitationId,
+      user,
+    );
+  }
+
   @Get(":agencyId/members")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Get all members for an agency" })

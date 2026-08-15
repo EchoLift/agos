@@ -98,6 +98,7 @@ function TimeCalendar({ events, selectedDate, mode, onDateChange, onOpenEvent }:
   const scrollRef = useRef<HTMLDivElement>(null);
   const days = useMemo(() => visibleDays(selectedDate, mode), [selectedDate, mode]);
   const stripDays = useMemo(() => mode === "day" ? visibleDays(selectedDate, "week") : days, [days, mode, selectedDate]);
+  const eventsByDay = useMemo(() => eventsByDate(events), [events]);
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -107,7 +108,7 @@ function TimeCalendar({ events, selectedDate, mode, onDateChange, onOpenEvent }:
 
   return (
     <div className="mt-2 min-w-0 overflow-hidden border-y border-border bg-card">
-      <DateStrip days={stripDays} events={events} selectedDate={selectedDate} onDateChange={onDateChange} />
+      <DateStrip days={stripDays} eventsByDay={eventsByDay} selectedDate={selectedDate} onDateChange={onDateChange} />
       <div className="border-b border-border bg-muted/40 py-2 pl-14 pr-3 text-sm font-semibold text-foreground">
         {selectedDate.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
       </div>
@@ -119,7 +120,7 @@ function TimeCalendar({ events, selectedDate, mode, onDateChange, onOpenEvent }:
             </div>
           ))}
           <div className="absolute bottom-0 left-12 right-0 top-0 grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
-            {days.map((day) => <DayColumn key={dateKey(day)} events={events.filter((event) => sameDay(new Date(event.startsAt), day))} onOpenEvent={onOpenEvent} />)}
+            {days.map((day) => <DayColumn key={dateKey(day)} events={eventsByDay.get(dateKey(day)) ?? []} onOpenEvent={onOpenEvent} />)}
           </div>
           {days.some((date) => sameDay(date, new Date())) ? <CurrentTimeLine days={days} /> : null}
         </div>
@@ -128,9 +129,9 @@ function TimeCalendar({ events, selectedDate, mode, onDateChange, onOpenEvent }:
   );
 }
 
-function DateStrip({ days, events, selectedDate, onDateChange }: { days: Date[]; events: CalendarEvent[]; selectedDate: Date; onDateChange: (date: Date) => void }) {
+function DateStrip({ days, eventsByDay, selectedDate, onDateChange }: { days: Date[]; eventsByDay: Map<string, CalendarEvent[]>; selectedDate: Date; onDateChange: (date: Date) => void }) {
   return <div className="grid border-b border-border bg-card pl-12" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>{days.map((day) => {
-    const count = events.filter((event) => sameDay(new Date(event.startsAt), day)).length;
+    const count = eventsByDay.get(dateKey(day))?.length ?? 0;
     const selected = sameDay(day, selectedDate);
     return <button key={dateKey(day)} type="button" onClick={() => onDateChange(day)} aria-pressed={selected} className={`min-h-14 border-l border-border px-1 text-center ${selected ? "bg-accent" : "bg-card"}`}>
       <span className={`block text-[10px] font-semibold uppercase ${selected ? "text-primary" : "text-muted-foreground"}`}>{day.toLocaleDateString(undefined, { weekday: "narrow" })}</span>
@@ -141,7 +142,7 @@ function DateStrip({ days, events, selectedDate, onDateChange }: { days: Date[];
 }
 
 function DayColumn({ events, onOpenEvent }: { events: CalendarEvent[]; onOpenEvent: (event: CalendarEvent) => void }) {
-  const positioned = positionEvents(events);
+  const positioned = useMemo(() => positionEvents(events), [events]);
   return <div className="relative min-w-0 border-l border-border/80 bg-card">{positioned.map(({ event, top, height, lane, lanes }) => (
     <button key={event.id} type="button" onClick={() => onOpenEvent(event)} className={`absolute z-10 overflow-hidden rounded border px-1.5 py-1 text-left text-[11px] leading-tight shadow-sm ${eventClasses(event)}`} style={{ top, height, left: `calc(${(lane / lanes) * 100}% + 2px)`, width: `calc(${100 / lanes}% - 4px)` }}>
       <span className="block truncate font-semibold">{event.title}</span>
@@ -160,11 +161,15 @@ function CurrentTimeLine({ days }: { days: Date[] }) {
 
 function MonthCalendar({ events, selectedDate, onDateChange, onOpenEvent }: { events: CalendarEvent[]; selectedDate: Date; onDateChange: (date: Date) => void; onOpenEvent: (event: CalendarEvent) => void }) {
   const days = monthGrid(selectedDate);
-  const selectedEvents = events.filter((event) => sameDay(new Date(event.startsAt), selectedDate)).sort(byStart);
+  const eventsByDay = useMemo(() => eventsByDate(events), [events]);
+  const selectedEvents = useMemo(
+    () => [...(eventsByDay.get(dateKey(selectedDate)) ?? [])].sort(byStart),
+    [eventsByDay, selectedDate],
+  );
   return <div className="mt-2 border-y border-border bg-card">
     <div className="grid grid-cols-7 border-b border-border text-center text-[11px] font-semibold uppercase text-muted-foreground">{"SMTWTFS".split("").map((label, index) => <div key={`${label}-${index}`} className="py-2">{label}</div>)}</div>
     <div className="grid grid-cols-7">{days.map((day) => {
-      const count = events.filter((event) => sameDay(new Date(event.startsAt), day)).length;
+      const count = eventsByDay.get(dateKey(day))?.length ?? 0;
       const inMonth = day.getMonth() === selectedDate.getMonth();
       const selected = sameDay(day, selectedDate);
       return <button key={dateKey(day)} type="button" onClick={() => onDateChange(day)} className={`min-h-14 border-b border-r border-border p-1 text-left ${selected ? "bg-accent" : "bg-card"} ${inMonth ? "text-foreground" : "text-muted-foreground opacity-60"}`}>
@@ -230,6 +235,20 @@ function groupByDate(events: CalendarEvent[]) {
     groups.set(key, [...(groups.get(key) || []), event]);
   });
   return Array.from(groups, ([date, groupEvents]) => ({ date, events: groupEvents }));
+}
+
+function eventsByDate(events: CalendarEvent[]) {
+  const groups = new Map<string, CalendarEvent[]>();
+  events.forEach((event) => {
+    const key = dateKey(new Date(event.startsAt));
+    const existing = groups.get(key);
+    if (existing) {
+      existing.push(event);
+    } else {
+      groups.set(key, [event]);
+    }
+  });
+  return groups;
 }
 
 function eventClasses(event: CalendarEvent) {

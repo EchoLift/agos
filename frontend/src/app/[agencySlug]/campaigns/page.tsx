@@ -1,45 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAgency } from "@/components/AgencyProvider";
-import { getCampaigns, Campaign } from "@/lib/api/campaigns";
-import { getClients, Client } from "@/lib/api/clients";
 import { useRouter } from "next/navigation";
 import { statusPillClasses } from "@/lib/status-style";
 import {getWorkspaceHref} from "@/lib/workspace-url";
+import { useCampaignsQuery, useClientsQuery } from "@/lib/query";
 
 export default function CampaignsPage() {
   const { agencyId, agencySlug } = useAgency();
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
   const [filters, setFilters] = useState({ search: "", clientId: "", status: "" });
-  const [isLoading, setIsLoading] = useState(true);
+  const campaignsQuery = useCampaignsQuery(agencyId);
+  const clientsQuery = useClientsQuery(agencyId);
+  const campaigns = useMemo(() => campaignsQuery.data ?? [], [campaignsQuery.data]);
+  const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data]);
+  const isLoading = (campaignsQuery.isLoading || clientsQuery.isLoading) && !campaignsQuery.data && !clientsQuery.data;
   const router = useRouter();
   const safeAgencySlug = agencySlug ?? "";
-  useEffect(() => {
-    if (!agencyId) return;
-    let isMounted = true;
-
-    Promise.all([getCampaigns(agencyId), getClients(agencyId)])
-      .then(([campaignData, clientData]) => {
-        if (isMounted) {
-          setCampaigns(campaignData);
-          setClients(clientData);
-          setIsLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (isMounted) {
-          console.error(err);
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [agencyId]);
 
   const clientById = useMemo(() => new Map(clients.map((client) => [client.id, client])), [clients]);
   const filteredCampaigns = useMemo(() => {
@@ -90,6 +68,8 @@ export default function CampaignsPage() {
       <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl shadow-black/20">
         {isLoading ? (
           <div className="text-sm text-zinc-500">Loading campaigns...</div>
+        ) : (campaignsQuery.error || clientsQuery.error) && !campaigns.length ? (
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">Failed to load campaigns.</div>
         ) : campaigns.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="rounded-full bg-zinc-900/80 p-4">
