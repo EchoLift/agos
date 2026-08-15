@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Member,
@@ -14,19 +15,23 @@ import {
 import { useAgency } from "@/components/AgencyProvider";
 import { statusPillClasses } from "@/lib/status-style";
 import { roleAccessLabels } from "@/lib/workspace-access";
-import { getWorkspaceHref } from "@/lib/workspace-url";
+import { getHelpHref, getWorkspaceHref } from "@/lib/workspace-url";
 import {
   queryKeys,
   useInvitationsQuery,
   useRolesQuery,
   useTeamQuery,
 } from "@/lib/query";
+import { rememberedTabKey, useRememberedTab } from "@/lib/remembered-tab";
+
+type TeamTab = "members" | "invitations";
+
+const memberTabs: readonly TeamTab[] = ["members"];
+const invitationTabs: readonly TeamTab[] = ["members", "invitations"];
 
 export default function TeamPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"members" | "invitations">(
-    "members",
-  );
+  const searchParams = useSearchParams();
   const [filters, setFilters] = useState({
     search: "",
     roleId: "",
@@ -64,6 +69,13 @@ export default function TeamPage() {
     currentRoleKeys.includes("ADMIN") ||
     agency?.role === "OWNER" ||
     agency?.role === "ADMIN";
+  const teamTabs = canManageInvitations ? invitationTabs : memberTabs;
+  const [activeTab, setActiveTab] = useRememberedTab<TeamTab>({
+    defaultTab: "members",
+    storageKey: agencyId ? rememberedTabKey("team", agencyId) : null,
+    urlTab: searchParams.get("tab"),
+    validTabs: teamTabs,
+  });
   const invitationsQuery = useInvitationsQuery(agencyId, canManageInvitations);
   const invitations = invitationsQuery.data ?? [];
   const isManagerOnly =
@@ -313,7 +325,7 @@ export default function TeamPage() {
             Manage your agency members and roles.
           </p>
           <Link
-            href="/help/team-access/roles"
+            href={getHelpHref("team-access/roles")}
             className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200"
           >
             Roles and workspace access

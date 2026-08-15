@@ -103,6 +103,41 @@ export function getRootDomainUrl(): string {
   );
 }
 
+export function getCentralAppHref(path: string = ""): string {
+  const cleanPath = path.startsWith("/")
+    ? path
+    : path
+      ? `/${path}`
+      : "";
+
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+
+    if (
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost")
+    ) {
+      return cleanPath || "/";
+    }
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    return cleanPath || "/";
+  }
+
+  return `${getRootDomainUrl()}${cleanPath}`;
+}
+
+export function getHelpHref(path: string = ""): string {
+  const cleanPath = path.startsWith("/")
+    ? path
+    : path
+      ? `/${path}`
+      : "";
+
+  return getCentralAppHref(`/help${cleanPath}`);
+}
+
 /**
  * Generates a full workspace URL.
  *

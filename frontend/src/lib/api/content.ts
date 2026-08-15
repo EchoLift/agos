@@ -63,6 +63,8 @@ export interface CreateContentInput {
   title: string;
   type: string;
   brief: string;
+  assigneeId?: string | null;
+  deadlineAt?: string | null;
 }
 
 export interface UpdateContentInput {
@@ -72,11 +74,29 @@ export interface UpdateContentInput {
   displayCode?: string;
 }
 
+export interface UpdateContentPlanningInput {
+  assigneeId?: string | null;
+  deadlineAt?: string | null;
+}
+
 export async function getContentAssets(agencyId: string): Promise<ContentAsset[]> {
   return apiClient<ContentAsset[]>("/content-assets", {
     method: "GET",
     agencyId,
   });
+}
+
+export async function getCampaignContentAssets(
+  agencyId: string,
+  campaignId: string,
+): Promise<ContentAsset[]> {
+  return apiClient<ContentAsset[]>(
+    `/content-assets?campaignId=${encodeURIComponent(campaignId)}`,
+    {
+      method: "GET",
+      agencyId,
+    },
+  );
 }
 
 export async function createContentAsset(agencyId: string, data: CreateContentInput): Promise<ContentAsset> {
@@ -96,6 +116,18 @@ export async function getContentAsset(agencyId: string, contentAssetId: string):
 
 export async function updateContentAsset(agencyId: string, contentAssetId: string, data: UpdateContentInput): Promise<ContentAsset> {
   return apiClient<ContentAsset>(`/content-assets/${contentAssetId}`, {
+    method: "PATCH",
+    agencyId,
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateContentPlanningFields(
+  agencyId: string,
+  contentAssetId: string,
+  data: UpdateContentPlanningInput,
+): Promise<ContentAsset> {
+  return apiClient<ContentAsset>(`/content-assets/${contentAssetId}/planning`, {
     method: "PATCH",
     agencyId,
     body: JSON.stringify(data),

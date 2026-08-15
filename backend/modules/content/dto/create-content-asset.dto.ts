@@ -1,4 +1,5 @@
 import {
+  IsDateString,
   IsEnum,
   IsOptional,
   IsString,
@@ -42,4 +43,12 @@ export class CreateContentAssetDto {
 
   @IsString()
   brief!: string;
+
+  @IsOptional()
+  @IsUUID()
+  assigneeId?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  deadlineAt?: string | null;
 }

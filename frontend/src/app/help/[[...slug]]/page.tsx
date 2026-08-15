@@ -6,6 +6,7 @@ import HelpMobileNavigation from "@/components/help/HelpMobileNavigation";
 import HelpSearch from "@/components/help/HelpSearch";
 import MarkdownContent from "@/components/help/MarkdownContent";
 import { getAllDocs, getDocBySlug, getDocsNavigation } from "@/lib/docs";
+import { getHelpHref } from "@/lib/workspace-url";
 
 export const metadata = {
   title: "Help Center • AGENCIE",
@@ -123,7 +124,7 @@ function ArticleView({ article, articles }: { article: NonNullable<ReturnType<ty
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link href="/help" className="text-sm text-muted-foreground transition hover:text-primary">
+            <Link href={getHelpHref()} className="text-sm text-muted-foreground transition hover:text-primary">
               Help
             </Link>
             <span className="text-muted-foreground">/</span>

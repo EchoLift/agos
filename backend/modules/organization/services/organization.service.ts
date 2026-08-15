@@ -56,6 +56,11 @@ export class OrganizationService implements OnModuleInit {
       "CONTENT_CREATE",
       "CONTENT_ASSIGN",
       "CONTENT_APPROVE",
+      "PUBLISHING_CREATE",
+      "PUBLISHING_UPDATE",
+      "PUBLISHING_CANCEL",
+      "PUBLISHING_MARK_PUBLISHED",
+      "PUBLISHING_LINK_CONTENT",
       "WORKFLOW_MANAGE",
       "TEAM_INVITE",
       "TEAM_REMOVE",
@@ -96,8 +101,8 @@ export class OrganizationService implements OnModuleInit {
         },
       });
 
-      // For MVP, just assign all permissions to OWNER and MANAGER to unblock features
-      if (sr.key === "OWNER" || sr.key === "MANAGER") {
+      // For MVP, assign all workspace-management permissions to owner/admin/manager roles.
+      if (sr.key === "OWNER" || sr.key === "ADMIN" || sr.key === "MANAGER") {
         for (const pKey of permissions) {
           const perm = await this.prisma.permission.findUnique({
             where: { key: pKey },

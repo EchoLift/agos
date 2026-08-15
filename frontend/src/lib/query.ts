@@ -17,7 +17,11 @@ import {
   getPublishingSchedules,
 } from "@/lib/api/campaigns";
 import { getClients, getClient } from "@/lib/api/clients";
-import { getContentAsset, getContentAssets } from "@/lib/api/content";
+import {
+  getCampaignContentAssets,
+  getContentAsset,
+  getContentAssets,
+} from "@/lib/api/content";
 import { getDashboardData } from "@/lib/api/dashboard";
 import { getGoogleCalendarStatus } from "@/lib/api/google-calendar";
 import {
@@ -75,6 +79,8 @@ export const queryKeys = {
   client: (agencyId: string, clientId: string) =>
     ["client", agencyId, clientId] as const,
   content: (agencyId: string) => ["content", agencyId] as const,
+  campaignContent: (agencyId: string, campaignId: string) =>
+    ["campaign-content", agencyId, campaignId] as const,
   contentAsset: (agencyId: string, contentId: string) =>
     ["workflow-item", agencyId, contentId] as const,
   gigs: (agencyId: string) => ["gigs", agencyId] as const,
@@ -289,6 +295,22 @@ export function useContentQuery(agencyId?: string | null) {
   });
 }
 
+export function useCampaignContentQuery(
+  agencyId?: string | null,
+  campaignId?: string | null,
+) {
+  return useQuery({
+    queryKey:
+      agencyId && campaignId
+        ? queryKeys.campaignContent(agencyId, campaignId)
+        : ["campaign-content", "missing"],
+    queryFn: () => getCampaignContentAssets(agencyId!, campaignId!),
+    enabled: Boolean(agencyId && campaignId),
+    staleTime: staleTimes.campaigns,
+    placeholderData: (previous) => previous,
+  });
+}
+
 export function useContentAssetQuery(
   agencyId?: string | null,
   contentId?: string | null,
@@ -424,6 +446,7 @@ export function invalidateWorkspaceQueries(
   scopes: Array<
     | "dashboard"
     | "calendar"
+    | "schedule"
     | "campaigns"
     | "clients"
     | "content"

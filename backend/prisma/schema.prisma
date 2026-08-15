@@ -1180,6 +1180,7 @@ enum StorageProvider {
 
 enum GoogleCalendarSourceType {
   WORK_ORDER
+  WORKFLOW_TASK
 }
 
 enum OutboxStatus {

@@ -63,6 +63,13 @@ export function middleware(req: NextRequest) {
       return NextResponse.redirect(createAgencyUrl, 307);
     }
 
+    if (url.pathname === "/help" || url.pathname.startsWith("/help/")) {
+      const helpUrl = new URL(url.pathname, appUrl);
+      helpUrl.search = url.search;
+
+      return NextResponse.redirect(helpUrl, 307);
+    }
+
     const newPath =
       `/${subdomain}` + `${url.pathname === "/" ? "" : url.pathname}`;
 

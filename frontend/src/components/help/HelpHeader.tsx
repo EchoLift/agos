@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import { getAccessToken } from "@/lib/auth";
+import { getHelpHref } from "@/lib/workspace-url";
 
 const subscribeToAuth = () => () => undefined;
 const getAuthSnapshot = () => Boolean(getAccessToken());
@@ -33,7 +34,7 @@ export default function HelpHeader() {
         >
           <ArrowLeft className="h-5 w-5" aria-hidden="true" />
         </button>
-        <Link href="/help" className="truncate rounded-lg bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+        <Link href={getHelpHref()} className="truncate rounded-lg bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
           AGENCIE Help
         </Link>
       </div>

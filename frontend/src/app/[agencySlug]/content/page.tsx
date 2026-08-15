@@ -1,141 +1,213 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useAgency } from "@/components/AgencyProvider";
 import { useRouter } from "next/navigation";
+import { useAgency } from "@/components/AgencyProvider";
+import { useCampaignsQuery, useClientsQuery, useContentQuery } from "@/lib/query";
 import { formatLabel, statusPillClasses } from "@/lib/status-style";
 import { getWorkspaceHref } from "@/lib/workspace-url";
-import { useCampaignsQuery, useClientsQuery, useContentQuery } from "@/lib/query";
-export default function ContentPage() {
+
+export default function ContentLibraryPage() {
+  const router = useRouter();
   const { agencyId, agencySlug } = useAgency();
-  const [filters, setFilters] = useState({ search: "", clientId: "", campaignId: "", type: "", status: "" });
+  const safeAgencySlug = agencySlug ?? "";
+  const [filters, setFilters] = useState({
+    search: "",
+    clientId: "",
+    campaignId: "",
+    status: "",
+  });
   const contentQuery = useContentQuery(agencyId);
   const clientsQuery = useClientsQuery(agencyId);
   const campaignsQuery = useCampaignsQuery(agencyId);
-  const contentAssets = useMemo(() => contentQuery.data ?? [], [contentQuery.data]);
+  const contentAssets = useMemo(
+    () => contentQuery.data ?? [],
+    [contentQuery.data],
+  );
   const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data]);
-  const campaigns = useMemo(() => campaignsQuery.data ?? [], [campaignsQuery.data]);
-  const isLoading = (contentQuery.isLoading || clientsQuery.isLoading || campaignsQuery.isLoading) && !contentQuery.data && !clientsQuery.data && !campaignsQuery.data;
-  const router = useRouter();
-  const safeAgencySlug = agencySlug ?? "";
-
-  const clientById = useMemo(() => new Map(clients.map((client) => [client.id, client])), [clients]);
-  const campaignById = useMemo(() => new Map(campaigns.map((campaign) => [campaign.id, campaign])), [campaigns]);
-  const types = useMemo(() => Array.from(new Set(contentAssets.map((asset) => asset.type))).sort(), [contentAssets]);
-  const statuses = useMemo(() => Array.from(new Set(contentAssets.map((asset) => asset.status))).sort(), [contentAssets]);
+  const campaigns = useMemo(
+    () => campaignsQuery.data ?? [],
+    [campaignsQuery.data],
+  );
+  const clientById = useMemo(
+    () => new Map(clients.map((client) => [client.id, client])),
+    [clients],
+  );
+  const campaignById = useMemo(
+    () => new Map(campaigns.map((campaign) => [campaign.id, campaign])),
+    [campaigns],
+  );
+  const statuses = useMemo(
+    () => Array.from(new Set(contentAssets.map((asset) => asset.status))).sort(),
+    [contentAssets],
+  );
   const filteredAssets = useMemo(() => {
     const search = filters.search.trim().toLowerCase();
     return contentAssets.filter((asset) => {
       const client = clientById.get(asset.clientId);
       const campaign = campaignById.get(asset.campaignId);
-      const matchesSearch = !search || [asset.title, asset.displayCode, asset.brief, client?.name, campaign?.name].some((value) => value?.toLowerCase().includes(search));
+      const matchesSearch =
+        !search ||
+        [
+          asset.title,
+          asset.displayCode,
+          asset.brief,
+          client?.name,
+          client?.displayName,
+          campaign?.name,
+        ].some((value) => value?.toLowerCase().includes(search));
       const matchesClient = !filters.clientId || asset.clientId === filters.clientId;
-      const matchesCampaign = !filters.campaignId || asset.campaignId === filters.campaignId;
-      const matchesType = !filters.type || asset.type === filters.type;
+      const matchesCampaign =
+        !filters.campaignId || asset.campaignId === filters.campaignId;
       const matchesStatus = !filters.status || asset.status === filters.status;
-      return matchesSearch && matchesClient && matchesCampaign && matchesType && matchesStatus;
+      return matchesSearch && matchesClient && matchesCampaign && matchesStatus;
     });
   }, [campaignById, clientById, contentAssets, filters]);
+  const isLoading =
+    (contentQuery.isLoading || clientsQuery.isLoading || campaignsQuery.isLoading) &&
+    !contentQuery.data &&
+    !clientsQuery.data &&
+    !campaignsQuery.data;
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">Production</p>
-          <h1 className="mt-2 text-3xl font-semibold text-white">Content</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
+            Internal Library
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold text-slate-950">
+            Content
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">
+            Browse content across campaigns. New planning starts from a campaign Content tab.
+          </p>
         </div>
         <button
-          onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/content/new"))}
-          className="rounded-full bg-indigo-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400"
+          type="button"
+          onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/campaigns"))}
+          className="rounded-full bg-indigo-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400"
         >
-          Create Content
+          Open Campaigns
         </button>
       </div>
 
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-4 shadow-2xl shadow-black/20">
-        <div className="grid gap-3 md:grid-cols-6">
-          <input value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Search content" className="rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500 md:col-span-2" />
-          <select value={filters.clientId} onChange={(event) => setFilters((current) => ({ ...current, clientId: event.target.value, campaignId: "" }))} className="rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500">
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="grid gap-2 md:grid-cols-5">
+          <input
+            value={filters.search}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, search: event.target.value }))
+            }
+            placeholder="Search content"
+            className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 md:col-span-2"
+          />
+          <select
+            value={filters.clientId}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                clientId: event.target.value,
+                campaignId: "",
+              }))
+            }
+            className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          >
             <option value="">All clients</option>
-            {clients.map((client) => <option key={client.id} value={client.id}>{client.displayName || client.name}</option>)}
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.displayName || client.name}
+              </option>
+            ))}
           </select>
-          <select value={filters.campaignId} onChange={(event) => setFilters((current) => ({ ...current, campaignId: event.target.value }))} className="rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500">
+          <select
+            value={filters.campaignId}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, campaignId: event.target.value }))
+            }
+            className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          >
             <option value="">All campaigns</option>
-            {campaigns.filter((campaign) => !filters.clientId || campaign.clientId === filters.clientId).map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
+            {campaigns
+              .filter((campaign) => !filters.clientId || campaign.clientId === filters.clientId)
+              .map((campaign) => (
+                <option key={campaign.id} value={campaign.id}>
+                  {campaign.name}
+                </option>
+              ))}
           </select>
-          <select value={filters.type} onChange={(event) => setFilters((current) => ({ ...current, type: event.target.value }))} className="rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500">
-            <option value="">All types</option>
-            {types.map((type) => <option key={type} value={type}>{type}</option>)}
-          </select>
-          <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))} className="rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500">
+          <select
+            value={filters.status}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, status: event.target.value }))
+            }
+            className="h-10 rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          >
             <option value="">All status</option>
-            {statuses.map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+            {statuses.map((status) => (
+              <option key={status} value={status}>
+                {formatLabel(status)}
+              </option>
+            ))}
           </select>
         </div>
       </div>
 
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl shadow-black/20">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {isLoading ? (
-          <div className="text-sm text-zinc-500">Loading content...</div>
-        ) : (contentQuery.error || clientsQuery.error || campaignsQuery.error) && !contentAssets.length ? (
-          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">Failed to load content.</div>
-        ) : contentAssets.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="rounded-full bg-zinc-900/80 p-4">
-              <span className="text-2xl">📝</span>
-            </div>
-            <h3 className="mt-4 text-lg font-semibold text-white">No content yet</h3>
-            <p className="mt-2 text-sm text-zinc-400">Start creating deliverables for your campaigns.</p>
-            <button
-              onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/content/new"))}
-              className="mt-6 rounded-full bg-zinc-800 px-5 py-2 text-sm font-semibold text-white transition hover:bg-zinc-700"
-            >
-              Create Content
-            </button>
+          <div className="p-4 text-sm text-slate-500">Loading content...</div>
+        ) : contentQuery.error || clientsQuery.error || campaignsQuery.error ? (
+          <div className="m-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            Failed to load content.
           </div>
-        ) : filteredAssets.length === 0 ? (
-          <div className="py-12 text-center text-sm text-zinc-500">No content matches these filters.</div>
-        ) : (
+        ) : filteredAssets.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-zinc-400">
-              <thead className="border-b border-zinc-800 text-xs uppercase tracking-wider text-zinc-500">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th className="pb-4 pr-6 font-medium">Title</th>
-                  <th className="pb-4 pr-6 font-medium">Format</th>
-                  <th className="pb-4 pr-6 font-medium">Stage</th>
-                  <th className="pb-4 font-medium text-right">Actions</th>
+                  <th className="px-3 py-2 font-semibold">Title</th>
+                  <th className="px-3 py-2 font-semibold">Campaign</th>
+                  <th className="px-3 py-2 font-semibold">Type</th>
+                  <th className="px-3 py-2 font-semibold">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/50">
+              <tbody className="divide-y divide-slate-100">
                 {filteredAssets.map((asset) => (
                   <tr
                     key={asset.id}
-                    onClick={() => router.push(`/content/${asset.id}`)}
-                    className="cursor-pointer transition-colors hover:bg-zinc-900/30"
+                    onClick={() =>
+                      router.push(
+                        getWorkspaceHref(
+                          safeAgencySlug,
+                          `/campaigns/${asset.campaignId}?tab=content`,
+                        ),
+                      )
+                    }
+                    className="cursor-pointer hover:bg-slate-50"
                   >
-                    <td className="py-4 pr-6 font-medium text-zinc-200">{asset.title}</td>
-                    <td className="py-4 pr-6">{asset.type}</td>
-                    <td className="py-4 pr-6">
+                    <td className="px-3 py-2 font-medium text-slate-950">
+                      {asset.displayCode ? `${asset.displayCode} · ` : ""}
+                      {asset.title}
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">
+                      {campaignById.get(asset.campaignId)?.name || "Campaign"}
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">
+                      {formatLabel(asset.type)}
+                    </td>
+                    <td className="px-3 py-2">
                       <span className={statusPillClasses(asset.stage || asset.status, "sm")}>
                         {formatLabel(asset.stage || asset.status)}
                       </span>
-                    </td>
-                    <td className="py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          router.push(`/content/${asset.id}`);
-                        }}
-                        className="text-indigo-400 hover:text-indigo-300"
-                      >
-                        View
-                      </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center text-sm text-slate-500">
+            No content matches these filters.
           </div>
         )}
       </div>

@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import {
   CampaignAssignmentRole,
@@ -19,6 +20,7 @@ import {
 import { PrismaService } from "@packages/database/prisma.service";
 import { DomainEventName, DomainEvents } from "@packages/events/domain-event";
 import { EventBusService } from "@packages/events/event-bus.service";
+import { GoogleCalendarSyncService } from "@modules/google-calendar/google-calendar-sync.service";
 import { isEmailChannelRequired } from "@modules/notification/notification.policy";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import { CampaignStatusActionDto } from "./dto/campaign-status-action.dto";
@@ -71,6 +73,8 @@ export class CampaignService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventBus: EventBusService,
+    @Optional()
+    private readonly googleCalendarSync?: GoogleCalendarSyncService,
   ) {}
 
   async create(dto: CreateCampaignDto, agencyId?: string, actorId?: string) {
@@ -882,10 +886,11 @@ export class CampaignService {
         },
       );
 
-      return updatedSlot;
+      return { updatedSlot, writingTaskId: writingTask.id };
     });
 
-    return this.toPublishingScheduleView(generatedSlot);
+    this.queueWorkflowTaskSync(generatedSlot.writingTaskId);
+    return this.toPublishingScheduleView(generatedSlot.updatedSlot);
   }
 
   async assignTeamMember(
@@ -2060,5 +2065,12 @@ export class CampaignService {
     if (value === undefined) return undefined;
     const trimmed = value?.trim();
     return trimmed ? trimmed : null;
+  }
+
+  private queueWorkflowTaskSync(...taskIds: Array<string | null | undefined>) {
+    if (!this.googleCalendarSync) return;
+    for (const taskId of new Set(taskIds.filter(Boolean) as string[])) {
+      this.googleCalendarSync.queueWorkflowTaskSync(taskId);
+    }
   }
 }

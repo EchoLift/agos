@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { createAgency } from "@/lib/api/organization";
-
+import { getWorkspaceHref } from "@/lib/workspace-url";
 function normalizeSlug(value: string) {
   return value
     .toLowerCase()
@@ -29,7 +29,7 @@ export default function CreateAgencyPage() {
   const slug = useWatch({ control, name: "slug" }) ?? "";
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  const safeagencySlug = slug ? normalizeSlug(slug) : "";
   const onSubmit = async (data: FormValues) => {
     const finalSlug = normalizeSlug(data.slug || data.displayName);
     if (finalSlug.length < 3) {
@@ -41,7 +41,7 @@ export default function CreateAgencyPage() {
     setIsSubmitting(true);
     try {
       const response = await createAgency(data.displayName, finalSlug);
-      router.push(`/${response.agency.slug}`);
+      router.push(getWorkspaceHref(safeagencySlug, `/${response.agency.slug}`));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create agency.");
       setIsSubmitting(false);

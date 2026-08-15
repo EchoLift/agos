@@ -6,7 +6,7 @@ import { useAgency } from "@/components/AgencyProvider";
 import { useRouter } from "next/navigation";
 import { industryOptions } from "@/lib/client-options";
 import { statusPillClasses } from "@/lib/status-style";
-import { getWorkspaceHref } from "@/lib/workspace-url";
+import { getHelpHref, getWorkspaceHref } from "@/lib/workspace-url";
 import { useClientsQuery } from "@/lib/query";
 export default function ClientsPage() {
   const { agencyId, agencySlug } = useAgency();
@@ -28,12 +28,12 @@ export default function ClientsPage() {
   }, [clients, filters]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">Directory</p>
           <h1 className="mt-2 text-3xl font-semibold text-white">Clients</h1>
-          <Link href="/help/clients/client-playbook" className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200">
+          <Link href={getHelpHref("clients/client-playbook")} className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200">
             What belongs in a client playbook?
           </Link>
         </div>
@@ -45,7 +45,7 @@ export default function ClientsPage() {
         </button>
       </div>
 
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-4 shadow-2xl shadow-black/20">
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950/80 p-2 shadow-2xl shadow-black/20">
         <div className="grid gap-3 md:grid-cols-4">
           <input value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Search clients or contacts" className="rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500 md:col-span-2" />
           <select value={filters.industry} onChange={(event) => setFilters((current) => ({ ...current, industry: event.target.value }))} className="rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500">
@@ -61,7 +61,7 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl shadow-black/20">
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl shadow-black/20">
         {isLoading ? (
           <div className="text-sm text-zinc-500">Loading clients...</div>
         ) : clientsQuery.error && !clients.length ? (
@@ -106,7 +106,7 @@ export default function ClientsPage() {
                     <td className="py-4 text-right">
                       <button
                         type="button"
-                        onClick={() => router.push(`/clients/${client.id}`)}
+                        onClick={() => router.push(getWorkspaceHref(safeAgencySlug, `/clients/${client.id}`))}
                         className="text-indigo-400 hover:text-indigo-300"
                       >
                         View

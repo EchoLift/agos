@@ -9,15 +9,23 @@ import { performWorkflowAction, WorkflowActionType, WorkflowBoardItem } from "@/
 import { formatLabel, statusPillClass, statusPillClasses } from "@/lib/status-style";
 import { getAgencyRoleKeys } from "@/lib/workspace-access";
 import { invalidateWorkspaceQueries, useWorkflowQuery } from "@/lib/query";
-
+import { getHelpHref } from "@/lib/workspace-url";
+import { getWorkspaceHref } from "@/lib/workspace-url";
+import { rememberedEntityKey, useRememberLastVisitedEntity } from "@/lib/remembered-tab";
 const riskOptions = ["ON_TRACK", "NEEDS_ATTENTION", "AT_RISK", "BLOCKED", "OVERDUE"];
 
 export default function WorkflowPage() {
   const { agencyId, agency } = useAgency();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const safeAgencySlug = agency?.slug ?? "";
   const roleKeys = useMemo(() => getAgencyRoleKeys(agency), [agency]);
   const [selectedItem, setSelectedItem] = useState<WorkflowBoardItem | null>(null);
+  useRememberLastVisitedEntity({
+    storageKey: rememberedEntityKey("workflow", agencyId),
+    entityId: selectedItem?.contentAssetId,
+    enabled: Boolean(selectedItem),
+  });
   const [mobileStage, setMobileStage] = useState("");
   const [filters, setFilters] = useState({ clientId: "", campaignId: "", ownerId: "", risk: "", search: "" });
   const [actionDraft, setActionDraft] = useState({ externalLink: "", comment: "", reason: "" });
@@ -99,24 +107,24 @@ export default function WorkflowPage() {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
             What is moving, what is stuck, who owns it, and what should happen next.
           </p>
-          <Link href="/help/daily-operations/workflow" className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200">
+          <Link href={getHelpHref("daily-operations/workflow")} className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200">
             Understand the production workflow
           </Link>
         </div>
         <div className="hidden rounded-full border border-zinc-800 bg-zinc-950 px-4 py-2 text-sm text-zinc-400 lg:block">Board view</div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 lg:gap-3">
+      <div className="grid grid-cols-5 gap-1 sm:grid-cols-5 lg:gap-1">
         <SummaryCard label="Active" value={board?.summary.active ?? 0} />
-        <SummaryCard label="Waiting Review" value={board?.summary.waitingReview ?? 0} />
+        <SummaryCard label="Review" value={board?.summary.waitingReview ?? 0} />
         <SummaryCard label="Blocked" value={board?.summary.blocked ?? 0} tone="danger" />
         <SummaryCard label="Overdue" value={board?.summary.overdue ?? 0} tone="danger" />
         <SummaryCard label="Due Today" value={board?.summary.dueToday ?? 0} tone="attention" />
       </div>
 
-      <details className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 lg:hidden">
-        <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-zinc-300">Search and filters</summary>
-        <div className="grid gap-2 pt-2">
+      <details className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-0 lg:hidden">
+        <summary className="min-h-8 cursor-pointer p-2 text-sm font-semibold text-zinc-300">Search and filters</summary>
+        <div className="grid gap-1 p-1">
           <WorkflowFilters filters={filters} setFilters={setFilters} options={filterOptions} />
         </div>
       </details>
@@ -280,7 +288,7 @@ export default function WorkflowPage() {
             <ClientContextCard
               client={selectedItem.clientSummary}
               fallbackName={selectedItem.clientName}
-              onView={() => router.push(`/clients/${selectedItem.clientId}`)}
+              onView={() => router.push(getWorkspaceHref(safeAgencySlug, `/clients/${selectedItem.clientId}`))}
             />
 
             <WorkflowActionPanel
@@ -295,7 +303,7 @@ export default function WorkflowPage() {
             <div className="mt-6 flex justify-end">
               <button
                 type="button"
-                onClick={() => router.push(`/workflow/${selectedItem.contentAssetId}`)}
+                onClick={() => router.push(getWorkspaceHref(safeAgencySlug, `/workflow/${selectedItem.contentAssetId}`))}
                 className="min-h-11 rounded-md bg-indigo-500 px-5 text-sm font-semibold text-white transition hover:bg-indigo-400 lg:rounded-full"
               >
                 Open full details
@@ -425,9 +433,9 @@ function WorkflowActionPanel({
 function SummaryCard({ label, value, tone = "default" }: { label: string; value: number; tone?: "default" | "attention" | "danger" }) {
   const valueClass = tone === "danger" ? "text-red-300" : tone === "attention" ? "text-amber-300" : "text-white";
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 shadow-lg shadow-black/10 lg:rounded-3xl lg:p-5 lg:shadow-2xl">
+    <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-2 shadow-lg shadow-black/10 lg:rounded-xl lg:p-1 lg:shadow-xl">
       <div className="text-sm text-zinc-400">{label}</div>
-      <div className={`mt-2 text-2xl font-semibold lg:mt-4 lg:text-3xl ${valueClass}`}>{value}</div>
+      <div className={`mt-2 text-xl font-semibold lg:mt-2 lg:text-xl ${valueClass}`}>{value}</div>
     </div>
   );
 }

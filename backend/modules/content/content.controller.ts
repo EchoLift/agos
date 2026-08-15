@@ -1,10 +1,19 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { CurrentUser } from "@packages/security/decorators/current-user.decorator";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import { RequirePermissions } from "@packages/security/decorators/require-permissions.decorator";
 import { ContentService } from "./content.service";
 import { CreateContentAssetDto } from "./dto/create-content-asset.dto";
+import { UpdateContentPlanningDto } from "./dto/update-content-planning.dto";
 import { UpdateContentAssetDto } from "./dto/update-content-asset.dto";
 
 @ApiTags("Content Assets")
@@ -19,12 +28,15 @@ export class ContentController {
     @Body() dto: CreateContentAssetDto,
     @CurrentUser() user: IdentityContext,
   ) {
-    return this.contentService.create(dto, user.agencyId, user.userId);
+    return this.contentService.create(dto, user.agencyId, user);
   }
 
   @Get()
-  findMany(@CurrentUser() user: IdentityContext) {
-    return this.contentService.findMany(user.agencyId ?? "");
+  findMany(
+    @CurrentUser() user: IdentityContext,
+    @Query("campaignId") campaignId?: string,
+  ) {
+    return this.contentService.findMany(user.agencyId ?? "", campaignId);
   }
 
   @Get(":id")
@@ -44,6 +56,21 @@ export class ContentController {
       dto,
       user.agencyId ?? "",
       user.userId,
+    );
+  }
+
+  @Patch(":id/planning")
+  @RequirePermissions("CONTENT_ASSIGN")
+  updatePlanning(
+    @Param("id") id: string,
+    @Body() dto: UpdateContentPlanningDto,
+    @CurrentUser() user: IdentityContext,
+  ) {
+    return this.contentService.updatePlanning(
+      id,
+      dto,
+      user.agencyId ?? "",
+      user,
     );
   }
 

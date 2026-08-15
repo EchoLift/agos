@@ -31,7 +31,7 @@ import {
   useCampaignsQuery,
   useGoogleCalendarStatusQuery,
 } from "@/lib/query";
-import { getWorkspaceHref } from "@/lib/workspace-url";
+import { getHelpHref, getWorkspaceHref } from "@/lib/workspace-url";
 
 const scopeOptions: Array<{ value: CalendarScope; label: string }> = [
   { value: "MY_SCHEDULE", label: "My Schedule" },
@@ -118,6 +118,7 @@ export default function CalendarPage() {
     }),
     [campaignId, range.from, range.to, selectedScope, visibleTypes],
   );
+  const safeAgencySlug = agencySlug ?? "";
   const calendarQuery = useCalendarQuery(agencyId, calendarFilters);
   const campaignsQuery = useCampaignsQuery(agencyId);
   const googleCalendarStatusQuery = useGoogleCalendarStatusQuery();
@@ -275,19 +276,40 @@ export default function CalendarPage() {
   const isGoogleCalendarConnected = Boolean(
     googleCalendarStatusQuery.data?.connected,
   );
+  const activeMobileFilterCount = useMemo(() => {
+    const defaults = currentMonthRange();
+    return [
+      scopeOverride,
+      campaignId,
+      clientId,
+      status,
+      range.from.slice(0, 10) !== defaults.from.slice(0, 10) ||
+        range.to.slice(0, 10) !== defaults.to.slice(0, 10),
+      defaultVisibleTypes.some((type) => !visibleTypes.includes(type)) ||
+        visibleTypes.some((type) => !defaultVisibleTypes.includes(type)),
+    ].filter(Boolean).length;
+  }, [
+    campaignId,
+    clientId,
+    range.from,
+    range.to,
+    scopeOverride,
+    status,
+    visibleTypes,
+  ]);
 
   const openCalendarEvent = useCallback(
     (event: CalendarEvent) => {
       if (event.workOrder?.id) {
-        router.push(`/gigs/${event.workOrder.id}`);
+        router.push(getWorkspaceHref(safeAgencySlug, `/gigs/${event.workOrder.id}`));
         return;
       }
       if (event.contentAsset?.id) {
-        router.push(`/workflow/${event.contentAsset.id}`);
+        router.push(getWorkspaceHref(safeAgencySlug, `/workflow/${event.contentAsset.id}`));
         return;
       }
       if (event.campaign?.id) {
-        router.push(`/campaigns/${event.campaign.id}`);
+        router.push(getWorkspaceHref(safeAgencySlug, `/campaigns/${event.campaign.id}`));
       }
     },
     [router],
@@ -332,7 +354,7 @@ export default function CalendarPage() {
   );
 
   return (
-    <div className="space-y-3 lg:space-y-5">
+    <div className="flex h-[calc(100dvh_-_8.75rem_-_env(safe-area-inset-bottom))] min-h-0 flex-col gap-2 overflow-hidden lg:block lg:h-auto lg:overflow-visible lg:space-y-5">
       <div className="hidden flex-wrap items-end justify-between gap-3 lg:flex">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">
@@ -351,7 +373,7 @@ export default function CalendarPage() {
             </p>
           ) : null}
           <Link
-            href="/help/daily-operations/calendar"
+            href={getHelpHref("daily-operations/calendar")}
             className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200"
           >
             How AGENCIE Calendar works
@@ -366,19 +388,19 @@ export default function CalendarPage() {
         </button>
       </div>
 
-      <section className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 shadow-xl shadow-black/10 lg:rounded-xl lg:p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-indigo-500/20 bg-indigo-500/10 text-indigo-300">
+      <section className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-2 shadow-xl shadow-black/10 lg:rounded-xl lg:p-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2 lg:gap-3">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-indigo-500/20 bg-indigo-500/10 text-indigo-300 lg:h-10 lg:w-10">
               <CalendarDays size={18} />
             </div>
-            <div>
-              <h2 className="text-sm font-semibold text-white">
+            <div className="min-w-0">
+              <h2 className="truncate text-sm font-semibold text-white">
                 {isGoogleCalendarConnected
                   ? "Google Calendar connected"
                   : "Google Calendar"}
               </h2>
-              <p className="mt-1 text-sm text-zinc-400">
+              <p className="mt-1 hidden text-sm text-zinc-400 sm:block">
                 {isGoogleCalendarConnected
                   ? "Your actionable work is syncing automatically."
                   : googleCalendarStatusQuery.isLoading
@@ -389,11 +411,16 @@ export default function CalendarPage() {
           </div>
           <Link
             href={googleCalendarHref}
-            className="inline-flex min-h-11 items-center justify-center rounded-full bg-indigo-500 px-4 text-sm font-semibold text-white transition hover:bg-indigo-400"
+            className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-md bg-indigo-500 px-3 text-sm font-semibold text-white transition hover:bg-indigo-400 lg:min-h-11 lg:rounded-full lg:px-4"
           >
-            {isGoogleCalendarConnected
-              ? "Manage Calendar Sync"
-              : "Connect Google Calendar"}
+            <span className="lg:hidden">
+              {isGoogleCalendarConnected ? "Manage" : "Connect"}
+            </span>
+            <span className="hidden lg:inline">
+              {isGoogleCalendarConnected
+                ? "Manage Calendar Sync"
+                : "Connect Google Calendar"}
+            </span>
           </Link>
         </div>
       </section>
@@ -411,6 +438,28 @@ export default function CalendarPage() {
         onModeChange={setMobileMode}
         onOpenFilters={() => setIsFilterOpen(true)}
         onOpenEvent={openCalendarEvent}
+        activeFilterCount={activeMobileFilterCount}
+        filtersContent={
+          <CalendarFilters
+            selectedScope={selectedScope}
+            allowedScopeOptions={allowedScopeOptions}
+            onScopeChange={setScopeOverride}
+            campaignId={campaignId}
+            campaigns={campaigns}
+            isCampaignsLoading={campaignsQuery.isLoading && !campaigns.length}
+            onCampaignChange={setCampaignId}
+            range={range}
+            onRangeChange={setRange}
+            visibleTypes={visibleTypes}
+            onToggleType={toggleType}
+            clientId={clientId}
+            clients={clients}
+            onClientChange={setClientId}
+            status={status}
+            statuses={statuses}
+            onStatusChange={setStatus}
+          />
+        }
       />
 
       <div className="hidden gap-3 lg:grid lg:grid-cols-[260px_1fr] lg:gap-4">

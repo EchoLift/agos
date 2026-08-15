@@ -9,6 +9,7 @@ import { ClientFormActions, ClientPlaybookForm, normalizeClientPayload } from "@
 import { useAgency } from "@/components/AgencyProvider";
 import { Client, createClient, CreateClientInput } from "@/lib/api/clients";
 import { invalidateWorkspaceQueries, queryKeys, setListItem } from "@/lib/query";
+import { getWorkspaceHref } from "@/lib/workspace-url";
 
 export default function NewClientPage() {
   const router = useRouter();
@@ -16,7 +17,7 @@ export default function NewClientPage() {
   const { agencyId } = useAgency();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  const safeAgencySlug = useAgency().agencySlug ?? "";
   const { register, handleSubmit, formState, setValue, watch } = useForm<CreateClientInput>({
     mode: "onChange",
     defaultValues: {
@@ -42,7 +43,7 @@ export default function NewClientPage() {
       const client = await createClient(agencyId, normalizeClientPayload(data));
       queryClient.setQueryData(queryKeys.clients(agencyId), (current: Client[] | undefined) => setListItem(current, client));
       invalidateWorkspaceQueries(queryClient, agencyId, ["clients"]);
-      router.push("/clients");
+      router.push(getWorkspaceHref(safeAgencySlug, "/clients"));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create client.");
       setIsSubmitting(false);
@@ -72,7 +73,7 @@ export default function NewClientPage() {
         {error ? <div className="rounded-xl bg-red-500/10 p-4 text-sm text-red-400">{error}</div> : null}
 
         <ClientFormActions>
-          <Link href={`/clients`} className="rounded-full border border-zinc-800 px-6 py-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white">
+          <Link href={getWorkspaceHref(safeAgencySlug, "/clients")} className="rounded-full border border-zinc-800 px-6 py-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white">
             Cancel
           </Link>
           <button type="submit" className="rounded-full bg-indigo-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60" disabled={!formState.isValid || isSubmitting}>

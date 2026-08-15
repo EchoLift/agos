@@ -16,9 +16,12 @@ import {
 import type { Agency } from "@/lib/api/organization";
 import type { WorkspaceNavItem } from "@/lib/workspace-access";
 import { hasAnyRole } from "@/lib/workspace-access";
-import { getWorkspaceHref } from "@/lib/workspace-url";
+import { getHelpHref, getWorkspaceHref } from "@/lib/workspace-url";
 
-type VisibleNavItem = WorkspaceNavItem & { hrefValue: string };
+type VisibleNavItem = WorkspaceNavItem & {
+  baseHrefValue?: string;
+  hrefValue: string;
+};
 
 export default function MobileWorkspaceNav({
   agency,
@@ -56,11 +59,6 @@ export default function MobileWorkspaceNav({
       label: "New Client",
       href: getWorkspaceHref(safeAgencySlug, "/clients/new"),
       visible: visibleKeys.has("clients"),
-    },
-    {
-      label: "New Content",
-      href: getWorkspaceHref(safeAgencySlug, "/content/new"),
-      visible: visibleKeys.has("content"),
     },
   ].filter((item) => item.visible);
   const canCreate =
@@ -145,7 +143,7 @@ export default function MobileWorkspaceNav({
               ))}
               {sheet === "more" ? (
                 <Link
-                  href="/help"
+                  href={getHelpHref()}
                   onClick={() => setSheet(null)}
                   className="flex min-h-12 items-center rounded-md border border-border bg-card px-3 text-sm font-medium text-card-foreground transition hover:bg-accent hover:text-accent-foreground"
                 >
@@ -168,10 +166,10 @@ function MobileNavLink({
   pathname: string;
 }) {
   const active =
-    item.hrefValue === "/"
+    (item.baseHrefValue ?? item.hrefValue) === "/"
       ? pathname === "/"
-      : pathname === item.hrefValue ||
-        pathname.startsWith(`${item.hrefValue}/`);
+      : pathname === (item.baseHrefValue ?? item.hrefValue) ||
+        pathname.startsWith(`${item.baseHrefValue ?? item.hrefValue}/`);
   const Icon = mobileNavIcons[item.key] ?? FolderKanban;
   return (
     <Link
