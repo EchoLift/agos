@@ -11,8 +11,17 @@ import {
   ForbiddenException,
   BadRequestException,
   ConflictException,
+  HttpException,
+  InternalServerErrorException,
 } from "@nestjs/common";
-import { User, Agency, Membership, Role, Invitation } from "@prisma/client";
+import {
+  User,
+  Agency,
+  Membership,
+  Role,
+  Invitation,
+  Prisma,
+} from "@prisma/client";
 import { ConfigService } from "@nestjs/config";
 
 describe("OrganizationService Unit Tests", () => {
@@ -21,6 +30,8 @@ describe("OrganizationService Unit Tests", () => {
   let userLookup: jest.Mocked<UserLookupService>;
   let cryptoService: jest.Mocked<CryptoService>;
   let configService: jest.Mocked<ConfigService>;
+  let prisma: any;
+  let eventBus: jest.Mocked<EventBusService>;
 
   beforeEach(async () => {
     const mockRepo = {
@@ -61,23 +72,42 @@ describe("OrganizationService Unit Tests", () => {
         .fn()
         .mockReturnValue({ correlationId: "corr-123", requestId: "req-123" }),
     };
+    const mockPrisma: any = {
+      systemRole: { upsert: jest.fn() },
+      permission: { upsert: jest.fn() },
+      systemRolePermission: { upsert: jest.fn() },
+      invitation: {
+        findFirst: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
+      },
+      notification: {
+        create: jest.fn(),
+      },
+      notificationDelivery: {
+        findFirst: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      $transaction: jest.fn(),
+    };
+    mockPrisma.$transaction.mockImplementation(
+      (callback: (tx: any) => unknown) => callback(mockPrisma),
+    );
+    const mockEventBus = {
+      publish: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrganizationService,
         { provide: OrganizationRepository, useValue: mockRepo },
-        {
-          provide: PrismaService,
-          useValue: {
-            systemRole: { upsert: jest.fn() },
-            permission: { upsert: jest.fn() },
-            systemRolePermission: { upsert: jest.fn() },
-          },
-        },
+        { provide: PrismaService, useValue: mockPrisma },
         { provide: UserLookupService, useValue: mockUserLookup },
         { provide: CryptoService, useValue: mockCrypto },
         { provide: RequestContextService, useValue: mockRequestContext },
-        { provide: EventBusService, useValue: { publish: jest.fn() } },
+        { provide: EventBusService, useValue: mockEventBus },
         {
           provide: ConfigService,
           useValue: {
@@ -98,6 +128,8 @@ describe("OrganizationService Unit Tests", () => {
     userLookup = module.get(UserLookupService) as any;
     cryptoService = module.get(CryptoService) as any;
     configService = module.get(ConfigService) as any;
+    prisma = module.get(PrismaService);
+    eventBus = module.get(EventBusService) as jest.Mocked<EventBusService>;
   });
 
   describe("createAgency", () => {
@@ -254,6 +286,313 @@ describe("OrganizationService Unit Tests", () => {
     // PERMISSION_DENIED code. This is validated in permissions.guard.spec.ts.
   });
 
+  describe("resendInvitation", () => {
+    const ownerActor = {
+      authUserId: "auth-owner",
+      userId: "user-owner",
+      agencyId: "agency-1",
+      membershipId: "mem-owner",
+      role: "OWNER",
+      roles: ["OWNER"],
+    } as any;
+
+    const invitationFixture = (overrides: Partial<any> = {}) => ({
+      id: "inv-1",
+      agencyId: "agency-1",
+      emailEncrypted: "editor@example.com",
+      emailHash: "hash-editor",
+      mobileNumber: null,
+      roleId: "role-writer",
+      status: "PENDING",
+      token: "existing-token",
+      expiresAt: new Date(Date.now() + 86400000),
+      lastEmailResentAt: null,
+      createdAt: new Date("2026-08-14T15:33:00.000Z"),
+      agency: {
+        id: "agency-1",
+        name: "EchoLift",
+        displayName: "EchoLift",
+        slug: "echolift",
+      },
+      role: {
+        id: "role-writer",
+        displayName: "Writer",
+        systemRole: { key: "WRITER" },
+      },
+      roles: [
+        {
+          roleId: "role-writer",
+          role: {
+            id: "role-writer",
+            displayName: "Writer",
+            systemRole: { key: "WRITER" },
+          },
+        },
+      ],
+      invitedBy: null,
+      ...overrides,
+    });
+
+    const existingDelivery = (overrides: Partial<any> = {}) => ({
+      id: "delivery-1",
+      agencyId: "agency-1",
+      notificationId: "notification-1",
+      invitationId: "inv-1",
+      channel: "EMAIL",
+      status: "SENT",
+      retryCount: 0,
+      ...overrides,
+    });
+
+    it("resends an existing pending invitation by requeueing the existing delivery", async () => {
+      const invitation = invitationFixture();
+      const delivery = existingDelivery();
+      prisma.invitation.findFirst.mockResolvedValue(invitation);
+      prisma.invitation.update.mockResolvedValue({
+        ...invitation,
+        lastEmailResentAt: expect.any(Date),
+      });
+      prisma.notificationDelivery.findFirst.mockResolvedValue(delivery);
+      prisma.notificationDelivery.update.mockResolvedValue({
+        ...delivery,
+        status: "QUEUED",
+      });
+
+      const result = await service.resendInvitation(
+        "agency-1",
+        "inv-1",
+        ownerActor,
+      );
+
+      expect(result.id).toBe("inv-1");
+      expect(result.inviteUrl).toContain("existing-token");
+      expect(repository.createInvitation).not.toHaveBeenCalled();
+      expect(prisma.invitation.update).toHaveBeenCalledWith({
+        where: { id: "inv-1" },
+        data: { lastEmailResentAt: expect.any(Date) },
+      });
+      expect(prisma.notification.create).not.toHaveBeenCalled();
+      expect(prisma.notificationDelivery.create).not.toHaveBeenCalled();
+      expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
+        where: { id: "delivery-1" },
+        data: expect.objectContaining({
+          status: "QUEUED",
+          retryCount: 0,
+          lastError: null,
+          nextRetryAt: null,
+          sentAt: null,
+        }),
+      });
+      expect(eventBus.publish).toHaveBeenCalledWith(
+        "NotificationQueued",
+        expect.objectContaining({
+          aggregateId: "delivery-1",
+          payload: expect.objectContaining({
+            deliveryId: "delivery-1",
+            notificationId: "notification-1",
+            invitationId: "inv-1",
+          }),
+        }),
+      );
+    });
+
+    it("resend after 48 hours succeeds", async () => {
+      const invitation = invitationFixture({
+        lastEmailResentAt: new Date(Date.now() - 49 * 60 * 60 * 1000),
+      });
+      const delivery = existingDelivery();
+      prisma.invitation.findFirst.mockResolvedValue(invitation);
+      prisma.invitation.update.mockResolvedValue({
+        ...invitation,
+        lastEmailResentAt: new Date(),
+      });
+      prisma.notificationDelivery.findFirst.mockResolvedValue(delivery);
+      prisma.notificationDelivery.update.mockResolvedValue({
+        ...delivery,
+        status: "QUEUED",
+      });
+
+      await expect(
+        service.resendInvitation("agency-1", "inv-1", ownerActor),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          id: "inv-1",
+          canResendEmail: false,
+          lastEmailResentAt: expect.any(String),
+        }),
+      );
+
+      expect(prisma.notificationDelivery.update).toHaveBeenCalledTimes(1);
+      expect(eventBus.publish).toHaveBeenCalledTimes(1);
+    });
+
+    it("resend before 48 hours fails with 429 and availability timestamp", async () => {
+      const lastEmailResentAt = new Date(Date.now() - 17 * 60 * 60 * 1000);
+      prisma.invitation.findFirst.mockResolvedValue(
+        invitationFixture({ lastEmailResentAt }),
+      );
+
+      let caught: unknown;
+      try {
+        await service.resendInvitation("agency-1", "inv-1", ownerActor);
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(HttpException);
+      expect((caught as HttpException).getStatus()).toBe(429);
+      expect((caught as HttpException).getResponse()).toEqual(
+        expect.objectContaining({
+          resendAvailableAt: new Date(
+            lastEmailResentAt.getTime() + 48 * 60 * 60 * 1000,
+          ).toISOString(),
+        }),
+      );
+      expect(prisma.invitation.update).not.toHaveBeenCalled();
+      expect(prisma.notificationDelivery.update).not.toHaveBeenCalled();
+      expect(eventBus.publish).not.toHaveBeenCalled();
+    });
+
+    it("creates the initial notification delivery only when none exists yet", async () => {
+      const invitation = invitationFixture();
+      prisma.invitation.findFirst.mockResolvedValue(invitation);
+      prisma.invitation.update.mockResolvedValue({
+        ...invitation,
+        lastEmailResentAt: new Date(),
+      });
+      prisma.notificationDelivery.findFirst.mockResolvedValue(null);
+      prisma.notification.create.mockResolvedValue({ id: "notification-new" });
+      prisma.notificationDelivery.create.mockResolvedValue({
+        ...existingDelivery(),
+        id: "delivery-new",
+        notificationId: "notification-new",
+        status: "QUEUED",
+      });
+
+      await service.resendInvitation("agency-1", "inv-1", ownerActor);
+
+      expect(repository.createInvitation).not.toHaveBeenCalled();
+      expect(prisma.notification.create).toHaveBeenCalledTimes(1);
+      expect(prisma.notificationDelivery.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          invitationId: "inv-1",
+          channel: "EMAIL",
+          status: "QUEUED",
+        }),
+      });
+    });
+
+    it("keeps repeated resend safe by updating the same delivery record", async () => {
+      const invitation = invitationFixture();
+      const delivery = existingDelivery();
+      prisma.invitation.findFirst.mockResolvedValue(invitation);
+      prisma.invitation.update.mockResolvedValue({
+        ...invitation,
+        lastEmailResentAt: new Date(),
+      });
+      prisma.notificationDelivery.findFirst.mockResolvedValue(delivery);
+      prisma.notificationDelivery.update.mockResolvedValue({
+        ...delivery,
+        status: "QUEUED",
+      });
+
+      await service.resendInvitation("agency-1", "inv-1", ownerActor);
+      await service.resendInvitation("agency-1", "inv-1", ownerActor);
+
+      expect(prisma.notificationDelivery.update).toHaveBeenCalledTimes(2);
+      expect(prisma.notificationDelivery.create).not.toHaveBeenCalled();
+      expect(eventBus.publish).toHaveBeenCalledTimes(2);
+      expect(repository.createInvitation).not.toHaveBeenCalled();
+    });
+
+    it("rejects accepted invitations", async () => {
+      prisma.invitation.findFirst.mockResolvedValue(
+        invitationFixture({ status: "ACCEPTED" }),
+      );
+
+      await expect(
+        service.resendInvitation("agency-1", "inv-1", ownerActor),
+      ).rejects.toThrow("Invitation already accepted.");
+
+      expect(prisma.notificationDelivery.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects revoked invitations", async () => {
+      prisma.invitation.findFirst.mockResolvedValue(
+        invitationFixture({ status: "CANCELLED" }),
+      );
+
+      await expect(
+        service.resendInvitation("agency-1", "inv-1", ownerActor),
+      ).rejects.toThrow("Invitation revoked.");
+
+      expect(prisma.notificationDelivery.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects expired invitations", async () => {
+      prisma.invitation.findFirst.mockResolvedValue(
+        invitationFixture({ expiresAt: new Date(Date.now() - 1000) }),
+      );
+
+      await expect(
+        service.resendInvitation("agency-1", "inv-1", ownerActor),
+      ).rejects.toThrow("Invitation expired.");
+
+      expect(repository.createInvitation).not.toHaveBeenCalled();
+      expect(prisma.notificationDelivery.update).not.toHaveBeenCalled();
+    });
+
+    it("does not resend an invitation from another agency", async () => {
+      prisma.invitation.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.resendInvitation("agency-1", "other-agency-inv", ownerActor),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(prisma.invitation.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "other-agency-inv", agencyId: "agency-1" },
+        }),
+      );
+      expect(prisma.notificationDelivery.update).not.toHaveBeenCalled();
+    });
+
+    it("does not expose raw Prisma unique constraint errors to the frontend", async () => {
+      const invitation = invitationFixture();
+      const delivery = existingDelivery();
+      prisma.invitation.findFirst.mockResolvedValue(invitation);
+      prisma.invitation.update.mockResolvedValue({
+        ...invitation,
+        lastEmailResentAt: new Date(),
+      });
+      prisma.notificationDelivery.findFirst.mockResolvedValue(delivery);
+      prisma.notificationDelivery.update.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError(
+          "Unique constraint failed on the fields: (`invitationId`,`channel`)",
+          {
+            code: "P2002",
+            clientVersion: "test",
+            meta: { target: ["invitationId", "channel"] },
+          },
+        ),
+      );
+
+      let caught: unknown;
+      try {
+        await service.resendInvitation("agency-1", "inv-1", ownerActor);
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(InternalServerErrorException);
+      expect((caught as Error).message).toBe(
+        "Unable to resend invitation right now.",
+      );
+      expect((caught as Error).message).not.toContain(
+        "Unique constraint failed",
+      );
+    });
+  });
 
   describe("acceptInvitation", () => {
     it("should accept invitation and return new membership", async () => {

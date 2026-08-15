@@ -55,6 +55,9 @@ export interface TeamInvitation {
   } | null;
   sentAt: string;
   expiresAt: string;
+  lastEmailResentAt: string | null;
+  resendAvailableAt: string | null;
+  canResendEmail: boolean;
   status: InvitationStatus;
   inviteUrl: string;
 }

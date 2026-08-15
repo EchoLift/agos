@@ -207,6 +207,7 @@ model Invitation {
   status                InvitationStatus @default(PENDING)
   token                 String           @unique
   expiresAt             DateTime
+  lastEmailResentAt     DateTime?
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
   agency                Agency           @relation(fields: [agencyId], references: [id])

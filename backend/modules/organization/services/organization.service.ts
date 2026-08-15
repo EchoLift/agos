@@ -4,9 +4,13 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
+  InternalServerErrorException,
   OnModuleInit,
   Logger,
 } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "@packages/database/prisma.service";
 import { OrganizationRepository } from "../repositories/organization.repository";
 import { UserLookupService } from "../../user/services/user-lookup.service";
@@ -21,6 +25,8 @@ import { ConfigService } from "@nestjs/config";
 import { EventBusService } from "@packages/events/event-bus.service";
 import { DomainEvents } from "@packages/events/domain-event";
 import * as crypto from "crypto";
+
+const INVITATION_RESEND_COOLDOWN_MS = 48 * 60 * 60 * 1000;
 
 @Injectable()
 export class OrganizationService implements OnModuleInit {
@@ -362,35 +368,47 @@ export class OrganizationService implements OnModuleInit {
     }
 
     const status = this.effectiveInvitationStatus(invitation);
-    if (status === "ACCEPTED" || status === "CANCELLED") {
-      throw new BadRequestException(
-        "Only pending or expired invitations can be resent.",
-      );
+    if (status === "ACCEPTED") {
+      throw new BadRequestException("Invitation already accepted.");
     }
-
     if (status === "EXPIRED") {
-      await this.prisma.invitation.updateMany({
-        where: { id: invitation.id, status: "PENDING" },
-        data: { status: "EXPIRED" },
-      });
-      const email = this.decryptOptional(invitation.emailEncrypted);
-      if (!email) {
-        throw new BadRequestException(
-          "This legacy invitation cannot be resent because its email is unavailable.",
-        );
-      }
-
-      const newInvitation = await this.createReplacementInvitation(
-        agencyId,
-        invitation,
-        email,
-        actor,
-      );
-      return this.serializeInvitation(newInvitation);
+      throw new BadRequestException("Invitation expired.");
+    }
+    if (status === "CANCELLED") {
+      throw new BadRequestException("Invitation revoked.");
     }
 
-    await this.queueInvitationEmail(invitation);
-    return this.serializeInvitation(invitation);
+    const resendAvailableAt = this.resendAvailableAt(invitation);
+    if (resendAvailableAt && resendAvailableAt > new Date()) {
+      throw new HttpException(
+        {
+          message: `Invitation email can be resent after ${resendAvailableAt.toISOString()}.`,
+          resendAvailableAt: resendAvailableAt.toISOString(),
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const resendRequestedAt = new Date();
+    try {
+      await this.queueInvitationEmail(invitation, resendRequestedAt);
+    } catch (error) {
+      const uniqueConstraint = this.isUniqueConstraintError(error)
+        ? error.meta?.target
+        : undefined;
+      this.logger.error(
+        { err: error, agencyId, invitationId, uniqueConstraint },
+        "Failed to resend invitation email",
+      );
+      throw new InternalServerErrorException(
+        "Unable to resend invitation right now.",
+      );
+    }
+
+    return this.serializeInvitation({
+      ...invitation,
+      lastEmailResentAt: resendRequestedAt,
+    });
   }
 
   async revokeInvitation(
@@ -738,6 +756,10 @@ export class OrganizationService implements OnModuleInit {
       sentAt: invitation.createdAt,
       expiresAt: invitation.expiresAt,
       status: this.effectiveInvitationStatus(invitation),
+      lastEmailResentAt: invitation.lastEmailResentAt?.toISOString?.() ?? null,
+      resendAvailableAt:
+        this.resendAvailableAt(invitation)?.toISOString() ?? null,
+      canResendEmail: this.canResendInvitationEmail(invitation),
       inviteUrl: this.inviteUrl(invitation.token),
     };
   }
@@ -768,40 +790,38 @@ export class OrganizationService implements OnModuleInit {
     return invitation.status;
   }
 
-  private async createReplacementInvitation(
-    agencyId: string,
-    invitation: any,
-    email: string,
-    actor: IdentityContext,
-  ) {
-    const roleIds = this.mapInvitationRoles(invitation).map(
-      (role: { id: string }) => role.id,
-    );
-    const token = crypto.randomBytes(24).toString("hex");
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const context = this.requestContext.get();
-    const created = await this.repository.createInvitation(
-      agencyId,
-      invitation.emailHash,
-      invitation.roleId,
-      actor.membershipId ?? invitation.invitedByMembershipId,
-      token,
-      expiresAt,
-      roleIds,
-      invitation.mobileNumber ?? null,
-      context?.correlationId,
-      this.cryptoService.encrypt(email),
-    );
-
-    return this.prisma.invitation.findUniqueOrThrow({
-      where: { id: created.id },
-      include: this.invitationInclude(),
-    });
-  }
-
-  private async queueInvitationEmail(invitation: any) {
-    const { notification, delivery } = await this.prisma.$transaction(
+  private async queueInvitationEmail(invitation: any, resendRequestedAt: Date) {
+    const { notificationId, delivery } = await this.prisma.$transaction(
       async (tx) => {
+        await tx.invitation.update({
+          where: { id: invitation.id },
+          data: { lastEmailResentAt: resendRequestedAt },
+        });
+
+        const existingDelivery = await tx.notificationDelivery.findFirst({
+          where: { invitationId: invitation.id, channel: "EMAIL" },
+        });
+
+        if (existingDelivery) {
+          const delivery = await tx.notificationDelivery.update({
+            where: { id: existingDelivery.id },
+            data: {
+              status: "QUEUED",
+              provider: null,
+              providerMessageId: null,
+              retryCount: 0,
+              lastError: null,
+              nextRetryAt: null,
+              sentAt: null,
+            },
+          });
+
+          return {
+            notificationId: existingDelivery.notificationId,
+            delivery,
+          };
+        }
+
         const notification = await tx.notification.create({
           data: {
             agencyId: invitation.agencyId,
@@ -822,7 +842,7 @@ export class OrganizationService implements OnModuleInit {
           },
         });
 
-        return { notification, delivery };
+        return { notificationId: notification.id, delivery };
       },
     );
 
@@ -833,10 +853,33 @@ export class OrganizationService implements OnModuleInit {
       aggregateType: "NotificationDelivery",
       payload: {
         deliveryId: delivery.id,
-        notificationId: notification.id,
+        notificationId,
         invitationId: invitation.id,
       },
     });
+  }
+
+  private isUniqueConstraintError(
+    error: unknown,
+  ): error is Prisma.PrismaClientKnownRequestError {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    );
+  }
+
+  private resendAvailableAt(invitation: any) {
+    if (!invitation.lastEmailResentAt) return null;
+    return new Date(
+      new Date(invitation.lastEmailResentAt).getTime() +
+        INVITATION_RESEND_COOLDOWN_MS,
+    );
+  }
+
+  private canResendInvitationEmail(invitation: any) {
+    if (this.effectiveInvitationStatus(invitation) !== "PENDING") return false;
+    const resendAvailableAt = this.resendAvailableAt(invitation);
+    return !resendAvailableAt || resendAvailableAt <= new Date();
   }
 
   private inviteUrl(token: string) {
