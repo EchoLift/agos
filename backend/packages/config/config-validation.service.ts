@@ -10,6 +10,8 @@ const requiredEnvironmentVariables = [
   "FIELD_ENCRYPTION_KEY_BASE64",
   "FIELD_LOOKUP_SECRET",
   "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "GOOGLE_CALENDAR_REDIRECT_URI",
 ];
 
 @Injectable()

@@ -2,6 +2,11 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "@packages/database/prisma.service";
 import { EventBusService } from "@packages/events/event-bus.service";
 import { DomainEvents } from "@packages/events/domain-event";
+import {
+  NotificationDeliveryIntent,
+  NotificationRecipientType,
+  isEmailChannelRequired,
+} from "./notification.policy";
 
 export interface NotifyInput {
   agencyId: string;
@@ -9,6 +14,8 @@ export interface NotifyInput {
   title: string;
   body: string;
   eventType: string;
+  deliveryIntent?: NotificationDeliveryIntent;
+  recipientType?: NotificationRecipientType;
   metadata?: Record<string, any>;
 }
 
@@ -22,24 +29,20 @@ export class NotificationService {
   ) {}
 
   /**
-   * Channel Policy Mapping:
-   * Determines whether an event requires an EMAIL delivery channel in addition to IN_APP.
+   * Channel policy:
+   * visibility-only events stay in-app; responsibility/action events can add email.
    */
-  isEmailChannelRequired(eventType: string): boolean {
-    const emailEventTypes = new Set<string>([
-      DomainEvents.MemberInvited,
-      DomainEvents.WorkOrderCreated,
-      DomainEvents.WorkOrderSubmitted,
-      DomainEvents.WorkOrderChangesRequested,
-      DomainEvents.ContentAssigned,
-      DomainEvents.WorkflowStageChanged,
-      DomainEvents.SubmissionCreated,
-      DomainEvents.ChangesRequested,
-      "ActionableApproval",
-      "WorkflowTaskAssigned",
-    ]);
-
-    return emailEventTypes.has(eventType);
+  isEmailChannelRequired(input: string | NotifyInput): boolean {
+    return isEmailChannelRequired(
+      typeof input === "string"
+        ? input
+        : {
+            eventType: input.eventType,
+            deliveryIntent: input.deliveryIntent,
+            recipientType: input.recipientType,
+            metadata: input.metadata,
+          },
+    );
   }
 
   /**
@@ -63,7 +66,7 @@ export class NotificationService {
 
     let deliveryId: string | null = null;
 
-    if (this.isEmailChannelRequired(input.eventType)) {
+    if (this.isEmailChannelRequired(input)) {
       const delivery = await this.prisma.notificationDelivery.create({
         data: {
           agencyId: input.agencyId,

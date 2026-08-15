@@ -7,7 +7,7 @@ import { getCampaigns, Campaign } from "@/lib/api/campaigns";
 import { getClients, Client } from "@/lib/api/clients";
 import { useRouter } from "next/navigation";
 import { formatLabel, statusPillClasses } from "@/lib/status-style";
-
+import { getWorkspaceHref } from "@/lib/workspace-url";
 export default function ContentPage() {
   const { agencyId, agencySlug } = useAgency();
   const [contentAssets, setContentAssets] = useState<ContentAsset[]>([]);
@@ -16,7 +16,7 @@ export default function ContentPage() {
   const [filters, setFilters] = useState({ search: "", clientId: "", campaignId: "", type: "", status: "" });
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-
+  const safeAgencySlug = agencySlug ?? "";
   useEffect(() => {
     if (!agencyId) return;
     let isMounted = true;
@@ -68,7 +68,7 @@ export default function ContentPage() {
           <h1 className="mt-2 text-3xl font-semibold text-white">Content</h1>
         </div>
         <button
-          onClick={() => router.push(`/content/new`)}
+          onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/content/new"))}
           className="rounded-full bg-indigo-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400"
         >
           Create Content
@@ -108,7 +108,7 @@ export default function ContentPage() {
             <h3 className="mt-4 text-lg font-semibold text-white">No content yet</h3>
             <p className="mt-2 text-sm text-zinc-400">Start creating deliverables for your campaigns.</p>
             <button
-              onClick={() => router.push(`/content/new`)}
+              onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/content/new"))}
               className="mt-6 rounded-full bg-zinc-800 px-5 py-2 text-sm font-semibold text-white transition hover:bg-zinc-700"
             >
               Create Content

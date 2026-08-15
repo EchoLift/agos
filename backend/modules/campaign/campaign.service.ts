@@ -19,6 +19,7 @@ import {
 import { PrismaService } from "@packages/database/prisma.service";
 import { DomainEventName, DomainEvents } from "@packages/events/domain-event";
 import { EventBusService } from "@packages/events/event-bus.service";
+import { isEmailChannelRequired } from "@modules/notification/notification.policy";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import { CampaignStatusActionDto } from "./dto/campaign-status-action.dto";
 import {
@@ -1833,7 +1834,7 @@ export class CampaignService {
 
     if (!membership) return null;
 
-    return tx.notification.create({
+    const notification = await tx.notification.create({
       data: {
         agencyId,
         userId: membership.userId,
@@ -1842,6 +1843,53 @@ export class CampaignService {
         eventType: input.eventType,
       },
     });
+
+    await this.queueEmailDeliveryForNotification(
+      tx,
+      agencyId,
+      notification.id,
+      input.eventType,
+    );
+
+    return notification;
+  }
+
+  private async queueEmailDeliveryForNotification(
+    tx: Prisma.TransactionClient,
+    agencyId: string,
+    notificationId: string,
+    eventType: string,
+  ) {
+    if (!isEmailChannelRequired(eventType) || !("notificationDelivery" in tx)) {
+      return null;
+    }
+
+    const delivery = await tx.notificationDelivery.create({
+      data: {
+        agencyId,
+        notificationId,
+        channel: "EMAIL",
+        status: "QUEUED",
+      },
+    });
+
+    if (typeof this.eventBus.publishWithinTransaction !== "function") {
+      return delivery;
+    }
+
+    await this.eventBus.publishWithinTransaction(
+      tx,
+      DomainEvents.NotificationQueued,
+      {
+        agencyId,
+        actorId: null,
+        aggregateId: delivery.id,
+        aggregateType: "NotificationDelivery",
+        payload: { deliveryId: delivery.id },
+      },
+    );
+
+    return delivery;
   }
 
   private async ensureCampaign(id: string, agencyId: string) {

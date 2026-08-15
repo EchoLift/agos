@@ -13,7 +13,7 @@ import {
   getMyMemberships,
 } from "@/lib/api/organization";
 import { visibleWorkspaceNavItems } from "@/lib/workspace-access";
-import { getWorkspaceUrl, getRootDomainUrl } from "@/lib/workspace-url";
+import { getWorkspaceUrl, getRootDomainUrl, getWorkspaceHref } from "@/lib/workspace-url";
 import { clearAgencyScopedUiState } from "@/lib/workspace-cache";
 import GlobalSearch from "@/components/GlobalSearch";
 import MobileWorkspaceNav from "@/components/MobileWorkspaceNav";
@@ -32,7 +32,7 @@ export default function WorkspaceHeader({
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const navItems = visibleWorkspaceNavItems(agency, profile?.id);
+  const navItems = visibleWorkspaceNavItems(agency, agencySlug, profile?.id);
   const [switchingAgencyId, setSwitchingAgencyId] = useState<string | null>(
     null,
   );
@@ -204,17 +204,19 @@ export default function WorkspaceHeader({
 
                   <div className="border-b border-zinc-800 p-2">
                     <MenuLink
-                      href={`/settings/profile`}
+                      href={getWorkspaceHref(agencySlug, "/settings/profile")}
                       label="My Profile"
                       onClick={() => setIsMenuOpen(false)}
                     />
+
                     <MenuLink
-                      href={`/settings/status`}
+                      href={getWorkspaceHref(agencySlug, "/settings/status")}
                       label="Status"
                       onClick={() => setIsMenuOpen(false)}
                     />
+
                     <MenuLink
-                      href={`/settings/appearance`}
+                      href={getWorkspaceHref(agencySlug, "/settings/appearance")}
                       label="Appearance"
                       onClick={() => setIsMenuOpen(false)}
                     />
@@ -259,7 +261,7 @@ export default function WorkspaceHeader({
                     />
                     {isOwner ? (
                       <MenuLink
-                        href={`/settings/agency`}
+                        href={getWorkspaceHref(agencySlug, "/settings/agency")}
                         label="Agency Settings"
                         onClick={() => setIsMenuOpen(false)}
                       />
@@ -311,6 +313,7 @@ export default function WorkspaceHeader({
       <GlobalSearch
         agency={agency}
         userId={profile?.id}
+        agencySlug={agencySlug}
         open={isSearchOpen}
         onOpenChange={setIsSearchOpen}
       />
@@ -330,11 +333,10 @@ function WorkspaceNavLink({
   return (
     <Link
       href={href}
-      className={`rounded-md px-3 py-2 transition ${
-        isActive
+      className={`rounded-md px-3 py-2 transition ${isActive
           ? "bg-indigo-500/15 text-indigo-200"
           : "hover:bg-zinc-900 hover:text-white"
-      }`}
+        }`}
     >
       {label}
     </Link>

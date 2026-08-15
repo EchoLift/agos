@@ -63,50 +63,53 @@ model Session {
 }
 
 model Agency {
-  id             String          @id @default(uuid())
-  name           String
-  displayName    String          @default("")
-  slug           String          @unique
-  status         AgencyStatus    @default(ACTIVE)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  deletedAt      DateTime?
-  version        Int             @default(1)
-  auditEvents    AuditEvent[]
-  campaigns      Campaign[]
-  clients        Client[]
-  clientContacts ClientContact[]
-  contentAssets  ContentAsset[]
-  invitations    Invitation[]
-  memberships    Membership[]
-  roles          Role[]
-  workOrders     WorkOrder[]
+  id                   String                @id @default(uuid())
+  name                 String
+  displayName          String                @default("")
+  slug                 String                @unique
+  status               AgencyStatus          @default(ACTIVE)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  deletedAt            DateTime?
+  version              Int                   @default(1)
+  auditEvents          AuditEvent[]
+  campaigns            Campaign[]
+  clients              Client[]
+  clientContacts       ClientContact[]
+  contentAssets        ContentAsset[]
+  invitations          Invitation[]
+  memberships          Membership[]
+  roles                Role[]
+  googleCalendarEvents GoogleCalendarEvent[]
+  workOrders           WorkOrder[]
 
   @@map("agencies")
 }
 
 model User {
-  id                    String          @id @default(uuid())
-  authUserId            String          @unique
-  name                  String?
-  avatarUrl             String?
-  mobileNumberEncrypted String?
-  mobileNumberHash      String?
-  timezone              String?
-  language              String?
-  jobTitle              String?
-  bio                   String?
-  presenceStatus        PresenceStatus?
-  workLocation          WorkLocation?
-  statusMessage         String?
-  statusExpiresAt       DateTime?
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
-  deletedAt             DateTime?
-  version               Int             @default(1)
-  memberships           Membership[]
-  clientContacts        ClientContact[]
-  authUser              AuthUser        @relation(fields: [authUserId], references: [id])
+  id                       String                    @id @default(uuid())
+  authUserId               String                    @unique
+  name                     String?
+  avatarUrl                String?
+  mobileNumberEncrypted    String?
+  mobileNumberHash         String?
+  timezone                 String?
+  language                 String?
+  jobTitle                 String?
+  bio                      String?
+  presenceStatus           PresenceStatus?
+  workLocation             WorkLocation?
+  statusMessage            String?
+  statusExpiresAt          DateTime?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  deletedAt                DateTime?
+  version                  Int                       @default(1)
+  memberships              Membership[]
+  clientContacts           ClientContact[]
+  googleCalendarConnection GoogleCalendarConnection?
+  googleCalendarEvents     GoogleCalendarEvent[]
+  authUser                 AuthUser                  @relation(fields: [authUserId], references: [id])
 
   @@map("users")
 }
@@ -778,10 +781,51 @@ model WorkOrderSubmission {
   @@map("work_order_submissions")
 }
 
+model GoogleCalendarConnection {
+  id                    String    @id @default(uuid())
+  userId                String    @unique
+  googleAccountEmail    String?
+  googleCalendarId      String?
+  encryptedRefreshToken String
+  tokenExpiresAt        DateTime?
+  grantedScopes         String[]  @default([])
+  syncEnabled           Boolean   @default(true)
+  connectedAt           DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  lastSyncAt            DateTime?
+  revokedAt             DateTime?
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([syncEnabled])
+  @@map("google_calendar_connections")
+}
+
+model GoogleCalendarEvent {
+  id               String                   @id @default(uuid())
+  userId           String
+  agencyId         String
+  sourceType       GoogleCalendarSourceType
+  sourceId         String
+  googleCalendarId String
+  googleEventId    String
+  lastSyncedAt     DateTime                 @default(now())
+  sourceUpdatedAt  DateTime?
+  sourceHash       String?
+  deletedAt        DateTime?
+  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agency           Agency                   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sourceType, sourceId])
+  @@unique([googleCalendarId, googleEventId])
+  @@index([agencyId])
+  @@index([userId, sourceType])
+  @@map("google_calendar_events")
+}
+
 model Notification {
   id         String                 @id @default(uuid())
   agencyId   String
-  userId     String?                // Nullable: invitation notifications have no registered userId yet
+  userId     String? // Nullable: invitation notifications have no registered userId yet
   title      String
   body       String
   eventType  String
@@ -798,7 +842,7 @@ model NotificationDelivery {
   id                String                      @id @default(uuid())
   agencyId          String
   notificationId    String
-  invitationId      String?                     // Set for invitation email deliveries; used for idempotency
+  invitationId      String? // Set for invitation email deliveries; used for idempotency
   channel           NotificationDeliveryChannel
   status            NotificationDeliveryStatus  @default(QUEUED)
   provider          String?
@@ -810,7 +854,7 @@ model NotificationDelivery {
   createdAt         DateTime                    @default(now())
   notification      Notification                @relation(fields: [notificationId], references: [id])
 
-  @@unique([invitationId, channel])  // Idempotency: only one EMAIL delivery per invitation
+  @@unique([invitationId, channel]) // Idempotency: only one EMAIL delivery per invitation
   @@index([agencyId, status, nextRetryAt])
   @@map("notification_deliveries")
 }
@@ -1132,6 +1176,10 @@ enum StorageProvider {
   S3
   R2
   EXTERNAL_URL
+}
+
+enum GoogleCalendarSourceType {
+  WORK_ORDER
 }
 
 enum OutboxStatus {

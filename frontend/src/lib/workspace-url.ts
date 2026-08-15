@@ -138,12 +138,10 @@ export function getWorkspaceUrl(
 
     if (
       hostname === "localhost" ||
-      hostname.endsWith(".localhost") ||
-      isDev
+      hostname.endsWith(".localhost")
     ) {
-      return `http://${window.location.host}/${agencySlug}${cleanPath}`;
+      return `${window.location.protocol}//${window.location.host}/${agencySlug}${cleanPath}`;
     }
-
     const protocol = window.location.protocol;
 
     const rootDomain =
@@ -191,18 +189,23 @@ export function getWorkspaceHref(
       : "";
 
   if (typeof window !== "undefined") {
-    const currentSubdomain =
-      parseSubdomainFromHost(
-        window.location.host,
-      );
+    const hostname = window.location.hostname;
+
+    if (
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost")
+    ) {
+      return `/${agencySlug}${cleanPath}`;
+    }
+
+    const currentSubdomain = parseSubdomainFromHost(
+      window.location.host,
+    );
 
     if (currentSubdomain === agencySlug) {
       return cleanPath || "/";
     }
   }
 
-  return getWorkspaceUrl(
-    agencySlug,
-    cleanPath,
-  );
+  return getWorkspaceUrl(agencySlug, cleanPath);
 }

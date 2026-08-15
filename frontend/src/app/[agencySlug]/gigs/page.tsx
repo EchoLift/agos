@@ -6,6 +6,7 @@ import { useAgency } from "@/components/AgencyProvider";
 import { getWorkOrders, WorkOrder } from "@/lib/api/work-orders";
 import { formatLabel, statusPillClasses } from "@/lib/status-style";
 import { hasAnyRole } from "@/lib/workspace-access";
+import { getWorkspaceHref } from "@/lib/workspace-url";
 
 export default function GigsPage() {
   const { agency, agencyId, agencySlug } = useAgency();
@@ -14,6 +15,7 @@ export default function GigsPage() {
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const canCreate = hasAnyRole(agency, ["OWNER", "ADMIN", "MANAGER"]);
+  const safeAgencySlug = agencySlug ?? "";
 
   useEffect(() => {
     if (!agencyId) return;
@@ -60,7 +62,7 @@ export default function GigsPage() {
           </Link>
         </div>
         {canCreate ? (
-          <Link href={`/gigs/new`} className="flex min-h-11 items-center rounded-md bg-indigo-500 px-4 text-sm font-semibold text-white hover:bg-indigo-400 lg:rounded-full lg:px-5">
+          <Link href={getWorkspaceHref(safeAgencySlug, "/gigs/new")} className="flex min-h-11 items-center rounded-md bg-indigo-500 px-4 text-sm font-semibold text-white hover:bg-indigo-400 lg:rounded-full lg:px-5">
             New Gig
           </Link>
         ) : null}

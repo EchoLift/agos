@@ -9,6 +9,7 @@ import { ClientModule } from "@modules/client/client.module";
 import { ContentModule } from "@modules/content/content.module";
 import { DashboardModule } from "@modules/dashboard/dashboard.module";
 import { FileModule } from "@modules/file/file.module";
+import { GoogleCalendarModule } from "@modules/google-calendar/google-calendar.module";
 import { NotificationModule } from "@modules/notification/notification.module";
 import { OrganizationModule } from "@modules/organization/organization.module";
 import { UserModule } from "@modules/user/user.module";
@@ -49,6 +50,7 @@ import { PermissionsGuard } from "@packages/security/guards/permissions.guard";
     NotificationModule,
     AuditModule,
     FileModule,
+    GoogleCalendarModule,
     SecurityModule,
   ],
   providers: [

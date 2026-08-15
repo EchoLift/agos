@@ -8,6 +8,7 @@ import {
 } from "@prisma/client";
 import { PrismaService } from "@packages/database/prisma.service";
 import { EventBusService } from "@packages/events/event-bus.service";
+import { GoogleCalendarSyncService } from "@modules/google-calendar/google-calendar-sync.service";
 import { WorkOrderService } from "./work-order.service";
 
 describe("WorkOrderService", () => {
@@ -72,6 +73,10 @@ describe("WorkOrderService", () => {
         {
           provide: EventBusService,
           useValue: { publishWithinTransaction: jest.fn() },
+        },
+        {
+          provide: GoogleCalendarSyncService,
+          useValue: { queueWorkOrderSync: jest.fn() },
         },
       ],
     }).compile();

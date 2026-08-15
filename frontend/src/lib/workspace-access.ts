@@ -1,4 +1,5 @@
 import { Agency } from "@/lib/api/organization";
+import { getWorkspaceHref } from "@/lib/workspace-url";
 
 export type WorkspaceNavKey =
   | "dashboard"
@@ -164,6 +165,7 @@ const roleAccess: Record<string, WorkspaceNavKey[]> = {
 
 export function visibleWorkspaceNavItems(
   agency: Agency | null,
+  slug: string,
   userId?: string | null,
 ) {
   const keys = allowedNavKeys(agency, userId);
@@ -180,7 +182,7 @@ export function visibleWorkspaceNavItems(
         item.key === "dashboard"
           ? workspaceHomeShortLabel(agency)
           : item.shortLabel,
-      hrefValue: item.href,
+      hrefValue: getWorkspaceHref(slug, item.href),
     }));
 }
 
@@ -224,9 +226,10 @@ export function roleAccessLabels(
 export function canAccessWorkspacePath(
   pathname: string,
   agency: Agency | null,
+  slug: string,
   userId?: string | null,
 ) {
-  const relativePath = pathname || "/";
+  const relativePath = pathname.replace(`/${slug}`, "") || "/";
   const allowed = allowedNavKeys(agency, userId);
 
   if (relativePath === "/") {
