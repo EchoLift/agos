@@ -2,52 +2,44 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAgency } from "@/components/AgencyProvider";
-import { ContentAsset, getContentAsset, updateContentAsset } from "@/lib/api/content";
+import { ContentAsset, updateContentAsset } from "@/lib/api/content";
 import { performWorkflowAction, WorkflowActionType } from "@/lib/api/workflow";
 import { formatLabel, statusPillClasses } from "@/lib/status-style";
 import { getAgencyRoleKeys } from "@/lib/workspace-access";
+import { invalidateWorkspaceQueries, queryKeys, setListItem, useContentAssetQuery } from "@/lib/query";
 
 const contentTypes = ["REEL", "CAROUSEL", "STATIC", "STORY", "BLOG", "YOUTUBE", "AD", "OTHER"];
 
 export default function WorkflowDetailPage() {
   const router = useRouter();
   const params = useParams<{ contentId: string }>();
-  const { agencyId, agencySlug, agency } = useAgency();
+  const queryClient = useQueryClient();
+  const { agencyId, agency } = useAgency();
   const roleKeys = useMemo(() => getAgencyRoleKeys(agency), [agency]);
   const canEditAsset = roleKeys.some((roleKey) => ["OWNER", "ADMIN", "MANAGER"].includes(roleKey));
-  const [asset, setAsset] = useState<ContentAsset | null>(null);
+  const assetQuery = useContentAssetQuery(agencyId, params.contentId);
+  const asset = assetQuery.data ?? null;
   const [draft, setDraft] = useState({ title: "", type: "REEL", brief: "" });
   const [actionDraft, setActionDraft] = useState({ externalLink: "", comment: "" });
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isActionRunning, setIsActionRunning] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isLoading = assetQuery.isLoading && !asset;
+  const firstLoadError = !asset && assetQuery.error
+    ? assetQuery.error instanceof Error
+      ? assetQuery.error.message
+      : "Failed to load workflow."
+    : null;
 
   useEffect(() => {
-    if (!agencyId || !params.contentId) return;
-    let isMounted = true;
-
-    getContentAsset(agencyId, params.contentId)
-      .then((data) => {
-        if (!isMounted) return;
-        setAsset(data);
-        setDraft({ title: data.title || "", type: data.type || "REEL", brief: data.brief || "" });
-        setError(null);
-      })
-      .catch((err: unknown) => {
-        if (!isMounted) return;
-        setError(err instanceof Error ? err.message : "Failed to load workflow.");
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [agencyId, params.contentId]);
+    if (!asset) return;
+    queueMicrotask(() => {
+      setDraft({ title: asset.title || "", type: asset.type || "REEL", brief: asset.brief || "" });
+    });
+  }, [asset]);
 
   const save = async () => {
     if (!agencyId || !asset) return;
@@ -55,7 +47,7 @@ export default function WorkflowDetailPage() {
     setError(null);
     try {
       const updated = await updateContentAsset(agencyId, asset.id, draft);
-      setAsset(updated);
+      cacheContentAsset(queryClient, agencyId, updated);
       setDraft({ title: updated.title || "", type: updated.type || "REEL", brief: updated.brief || "" });
       setIsEditing(false);
     } catch (err: unknown) {
@@ -84,8 +76,10 @@ export default function WorkflowDetailPage() {
           : {}),
         ...(trimmedComment ? { comment: trimmedComment } : {}),
       });
-      const updated = await getContentAsset(agencyId, asset.id);
-      setAsset(updated);
+      const refreshed = await assetQuery.refetch();
+      if (refreshed.data) {
+        cacheContentAsset(queryClient, agencyId, refreshed.data);
+      }
       setActionDraft({ externalLink: "", comment: "" });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Workflow action failed.");
@@ -124,6 +118,8 @@ export default function WorkflowDetailPage() {
       <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 shadow-xl shadow-black/20 sm:p-4 lg:rounded-xl lg:p-6">
         {isLoading ? (
           <div className="text-sm text-zinc-500">Loading workflow...</div>
+        ) : firstLoadError ? (
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{firstLoadError}</div>
         ) : error ? (
           <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>
         ) : asset ? (
@@ -259,6 +255,12 @@ function LatestSubmissionCard({ submission }: { submission: ContentAsset["latest
       </div>
     </section>
   );
+}
+
+function cacheContentAsset(queryClient: ReturnType<typeof useQueryClient>, agencyId: string, asset: ContentAsset) {
+  queryClient.setQueryData(queryKeys.contentAsset(agencyId, asset.id), asset);
+  queryClient.setQueryData(queryKeys.content(agencyId), (current: ContentAsset[] | undefined) => setListItem(current, asset));
+  invalidateWorkspaceQueries(queryClient, agencyId, ["content", "workflow", "dashboard", "calendar"]);
 }
 
 function CampaignContext({ campaign }: { campaign: ContentAsset["campaignSummary"] }) {

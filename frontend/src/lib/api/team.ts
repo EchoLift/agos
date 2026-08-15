@@ -1,4 +1,4 @@
-import { apiClient } from '../api-client';
+import { apiClient } from "../api-client";
 
 export interface Role {
   id: string;
@@ -17,7 +17,7 @@ export interface Member {
     key: string;
     name: string;
   }>;
-  status: 'ACTIVE' | 'INACTIVE';
+  status: "ACTIVE" | "INACTIVE";
   joinedAt: string;
   version: number;
   name: string | null;
@@ -33,8 +33,34 @@ export interface InviteMemberParams {
   roleIds?: string[];
 }
 
+export type InvitationStatus =
+  "PENDING" | "ACCEPTED" | "EXPIRED" | "CANCELLED" | "DECLINED";
+
+export interface TeamInvitation {
+  id: string;
+  agencyId: string;
+  email: string | null;
+  mobileNumber: string | null;
+  roleId: string;
+  roleName: string | null;
+  roles: Array<{
+    id: string;
+    key?: string;
+    name: string;
+  }>;
+  invitedBy: {
+    membershipId: string;
+    name: string | null;
+    email: string | null;
+  } | null;
+  sentAt: string;
+  expiresAt: string;
+  status: InvitationStatus;
+  inviteUrl: string;
+}
+
 export async function getRoles(agencyId: string): Promise<Role[]> {
-  return apiClient<Role[]>('/organizations/roles', {
+  return apiClient<Role[]>("/organizations/roles", {
     agencyId,
   });
 }
@@ -47,34 +73,77 @@ export async function getMembers(agencyId: string): Promise<Member[]> {
 
 export async function inviteMember(
   agencyId: string,
-  params: InviteMemberParams
+  params: InviteMemberParams,
 ): Promise<{ invitationId: string; status: string }> {
-  return apiClient<{ invitationId: string; status: string }>(`/organizations/${agencyId}/invitations`, {
-    method: 'POST',
+  return apiClient<{ invitationId: string; status: string }>(
+    `/organizations/${agencyId}/invitations`,
+    {
+      method: "POST",
+      agencyId,
+      body: JSON.stringify(params),
+    },
+  );
+}
+
+export async function getInvitations(
+  agencyId: string,
+): Promise<TeamInvitation[]> {
+  return apiClient<TeamInvitation[]>(`/organizations/${agencyId}/invitations`, {
     agencyId,
-    body: JSON.stringify(params),
   });
+}
+
+export async function resendInvitation(
+  agencyId: string,
+  invitationId: string,
+): Promise<TeamInvitation> {
+  return apiClient<TeamInvitation>(
+    `/organizations/${agencyId}/invitations/${invitationId}/resend`,
+    {
+      method: "POST",
+      agencyId,
+    },
+  );
+}
+
+export async function revokeInvitation(
+  agencyId: string,
+  invitationId: string,
+): Promise<TeamInvitation> {
+  return apiClient<TeamInvitation>(
+    `/organizations/${agencyId}/invitations/${invitationId}`,
+    {
+      method: "DELETE",
+      agencyId,
+    },
+  );
 }
 
 export async function updateMemberRole(
   agencyId: string,
   membershipId: string,
-  params: { roleId: string; roleIds?: string[]; version: number }
+  params: { roleId: string; roleIds?: string[]; version: number },
 ): Promise<Member> {
-  return apiClient<Member>(`/organizations/${agencyId}/members/${membershipId}/role`, {
-    method: 'PATCH',
-    agencyId,
-    body: JSON.stringify(params),
-  });
+  return apiClient<Member>(
+    `/organizations/${agencyId}/members/${membershipId}/role`,
+    {
+      method: "PATCH",
+      agencyId,
+      body: JSON.stringify(params),
+    },
+  );
 }
 
 export async function removeMember(
   agencyId: string,
   membershipId: string,
-  version: number
+  version: number,
 ): Promise<{ success: boolean }> {
-  return apiClient<{ success: boolean }>(`/organizations/${agencyId}/members/${membershipId}?version=${version}`, {
-    method: 'DELETE',
-    agencyId,
-  });
+  return apiClient<{ success: boolean }>(
+    `/organizations/${agencyId}/members/${membershipId}?version=${version}`,
+    {
+      method: "DELETE",
+      agencyId,
+    },
+  );
 }

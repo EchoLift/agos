@@ -1,33 +1,17 @@
 "use client";
 
 import { ReactNode } from "react";
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAgency } from "@/components/AgencyProvider";
-import { getProfile, Profile } from "@/lib/api/me";
+import { useProfileQuery } from "@/lib/query";
 import { canAccessWorkspacePath } from "@/lib/workspace-access";
 
 export default function WorkspaceAccessGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { agency, agencySlug } = useAgency();
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { data: profile } = useProfileQuery();
   const slug = agencySlug || "";
-
-  useEffect(() => {
-    let isMounted = true;
-    getProfile()
-      .then((data) => {
-        if (isMounted) setProfile(data);
-      })
-      .catch(() => {
-        if (isMounted) setProfile(null);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   if (!slug || canAccessWorkspacePath(pathname, agency, slug, profile?.id)) {
     return <>{children}</>;

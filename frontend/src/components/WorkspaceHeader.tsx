@@ -2,16 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Search } from "lucide-react";
 import { useAgency } from "@/components/AgencyProvider";
 import { logout } from "@/lib/auth";
-import { getProfile, Profile } from "@/lib/api/me";
-import {
-  activateAgency,
-  Agency,
-  getMyMemberships,
-} from "@/lib/api/organization";
+import { Agency } from "@/lib/api/organization";
+import { useActivateAgencyMutation, useMembershipsQuery, useProfileQuery } from "@/lib/query";
 import { visibleWorkspaceNavItems } from "@/lib/workspace-access";
 import { getWorkspaceUrl, getRootDomainUrl, getWorkspaceHref } from "@/lib/workspace-url";
 import { clearAgencyScopedUiState } from "@/lib/workspace-cache";
@@ -23,37 +19,20 @@ export default function WorkspaceHeader({
 }: {
   agencySlug: string;
 }) {
-  const router = useRouter();
   const pathname = usePathname();
   const { agency, agencyDisplayName } = useAgency();
   const displayName = agencyDisplayName || agencySlug;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [agencies, setAgencies] = useState<Agency[]>([]);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { data: profile } = useProfileQuery();
+  const { data: memberships } = useMembershipsQuery();
+  const activateAgencyMutation = useActivateAgencyMutation();
+  const agencies = memberships?.agencies ?? [];
   const navItems = visibleWorkspaceNavItems(agency, agencySlug, profile?.id);
   const [switchingAgencyId, setSwitchingAgencyId] = useState<string | null>(
     null,
   );
-
-  useEffect(() => {
-    let isMounted = true;
-    Promise.all([getProfile(), getMyMemberships()])
-      .then(([profileData, membershipData]) => {
-        if (!isMounted) return;
-        setProfile(profileData);
-        setAgencies(membershipData.agencies);
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        setProfile(null);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   useEffect(() => {
     const closeOnOutsideClick = (event: MouseEvent) => {
@@ -92,19 +71,11 @@ export default function WorkspaceHeader({
     try {
       const previousAgencyId = agency?.id;
 
-      const response = await activateAgency(targetAgency.id);
+      const response = await activateAgencyMutation.mutateAsync(targetAgency.id);
 
       clearAgencyScopedUiState(previousAgencyId, response.activeAgencyId);
 
-      setAgencies((items) =>
-        items.map((item) =>
-          item.id === response.agency.id
-            ? { ...item, ...response.agency }
-            : item,
-        ),
-      );
-
-      window.location.href = getWorkspaceUrl(response.agency.slug);
+      window.location.assign(getWorkspaceUrl(response.agency.slug));
     } catch (error) {
       setSwitchingAgencyId(null);
 
@@ -123,7 +94,7 @@ export default function WorkspaceHeader({
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-zinc-800/70 bg-[#09090b]/95 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-zinc-800/70 bg-[#09090b]/95 backdrop-blur-xl">
         <div className="flex min-h-14 w-full items-center justify-between px-3 py-1.5 md:px-4 lg:px-5">
           <div className="flex items-center gap-2">
             <div className="rounded-md bg-indigo-500/15 px-3 py-2 text-sm font-semibold text-indigo-200">
@@ -174,7 +145,7 @@ export default function WorkspaceHeader({
               </button>
 
               {isMenuOpen ? (
-                <div className="fixed inset-x-2 top-16 max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/40 md:absolute md:inset-x-auto md:right-0 md:top-auto md:mt-3 md:w-80">
+                <div className="fixed inset-x-2 top-16 z-[100] max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/40 md:absolute md:inset-x-auto md:right-0 md:top-auto md:mt-3 md:w-80">
                   <div className="border-b border-zinc-800 p-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-indigo-500/15 text-sm font-semibold text-indigo-200">

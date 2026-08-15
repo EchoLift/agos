@@ -3,44 +3,47 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useParams, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { ClientFormActions, ClientPlaybookForm, normalizeClientPayload } from "@/components/ClientPlaybookForm";
 import { useAgency } from "@/components/AgencyProvider";
-import { Client, ClientPlaybookResponse, CreateClientInput, getClient, updateClient } from "@/lib/api/clients";
+import { Client, ClientPlaybookResponse, CreateClientInput, updateClient } from "@/lib/api/clients";
 import { statusPillClasses } from "@/lib/status-style";
+import { invalidateWorkspaceQueries, queryKeys, setListItem, useClientQuery } from "@/lib/query";
 
 export default function ClientDetailPage() {
   const router = useRouter();
   const params = useParams<{ clientId: string }>();
-  const { agencyId, agencySlug } = useAgency();
-  const [playbook, setPlaybook] = useState<ClientPlaybookResponse | null>(null);
+  const queryClient = useQueryClient();
+  const { agencyId } = useAgency();
+  const playbookQuery = useClientQuery(agencyId, params.clientId);
+  const playbook = playbookQuery.data ?? null;
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { register, handleSubmit, formState, setValue, watch, reset } = useForm<CreateClientInput>({ mode: "onChange" });
+  const isLoading = playbookQuery.isLoading && !playbook;
+  const firstLoadError = !playbook && playbookQuery.error
+    ? playbookQuery.error instanceof Error
+      ? playbookQuery.error.message
+      : "Failed to load client."
+    : null;
 
   useEffect(() => {
-    if (!agencyId || !params.clientId) return;
-    getClient(agencyId, params.clientId)
-      .then((data) => {
-        setPlaybook(data);
-        reset(toFormValues(data.client));
-        setError(null);
-      })
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load client."))
-      .finally(() => setIsLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agencyId, params.clientId]);
+    if (!playbook) return;
+    reset(toFormValues(playbook.client));
+  }, [playbook, reset]);
 
   const save = async (data: CreateClientInput) => {
     if (!agencyId || !playbook?.client.id) return;
     setIsSaving(true);
     setError(null);
     try {
-      await updateClient(agencyId, playbook.client.id, normalizeClientPayload(data));
-      const updated = await getClient(agencyId, playbook.client.id);
-      setPlaybook(updated);
-      reset(toFormValues(updated.client));
+      const updatedClient = await updateClient(agencyId, playbook.client.id, normalizeClientPayload(data));
+      const updated: ClientPlaybookResponse = { ...playbook, client: updatedClient };
+      queryClient.setQueryData(queryKeys.client(agencyId, updatedClient.id), updated);
+      queryClient.setQueryData(queryKeys.clients(agencyId), (current: Client[] | undefined) => setListItem(current, updatedClient));
+      invalidateWorkspaceQueries(queryClient, agencyId, ["clients"]);
+      reset(toFormValues(updatedClient));
       setIsEditing(false);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to save client.");
@@ -71,6 +74,8 @@ export default function ClientDetailPage() {
 
       {isLoading ? (
         <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 text-sm text-zinc-500">Loading client...</div>
+      ) : firstLoadError ? (
+        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{firstLoadError}</div>
       ) : error ? (
         <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>
       ) : playbook ? (

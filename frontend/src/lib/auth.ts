@@ -3,6 +3,28 @@ const STORAGE_KEYS = {
   accessTokenExpiresAt: "agencie_access_token_expires_at",
 };
 
+const REFRESH_TIMEOUT_MS = 15_000;
+const REFRESH_RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
+
+export class AuthTemporarilyUnavailableError extends Error {
+  status?: number;
+
+  constructor(
+    message = "Authentication is temporarily unavailable.",
+    status?: number,
+  ) {
+    super(message);
+    this.name = "AuthTemporarilyUnavailableError";
+    this.status = status;
+  }
+}
+
+export function isAuthTemporarilyUnavailableError(
+  error: unknown,
+): error is AuthTemporarilyUnavailableError {
+  return error instanceof AuthTemporarilyUnavailableError;
+}
+
 export function getApiBaseUrl() {
   return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api/v1";
 }
@@ -61,28 +83,67 @@ export function getAuthHeaders() {
 
 let refreshPromise: Promise<string | null> | null = null;
 
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchRefreshToken(): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
+
+  try {
+    return await fetch(`${getApiBaseUrl()}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export async function refreshAccessToken(): Promise<string | null> {
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
     try {
-      const response = await fetch(`${getApiBaseUrl()}/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
+      for (let attempt = 0; attempt <= REFRESH_RETRY_DELAYS_MS.length; attempt += 1) {
+        try {
+          const response = await fetchRefreshToken();
 
-      if (!response.ok) {
-        clearAccessToken();
-        return null;
+          if (response.status === 401) {
+            clearAccessToken();
+            return null;
+          }
+
+          if (!response.ok) {
+            throw new AuthTemporarilyUnavailableError(
+              "Authentication service is temporarily unavailable.",
+              response.status,
+            );
+          }
+
+          const data = await response.json();
+          persistAccessToken(data.accessToken, data.expiresIn ?? 900);
+          return data.accessToken;
+        } catch (error) {
+          if (!isAuthTemporarilyUnavailableError(error)) {
+            throw new AuthTemporarilyUnavailableError(
+              "Authentication service is temporarily unavailable.",
+            );
+          }
+
+          const retryDelay = REFRESH_RETRY_DELAYS_MS[attempt];
+          if (retryDelay === undefined) {
+            throw error;
+          }
+
+          await delay(retryDelay);
+        }
       }
 
-      const data = await response.json();
-      persistAccessToken(data.accessToken, data.expiresIn ?? 900);
-      return data.accessToken;
-    } catch {
-      clearAccessToken();
-      return null;
+      throw new AuthTemporarilyUnavailableError();
     } finally {
       refreshPromise = null;
     }
@@ -101,7 +162,7 @@ export async function logout() {
     // Ignore logout network errors.
   }
   clearAccessToken();
-  redirectToCentralLogin()
+  redirectToCentralLogin();
 }
 
 export function redirectToCentralLogin() {

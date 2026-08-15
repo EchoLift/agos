@@ -5,6 +5,7 @@ import { UserLookupService } from "../../user/services/user-lookup.service";
 import { CryptoService } from "../../auth/services/crypto.service";
 import { RequestContextService } from "@packages/request-context/request-context.service";
 import { PrismaService } from "@packages/database/prisma.service";
+import { EventBusService } from "@packages/events/event-bus.service";
 import {
   NotFoundException,
   ForbiddenException,
@@ -76,6 +77,7 @@ describe("OrganizationService Unit Tests", () => {
         { provide: UserLookupService, useValue: mockUserLookup },
         { provide: CryptoService, useValue: mockCrypto },
         { provide: RequestContextService, useValue: mockRequestContext },
+        { provide: EventBusService, useValue: { publish: jest.fn() } },
         {
           provide: ConfigService,
           useValue: {

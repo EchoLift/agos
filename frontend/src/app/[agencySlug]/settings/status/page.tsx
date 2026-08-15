@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { clearStatus, getProfile, PresenceStatus, WorkLocation, updateStatus } from "@/lib/api/me";
+import { PresenceStatus, WorkLocation } from "@/lib/api/me";
+import { useProfileMutations, useProfileQuery } from "@/lib/query";
 
 const statuses: Array<{ value: PresenceStatus; label: string }> = [
   { value: "AVAILABLE", label: "Available" },
@@ -18,6 +19,8 @@ const locations: Array<{ value: WorkLocation; label: string }> = [
 ];
 
 export default function StatusSettingsPage() {
+  const profileQuery = useProfileQuery();
+  const { clearStatusMutation, updateStatusMutation } = useProfileMutations();
   const [status, setStatus] = useState<PresenceStatus>("AVAILABLE");
   const [location, setLocation] = useState<WorkLocation | "">("");
   const [message, setMessage] = useState("");
@@ -26,19 +29,29 @@ export default function StatusSettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    getProfile().then((profile) => {
+    const profile = profileQuery.data;
+    if (!profile) return;
+    queueMicrotask(() => {
       setStatus(profile.presenceStatus || "AVAILABLE");
       setLocation(profile.workLocation || "");
       setMessage(profile.statusMessage || "");
       setExpiresAt(profile.statusExpiresAt ? profile.statusExpiresAt.slice(0, 16) : "");
-    }).catch((error) => setNotice(error instanceof Error ? error.message : "Failed to load status."));
-  }, []);
+    });
+  }, [profileQuery.data]);
+
+  useEffect(() => {
+    if (profileQuery.error) {
+      queueMicrotask(() => {
+        setNotice(profileQuery.error instanceof Error ? profileQuery.error.message : "Failed to load status.");
+      });
+    }
+  }, [profileQuery.error]);
 
   const save = async () => {
     setIsSaving(true);
     setNotice(null);
     try {
-      await updateStatus({ status, location: location || null, message: message || null, expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null });
+      await updateStatusMutation.mutateAsync({ status, location: location || null, message: message || null, expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null });
       setNotice("Status saved.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Failed to save status.");
@@ -50,7 +63,7 @@ export default function StatusSettingsPage() {
   const reset = async () => {
     setIsSaving(true);
     try {
-      await clearStatus();
+      await clearStatusMutation.mutateAsync();
       setStatus("AVAILABLE");
       setLocation("");
       setMessage("");

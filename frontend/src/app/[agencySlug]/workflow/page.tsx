@@ -1,58 +1,36 @@
 "use client";
 
-import { Dispatch, ReactNode, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
+import { Dispatch, ReactNode, SetStateAction, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAgency } from "@/components/AgencyProvider";
-import { getWorkflowBoard, performWorkflowAction, WorkflowActionType, WorkflowBoard, WorkflowBoardItem } from "@/lib/api/workflow";
+import { performWorkflowAction, WorkflowActionType, WorkflowBoardItem } from "@/lib/api/workflow";
 import { formatLabel, statusPillClass, statusPillClasses } from "@/lib/status-style";
 import { getAgencyRoleKeys } from "@/lib/workspace-access";
+import { invalidateWorkspaceQueries, useWorkflowQuery } from "@/lib/query";
 
 const riskOptions = ["ON_TRACK", "NEEDS_ATTENTION", "AT_RISK", "BLOCKED", "OVERDUE"];
 
 export default function WorkflowPage() {
-  const { agencyId, agencySlug, agency } = useAgency();
+  const { agencyId, agency } = useAgency();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const roleKeys = useMemo(() => getAgencyRoleKeys(agency), [agency]);
-  const [board, setBoard] = useState<WorkflowBoard | null>(null);
   const [selectedItem, setSelectedItem] = useState<WorkflowBoardItem | null>(null);
   const [mobileStage, setMobileStage] = useState("");
   const [filters, setFilters] = useState({ clientId: "", campaignId: "", ownerId: "", risk: "", search: "" });
   const [actionDraft, setActionDraft] = useState({ externalLink: "", comment: "", reason: "" });
   const [isActionRunning, setIsActionRunning] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const loadBoard = useCallback(async () => {
-    if (!agencyId) return;
-    const data = await getWorkflowBoard(agencyId, filters);
-    setBoard(data);
-    setError(null);
-    setIsLoading(false);
-    return data;
-  }, [agencyId, filters]);
-
-  useEffect(() => {
-    if (!agencyId) return;
-    let isMounted = true;
-
-    getWorkflowBoard(agencyId, filters)
-      .then((data) => {
-        if (!isMounted) return;
-        setBoard(data);
-        setError(null);
-        setIsLoading(false);
-      })
-      .catch((err: unknown) => {
-        if (!isMounted) return;
-        setError(err instanceof Error ? err.message : "Failed to load workflow board.");
-        setIsLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [agencyId, filters]);
+  const boardQuery = useWorkflowQuery(agencyId, filters);
+  const board = boardQuery.data ?? null;
+  const isLoading = boardQuery.isLoading && !board;
+  const firstLoadError = !board && boardQuery.error
+    ? boardQuery.error instanceof Error
+      ? boardQuery.error.message
+      : "Failed to load workflow board."
+    : null;
 
   const selectItem = (item: WorkflowBoardItem | null) => {
     setSelectedItem(item);
@@ -69,7 +47,7 @@ export default function WorkflowPage() {
     const trimmedReason = actionDraft.reason.trim();
 
     try {
-      const refreshed = await performWorkflowAction(agencyId, selectedItem.contentAssetId, {
+      await performWorkflowAction(agencyId, selectedItem.contentAssetId, {
         action,
         idempotencyKey: `${action}:${selectedItem.workflowTaskId ?? selectedItem.contentAssetId}:${Date.now()}`,
         ...(trimmedLink
@@ -79,9 +57,11 @@ export default function WorkflowPage() {
           : {}),
         ...(trimmedComment ? { comment: trimmedComment } : {}),
         ...(trimmedReason ? { reason: trimmedReason } : {}),
-      }).then(() => loadBoard());
+      });
+      invalidateWorkspaceQueries(queryClient, agencyId, ["workflow", "dashboard", "calendar"]);
+      const refreshed = await boardQuery.refetch();
 
-      const nextSelected = refreshed?.columns.flatMap((column) => column.items).find((item) => item.contentAssetId === selectedItem.contentAssetId) ?? null;
+      const nextSelected = refreshed.data?.columns.flatMap((column) => column.items).find((item) => item.contentAssetId === selectedItem.contentAssetId) ?? null;
       selectItem(nextSelected);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Workflow action failed.");
@@ -168,6 +148,8 @@ export default function WorkflowPage() {
       <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-2 shadow-xl shadow-black/10 lg:rounded-3xl lg:p-4 lg:shadow-2xl">
         {isLoading ? (
           <div className="p-4 text-sm text-zinc-500">Loading workflow board...</div>
+        ) : firstLoadError ? (
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{firstLoadError}</div>
         ) : error ? (
           <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>
         ) : !hasItems ? (

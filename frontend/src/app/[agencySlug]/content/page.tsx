@@ -1,46 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useAgency } from "@/components/AgencyProvider";
-import { getContentAssets, ContentAsset } from "@/lib/api/content";
-import { getCampaigns, Campaign } from "@/lib/api/campaigns";
-import { getClients, Client } from "@/lib/api/clients";
 import { useRouter } from "next/navigation";
 import { formatLabel, statusPillClasses } from "@/lib/status-style";
 import { getWorkspaceHref } from "@/lib/workspace-url";
+import { useCampaignsQuery, useClientsQuery, useContentQuery } from "@/lib/query";
 export default function ContentPage() {
   const { agencyId, agencySlug } = useAgency();
-  const [contentAssets, setContentAssets] = useState<ContentAsset[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [filters, setFilters] = useState({ search: "", clientId: "", campaignId: "", type: "", status: "" });
-  const [isLoading, setIsLoading] = useState(true);
+  const contentQuery = useContentQuery(agencyId);
+  const clientsQuery = useClientsQuery(agencyId);
+  const campaignsQuery = useCampaignsQuery(agencyId);
+  const contentAssets = useMemo(() => contentQuery.data ?? [], [contentQuery.data]);
+  const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data]);
+  const campaigns = useMemo(() => campaignsQuery.data ?? [], [campaignsQuery.data]);
+  const isLoading = (contentQuery.isLoading || clientsQuery.isLoading || campaignsQuery.isLoading) && !contentQuery.data && !clientsQuery.data && !campaignsQuery.data;
   const router = useRouter();
   const safeAgencySlug = agencySlug ?? "";
-  useEffect(() => {
-    if (!agencyId) return;
-    let isMounted = true;
-
-    Promise.all([getContentAssets(agencyId), getClients(agencyId), getCampaigns(agencyId)])
-      .then(([contentData, clientData, campaignData]) => {
-        if (isMounted) {
-          setContentAssets(contentData);
-          setClients(clientData);
-          setCampaigns(campaignData);
-          setIsLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (isMounted) {
-          console.error(err);
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [agencyId]);
 
   const clientById = useMemo(() => new Map(clients.map((client) => [client.id, client])), [clients]);
   const campaignById = useMemo(() => new Map(campaigns.map((campaign) => [campaign.id, campaign])), [campaigns]);
@@ -100,6 +77,8 @@ export default function ContentPage() {
       <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl shadow-black/20">
         {isLoading ? (
           <div className="text-sm text-zinc-500">Loading content...</div>
+        ) : (contentQuery.error || clientsQuery.error || campaignsQuery.error) && !contentAssets.length ? (
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">Failed to load content.</div>
         ) : contentAssets.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="rounded-full bg-zinc-900/80 p-4">

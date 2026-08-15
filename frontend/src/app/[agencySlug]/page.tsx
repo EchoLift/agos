@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { DashboardData, getDashboardData } from "@/lib/api/dashboard";
-import { getActivation, ActivationState } from "@/lib/api/activation";
+import { useEffect, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAgency } from "@/components/AgencyProvider";
 import { useRouter } from "next/navigation";
 import { formatLabel, statusPillClasses } from "@/lib/status-style";
 import { isProductionWorkspaceRole, workspaceHomeLabel } from "@/lib/workspace-access";
 import { getWorkspaceHref } from "@/lib/workspace-url";
+import { queryKeys, staleTimes, useActivationQuery, useDashboardQuery } from "@/lib/query";
+import { getCalendarEvents } from "@/lib/api/calendar";
+import { getWorkOrders } from "@/lib/api/work-orders";
 
 type StepId = "agency" | "team" | "client" | "campaign" | "content" | "workflow";
 
@@ -29,58 +31,17 @@ const stepTemplates: Step[] = [
 ];
 
 export default function WorkspaceDashboard() {
-  const [activation, setActivation] = useState<ActivationState | null>(null);
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { agency, agencyId, agencySlug } = useAgency();
+  const dashboardQuery = useDashboardQuery(agencyId);
+  const activationQuery = useActivationQuery(agencyId);
+  const activation = activationQuery.data ?? null;
+  const dashboardData = dashboardQuery.data ?? null;
   const name = agency?.displayName || agency?.name || "Agency";
   const isMyWork = isProductionWorkspaceRole(agency);
   const homeLabel = workspaceHomeLabel(agency);
   const safeAgencySlug = agencySlug ?? "";
-
-  useEffect(() => {
-    let isMounted = true;
-
-    if (!agencyId) return;
-
-    Promise.all([getDashboardData(agencyId), getActivation(agencyId)])
-      .then((data) => {
-        if (isMounted) {
-          setDashboardData(data[0]);
-          setActivation(data[1]);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setDashboardData({
-            myTasks: [],
-            pendingApprovals: 0,
-            blockedContent: 0,
-            overdueContent: 0,
-            publishingToday: 0,
-            activity: [],
-            riskSummary: { activeClients: 0, activeCampaigns: 0, activeContent: 0, blockedItems: 0 },
-          });
-          setActivation({
-            completed: false,
-            progress: 0,
-            steps: {
-              agency: true,
-              team: false,
-              client: false,
-              campaign: false,
-              content: false,
-              workflow: false,
-            },
-            nextStep: "CREATE_CLIENT",
-          });
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [agencyId]);
 
   const steps = useMemo(
     () => stepTemplates.map((step) => ({ ...step, done: activation?.steps[step.id] ?? false })),
@@ -120,6 +81,51 @@ export default function WorkspaceDashboard() {
     router.push(getWorkspaceHref(safeAgencySlug, `/${stepTemplates.find((step) => step.id === stepId)?.href ?? ""}/new`));
   };
 
+  useEffect(() => {
+    if (!agencyId || !dashboardData) return;
+    const calendarFilters = {
+      scope: isMyWork ? "MY_SCHEDULE" as const : "AGENCY" as const,
+      ...currentMonthRange(),
+    };
+    const prefetch = () => {
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.calendar(agencyId, calendarFilters),
+        queryFn: () => getCalendarEvents(agencyId, calendarFilters),
+        staleTime: staleTimes.calendar,
+      });
+      void queryClient.prefetchQuery({
+        queryKey: queryKeys.gigs(agencyId),
+        queryFn: () => getWorkOrders(agencyId),
+        staleTime: staleTimes.gigs,
+      });
+    };
+    const idleId = window.requestIdleCallback(prefetch, { timeout: 2500 });
+    return () => window.cancelIdleCallback(idleId);
+  }, [agencyId, dashboardData, isMyWork, queryClient]);
+
+  const firstLoadError =
+    !dashboardData && dashboardQuery.error
+      ? dashboardQuery.error instanceof Error
+        ? dashboardQuery.error.message
+        : "Failed to load dashboard."
+      : !activation && activationQuery.error
+        ? activationQuery.error instanceof Error
+          ? activationQuery.error.message
+          : "Failed to load workspace activation."
+        : null;
+
+  if ((dashboardQuery.isLoading || activationQuery.isLoading) && !dashboardData && !activation) {
+    return <DashboardSkeleton />;
+  }
+
+  if (firstLoadError) {
+    return (
+      <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+        {firstLoadError}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3 sm:space-y-4 lg:space-y-8">
       <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-4 shadow-xl shadow-black/10 lg:rounded-3xl lg:p-8 lg:shadow-2xl">
@@ -140,7 +146,11 @@ export default function WorkspaceDashboard() {
             </p>
           </div>
           <div className="w-fit rounded-md border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-300 lg:rounded-full lg:px-4">
-            {showDashboard ? (isMyWork ? homeLabel : "Operational view") : `${progress}% complete`}
+            {dashboardQuery.isFetching || activationQuery.isFetching
+              ? "Refreshing..."
+              : showDashboard
+                ? (isMyWork ? homeLabel : "Operational view")
+                : `${progress}% complete`}
           </div>
         </div>
       </div>
@@ -332,4 +342,32 @@ function formatDateTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function currentMonthRange() {
+  const now = new Date();
+  return {
+    from: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
+    to: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString(),
+  };
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-4 lg:space-y-8">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-4 lg:rounded-3xl lg:p-8">
+        <div className="h-4 w-40 animate-pulse rounded bg-zinc-800" />
+        <div className="mt-4 h-9 w-2/3 animate-pulse rounded bg-zinc-800" />
+        <div className="mt-4 h-4 w-1/2 animate-pulse rounded bg-zinc-800" />
+      </div>
+      <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }, (_, index) => (
+          <div key={index} className="min-h-24 rounded-lg border border-zinc-800 bg-zinc-950/80 p-4">
+            <div className="h-4 w-24 animate-pulse rounded bg-zinc-800" />
+            <div className="mt-4 h-8 w-12 animate-pulse rounded bg-zinc-800" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }

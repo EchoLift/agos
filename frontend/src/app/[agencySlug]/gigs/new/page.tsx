@@ -1,21 +1,25 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAgency } from "@/components/AgencyProvider";
-import { getClients, Client } from "@/lib/api/clients";
-import { getMembers, Member } from "@/lib/api/team";
-import { createWorkOrder, WorkOrderPriority, WorkOrderType } from "@/lib/api/work-orders";
+import { Member } from "@/lib/api/team";
+import { createWorkOrder, WorkOrder, WorkOrderPriority, WorkOrderType } from "@/lib/api/work-orders";
 import { formatLabel } from "@/lib/status-style";
+import { invalidateWorkspaceQueries, queryKeys, setListItem, useClientsQuery, useTeamQuery } from "@/lib/query";
 
 const workTypes: WorkOrderType[] = ["SCRIPT", "EDIT", "DESIGN", "SHOOT", "THUMBNAIL", "CAPTION", "RESEARCH", "OTHER"];
 const priorities: WorkOrderPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
 export default function NewGigPage() {
   const router = useRouter();
-  const { agencyId, agencySlug } = useAgency();
-  const [clients, setClients] = useState<Client[]>([]);
-  const [members, setMembers] = useState<Member[]>([]);
+  const queryClient = useQueryClient();
+  const { agencyId } = useAgency();
+  const clientsQuery = useClientsQuery(agencyId);
+  const teamQuery = useTeamQuery(agencyId);
+  const clients = clientsQuery.data ?? [];
+  const members = useMemo(() => (teamQuery.data ?? []).filter((member) => member.status === "ACTIVE"), [teamQuery.data]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -31,14 +35,6 @@ export default function NewGigPage() {
     rewardAmount: "",
     rewardCurrency: "INR",
   });
-
-  useEffect(() => {
-    if (!agencyId) return;
-    Promise.all([getClients(agencyId), getMembers(agencyId)]).then(([clientData, memberData]) => {
-      setClients(clientData);
-      setMembers(memberData.filter((member) => member.status === "ACTIVE"));
-    });
-  }, [agencyId]);
 
   const assigneeOptions = useMemo(
     () => members.filter((member) => roleMatchesType(member, form.workType)),
@@ -69,6 +65,9 @@ export default function NewGigPage() {
         ...(estimatedHours ? { estimatedHours } : {}),
         ...(rewardAmount ? { rewardAmount, rewardCurrency: form.rewardCurrency || "INR" } : {}),
       });
+      queryClient.setQueryData(queryKeys.gig(agencyId, gig.id), gig);
+      queryClient.setQueryData(queryKeys.gigs(agencyId), (current: WorkOrder[] | undefined) => setListItem(current, gig));
+      invalidateWorkspaceQueries(queryClient, agencyId, ["gigs", "dashboard", "calendar"]);
       router.push(`/gigs/${gig.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create gig");

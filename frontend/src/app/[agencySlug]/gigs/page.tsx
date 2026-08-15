@@ -1,37 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAgency } from "@/components/AgencyProvider";
-import { getWorkOrders, WorkOrder } from "@/lib/api/work-orders";
 import { formatLabel, statusPillClasses } from "@/lib/status-style";
 import { hasAnyRole } from "@/lib/workspace-access";
 import { getWorkspaceHref } from "@/lib/workspace-url";
+import { useGigsQuery } from "@/lib/query";
 
 export default function GigsPage() {
   const { agency, agencyId, agencySlug } = useAgency();
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
-  const [loading, setLoading] = useState(true);
+  const gigsQuery = useGigsQuery(agencyId);
+  const workOrders = useMemo(() => gigsQuery.data ?? [], [gigsQuery.data]);
+  const loading = gigsQuery.isLoading && !gigsQuery.data;
   const canCreate = hasAnyRole(agency, ["OWNER", "ADMIN", "MANAGER"]);
   const safeAgencySlug = agencySlug ?? "";
-
-  useEffect(() => {
-    if (!agencyId) return;
-    let isMounted = true;
-    getWorkOrders(agencyId)
-      .then((data) => {
-        if (isMounted) setWorkOrders(data);
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [agencyId]);
 
   const filtered = useMemo(
     () =>
@@ -105,6 +90,8 @@ export default function GigsPage() {
       <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-2 lg:rounded-2xl lg:p-4">
         {loading ? (
           <p className="text-sm text-zinc-400">Loading gigs...</p>
+        ) : gigsQuery.error && !workOrders.length ? (
+          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">Failed to load gigs.</div>
         ) : filtered.length ? (
           <div className="divide-y divide-zinc-800">
             {filtered.map((gig) => (
