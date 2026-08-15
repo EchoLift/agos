@@ -1,8 +1,11 @@
 import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import {
+  ContentAssetStatus,
   GoogleCalendarConnection,
   GoogleCalendarSourceType,
+  TaskStatus,
   WorkOrderStatus,
+  WorkflowInstanceStatus,
 } from "@prisma/client";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "@packages/database/prisma.service";
@@ -10,11 +13,27 @@ import { GoogleCalendarOAuthService } from "./google-calendar-oauth.service";
 import * as crypto from "crypto";
 
 type WorkOrderForSync = any;
+type WorkflowTaskForSync = any;
+type GoogleEventPayload = Record<string, unknown>;
+
+const ACTIVE_WORK_ORDER_STATUSES = [
+  WorkOrderStatus.ASSIGNED,
+  WorkOrderStatus.IN_PROGRESS,
+  WorkOrderStatus.SUBMITTED,
+  WorkOrderStatus.CHANGES_REQUESTED,
+];
+
+const ACTIVE_WORKFLOW_TASK_STATUSES = [
+  TaskStatus.TODO,
+  TaskStatus.IN_PROGRESS,
+  TaskStatus.WAITING_REVIEW,
+  TaskStatus.WAITING_HANDOFF_ACCEPTANCE,
+  TaskStatus.BLOCKED,
+];
 
 @Injectable()
 export class GoogleCalendarSyncService {
   private readonly logger = new Logger(GoogleCalendarSyncService.name);
-  private readonly sourceType = GoogleCalendarSourceType.WORK_ORDER;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -38,7 +57,10 @@ export class GoogleCalendarSyncService {
     }
 
     const accessToken = await this.accessToken(connection);
-    const workOrders = await this.findRelevantWorkOrders(userId);
+    const [workOrders, workflowTasks] = await Promise.all([
+      this.findRelevantWorkOrders(userId),
+      this.findRelevantWorkflowTasks(userId),
+    ]);
     const changed = { synced: true, created: 0, updated: 0, deleted: 0 };
 
     for (const workOrder of workOrders) {
@@ -51,12 +73,26 @@ export class GoogleCalendarSyncService {
       changed.updated += result.updated;
     }
 
-    const deleted = await this.removeStaleMappings(
+    for (const workflowTask of workflowTasks) {
+      const result = await this.syncWorkflowTask(
+        connection,
+        accessToken,
+        workflowTask,
+      );
+      changed.created += result.created;
+      changed.updated += result.updated;
+    }
+
+    changed.deleted += await this.removeStaleWorkOrderMappings(
       connection,
       accessToken,
       workOrders,
     );
-    changed.deleted += deleted;
+    changed.deleted += await this.removeStaleWorkflowTaskMappings(
+      connection,
+      accessToken,
+      workflowTasks,
+    );
 
     await this.prisma.googleCalendarConnection.update({
       where: { userId },
@@ -76,6 +112,16 @@ export class GoogleCalendarSyncService {
     });
   }
 
+  queueWorkflowTaskSync(workflowTaskId: string) {
+    setImmediate(() => {
+      void this.syncAffectedWorkflowTaskUsers(workflowTaskId).catch((error) => {
+        this.logger.warn(
+          `Google Calendar sync failed for workflow task ${workflowTaskId}: ${this.safeError(error)}`,
+        );
+      });
+    });
+  }
+
   async syncAffectedWorkOrderUsers(workOrderId: string) {
     const workOrder = await this.prisma.workOrder.findUnique({
       where: { id: workOrderId },
@@ -86,7 +132,7 @@ export class GoogleCalendarSyncService {
     });
     const existingMappings = await this.prisma.googleCalendarEvent.findMany({
       where: {
-        sourceType: this.sourceType,
+        sourceType: GoogleCalendarSourceType.WORK_ORDER,
         sourceId: workOrderId,
       },
       select: { userId: true },
@@ -112,22 +158,93 @@ export class GoogleCalendarSyncService {
     );
   }
 
-  private async syncWorkOrder(
+  async syncAffectedWorkflowTaskUsers(workflowTaskId: string) {
+    const workflowTask = await this.prisma.workflowTask.findUnique({
+      where: { id: workflowTaskId },
+      select: {
+        owner: { select: { userId: true } },
+      },
+    });
+    const existingMappings = await this.prisma.googleCalendarEvent.findMany({
+      where: {
+        sourceType: GoogleCalendarSourceType.WORKFLOW_TASK,
+        sourceId: workflowTaskId,
+      },
+      select: { userId: true },
+    });
+    const userIds = [
+      ...new Set(
+        [
+          workflowTask?.owner?.userId,
+          ...existingMappings.map((mapping) => mapping.userId),
+        ].filter((value): value is string => Boolean(value)),
+      ),
+    ];
+
+    await Promise.all(
+      userIds.map((userId) =>
+        this.syncUser(userId).catch((error) => {
+          this.logger.warn(
+            `Google Calendar sync failed for user ${userId}: ${this.safeError(error)}`,
+          );
+        }),
+      ),
+    );
+  }
+
+  private syncWorkOrder(
     connection: GoogleCalendarConnection,
     accessToken: string,
     workOrder: WorkOrderForSync,
   ) {
+    return this.syncSourceEvent(
+      connection,
+      accessToken,
+      GoogleCalendarSourceType.WORK_ORDER,
+      {
+        id: workOrder.id,
+        agencyId: workOrder.agencyId,
+        updatedAt: workOrder.updatedAt,
+      },
+      this.toWorkOrderGoogleEvent(workOrder),
+    );
+  }
+
+  private syncWorkflowTask(
+    connection: GoogleCalendarConnection,
+    accessToken: string,
+    workflowTask: WorkflowTaskForSync,
+  ) {
+    return this.syncSourceEvent(
+      connection,
+      accessToken,
+      GoogleCalendarSourceType.WORKFLOW_TASK,
+      {
+        id: workflowTask.id,
+        agencyId: workflowTask.agencyId,
+        updatedAt: workflowTask.updatedAt,
+      },
+      this.toWorkflowTaskGoogleEvent(workflowTask),
+    );
+  }
+
+  private async syncSourceEvent(
+    connection: GoogleCalendarConnection,
+    accessToken: string,
+    sourceType: GoogleCalendarSourceType,
+    source: { id: string; agencyId: string; updatedAt?: Date | null },
+    event: GoogleEventPayload,
+  ) {
     const googleCalendarId = connection.googleCalendarId;
     if (!googleCalendarId) return { created: 0, updated: 0 };
 
-    const event = this.toGoogleEvent(workOrder);
     const sourceHash = this.hashEvent(event);
     const mapping = await this.prisma.googleCalendarEvent.findUnique({
       where: {
         userId_sourceType_sourceId: {
           userId: connection.userId,
-          sourceType: this.sourceType,
-          sourceId: workOrder.id,
+          sourceType,
+          sourceId: source.id,
         },
       },
     });
@@ -146,10 +263,10 @@ export class GoogleCalendarSyncService {
       await this.prisma.googleCalendarEvent.update({
         where: { id: mapping.id },
         data: {
-          agencyId: workOrder.agencyId,
+          agencyId: source.agencyId,
           googleCalendarId,
           lastSyncedAt: new Date(),
-          sourceUpdatedAt: workOrder.updatedAt,
+          sourceUpdatedAt: source.updatedAt ?? null,
           sourceHash,
         },
       });
@@ -165,27 +282,27 @@ export class GoogleCalendarSyncService {
       where: {
         userId_sourceType_sourceId: {
           userId: connection.userId,
-          sourceType: this.sourceType,
-          sourceId: workOrder.id,
+          sourceType,
+          sourceId: source.id,
         },
       },
       create: {
         userId: connection.userId,
-        agencyId: workOrder.agencyId,
-        sourceType: this.sourceType,
-        sourceId: workOrder.id,
+        agencyId: source.agencyId,
+        sourceType,
+        sourceId: source.id,
         googleCalendarId,
         googleEventId,
         lastSyncedAt: new Date(),
-        sourceUpdatedAt: workOrder.updatedAt,
+        sourceUpdatedAt: source.updatedAt ?? null,
         sourceHash,
       },
       update: {
-        agencyId: workOrder.agencyId,
+        agencyId: source.agencyId,
         googleCalendarId,
         googleEventId,
         lastSyncedAt: new Date(),
-        sourceUpdatedAt: workOrder.updatedAt,
+        sourceUpdatedAt: source.updatedAt ?? null,
         sourceHash,
         deletedAt: null,
       },
@@ -194,19 +311,94 @@ export class GoogleCalendarSyncService {
     return { created: 1, updated: 0 };
   }
 
-  private async removeStaleMappings(
+  private removeStaleWorkOrderMappings(
     connection: GoogleCalendarConnection,
     accessToken: string,
     currentWorkOrders: WorkOrderForSync[],
   ) {
+    return this.removeStaleMappings(
+      connection,
+      accessToken,
+      GoogleCalendarSourceType.WORK_ORDER,
+      currentWorkOrders.map((item) => item.id),
+      (sourceIds) =>
+        this.prisma.workOrder
+          .findMany({
+            where: { id: { in: sourceIds } },
+            include: this.workOrderInclude(),
+          })
+          .then(
+            (workOrders) => new Map(workOrders.map((item) => [item.id, item])),
+          ),
+      async (mapping, source) => {
+        if (source?.status !== WorkOrderStatus.COMPLETED) return false;
+        await this.syncCompletedSourceEvent(
+          connection,
+          accessToken,
+          mapping.id,
+          mapping.googleEventId,
+          source.updatedAt,
+          this.toWorkOrderGoogleEvent(source, true),
+        );
+        return true;
+      },
+    );
+  }
+
+  private removeStaleWorkflowTaskMappings(
+    connection: GoogleCalendarConnection,
+    accessToken: string,
+    currentWorkflowTasks: WorkflowTaskForSync[],
+  ) {
+    return this.removeStaleMappings(
+      connection,
+      accessToken,
+      GoogleCalendarSourceType.WORKFLOW_TASK,
+      currentWorkflowTasks.map((item) => item.id),
+      (sourceIds) =>
+        this.prisma.workflowTask
+          .findMany({
+            where: { id: { in: sourceIds } },
+            include: this.workflowTaskInclude(),
+          })
+          .then(
+            (workflowTasks) =>
+              new Map(workflowTasks.map((item) => [item.id, item])),
+          ),
+      async (mapping, source) => {
+        if (source?.status !== TaskStatus.COMPLETED) return false;
+        await this.syncCompletedSourceEvent(
+          connection,
+          accessToken,
+          mapping.id,
+          mapping.googleEventId,
+          source.updatedAt,
+          this.toWorkflowTaskGoogleEvent(source, true),
+        );
+        return true;
+      },
+    );
+  }
+
+  private async removeStaleMappings<TSource extends { id: string }>(
+    connection: GoogleCalendarConnection,
+    accessToken: string,
+    sourceType: GoogleCalendarSourceType,
+    activeSourceIdsList: string[],
+    loadSources: (sourceIds: string[]) => Promise<Map<string, TSource>>,
+    keepCompleted: (
+      mapping: { id: string; googleEventId: string },
+      source: TSource | undefined,
+    ) => Promise<boolean>,
+  ) {
     const googleCalendarId = connection.googleCalendarId;
     if (!googleCalendarId) return 0;
 
-    const activeSourceIds = new Set(currentWorkOrders.map((item) => item.id));
+    const activeSourceIds = new Set(activeSourceIdsList);
     const mappings = await this.prisma.googleCalendarEvent.findMany({
       where: {
         userId: connection.userId,
-        sourceType: this.sourceType,
+        sourceType,
         deletedAt: null,
       },
     });
@@ -215,23 +407,22 @@ export class GoogleCalendarSyncService {
     );
     if (!staleMappings.length) return 0;
 
-    const workOrders = await this.prisma.workOrder.findMany({
-      where: { id: { in: staleMappings.map((mapping) => mapping.sourceId) } },
-      include: this.workOrderInclude(),
-    });
-    const workOrdersById = new Map(workOrders.map((item) => [item.id, item]));
+    const sourcesById = await loadSources(
+      staleMappings.map((mapping) => mapping.sourceId),
+    );
     let deleted = 0;
 
     for (const mapping of staleMappings) {
-      const source = workOrdersById.get(mapping.sourceId);
-      if (source?.status === WorkOrderStatus.COMPLETED) {
-        await this.syncCompletedWorkOrder(
-          connection,
-          accessToken,
-          mapping.id,
-          mapping.googleEventId,
+      const source = sourcesById.get(mapping.sourceId);
+      if (
+        await keepCompleted(
+          {
+            id: mapping.id,
+            googleEventId: mapping.googleEventId,
+          },
           source,
-        );
+        )
+      ) {
         continue;
       }
 
@@ -250,17 +441,17 @@ export class GoogleCalendarSyncService {
     return deleted;
   }
 
-  private async syncCompletedWorkOrder(
+  private async syncCompletedSourceEvent(
     connection: GoogleCalendarConnection,
     accessToken: string,
     mappingId: string,
     googleEventId: string,
-    workOrder: WorkOrderForSync,
+    sourceUpdatedAt: Date | null | undefined,
+    event: GoogleEventPayload,
   ) {
     const googleCalendarId = connection.googleCalendarId;
     if (!googleCalendarId) return;
 
-    const event = this.toGoogleEvent(workOrder, true);
     const sourceHash = this.hashEvent(event);
     await this.oauth.updateEvent(
       accessToken,
@@ -272,7 +463,7 @@ export class GoogleCalendarSyncService {
       where: { id: mappingId },
       data: {
         lastSyncedAt: new Date(),
-        sourceUpdatedAt: workOrder.updatedAt,
+        sourceUpdatedAt: sourceUpdatedAt ?? null,
         sourceHash,
       },
     });
@@ -287,14 +478,7 @@ export class GoogleCalendarSyncService {
       where: {
         deletedAt: null,
         dueAt: { gte: now, lte: to },
-        status: {
-          in: [
-            WorkOrderStatus.ASSIGNED,
-            WorkOrderStatus.IN_PROGRESS,
-            WorkOrderStatus.SUBMITTED,
-            WorkOrderStatus.CHANGES_REQUESTED,
-          ],
-        },
+        status: { in: ACTIVE_WORK_ORDER_STATUSES },
         OR: [
           { assignee: { userId, status: "ACTIVE" } },
           { reviewer: { userId, status: "ACTIVE" } },
@@ -302,6 +486,31 @@ export class GoogleCalendarSyncService {
       },
       include: this.workOrderInclude(),
       orderBy: { dueAt: "asc" },
+    });
+  }
+
+  private findRelevantWorkflowTasks(userId: string) {
+    const now = new Date();
+    const to = new Date(now);
+    to.setDate(to.getDate() + this.syncWindowDays());
+
+    return this.prisma.workflowTask.findMany({
+      where: {
+        owner: { userId, status: "ACTIVE" },
+        deadlineAt: { gte: now, lte: to },
+        status: { in: ACTIVE_WORKFLOW_TASK_STATUSES },
+        currentForWorkflowInstance: {
+          some: { status: WorkflowInstanceStatus.ACTIVE },
+        },
+        workflowInstance: {
+          status: WorkflowInstanceStatus.ACTIVE,
+          contentAsset: {
+            status: ContentAssetStatus.ACTIVE,
+          },
+        },
+      },
+      include: this.workflowTaskInclude(),
+      orderBy: { deadlineAt: "asc" },
     });
   }
 
@@ -314,7 +523,29 @@ export class GoogleCalendarSyncService {
     };
   }
 
-  private toGoogleEvent(workOrder: WorkOrderForSync, completed = false) {
+  private workflowTaskInclude() {
+    return {
+      agency: true,
+      owner: { include: { user: true } },
+      workflowStep: true,
+      workflowInstance: {
+        include: {
+          currentStep: true,
+          contentAsset: {
+            include: {
+              campaign: true,
+              client: true,
+            },
+          },
+        },
+      },
+    };
+  }
+
+  private toWorkOrderGoogleEvent(
+    workOrder: WorkOrderForSync,
+    completed = false,
+  ) {
     const titlePrefix = completed ? "[Completed] [AGENCIE]" : "[AGENCIE]";
     const summary = `${titlePrefix} ${this.labelize(workOrder.workType)} - ${workOrder.title}`;
     const link = `https://${workOrder.agency.slug}.${this.rootDomain()}/gigs/${workOrder.id}`;
@@ -342,14 +573,14 @@ export class GoogleCalendarSyncService {
     return {
       summary,
       description,
-      ...this.eventDates(workOrder),
+      ...this.workOrderEventDates(workOrder),
       source: {
         title: "AGENCIE",
         url: link,
       },
       extendedProperties: {
         private: {
-          agencieSourceType: this.sourceType,
+          agencieSourceType: GoogleCalendarSourceType.WORK_ORDER,
           agencieSourceId: workOrder.id,
           agencieAgencyId: workOrder.agencyId,
         },
@@ -357,16 +588,60 @@ export class GoogleCalendarSyncService {
     };
   }
 
-  private eventDates(workOrder: WorkOrderForSync) {
-    const timezone = workOrder.assignee.user.timezone ?? "UTC";
+  private toWorkflowTaskGoogleEvent(
+    workflowTask: WorkflowTaskForSync,
+    completed = false,
+  ) {
+    const contentAsset = workflowTask.workflowInstance.contentAsset;
+    const stage =
+      workflowTask.workflowStep?.stage ??
+      workflowTask.workflowInstance.currentStep?.stage ??
+      "WORKFLOW_TASK";
+    const titlePrefix = completed ? "[Completed] [AGENCIE]" : "[AGENCIE]";
+    const contentTitle = contentAsset.title || contentAsset.displayCode;
+    const summary = `${titlePrefix} ${this.labelize(stage)} - ${contentTitle}`;
+    const link = `https://${workflowTask.agency.slug}.${this.rootDomain()}/workflow/${contentAsset.id}`;
+    const description = [
+      `Agency: ${workflowTask.agency.displayName || workflowTask.agency.name}`,
+      contentAsset.client
+        ? `Client: ${contentAsset.client.displayName ?? contentAsset.client.name}`
+        : null,
+      contentAsset.campaign ? `Campaign: ${contentAsset.campaign.name}` : null,
+      `Content: ${contentTitle}`,
+      `Stage: ${this.labelize(stage)}`,
+      `Status: ${this.labelize(workflowTask.status)}`,
+      workflowTask.owner?.user?.name
+        ? `Assignee: ${workflowTask.owner.user.name}`
+        : null,
+      "",
+      "Open in AGENCIE:",
+      link,
+    ]
+      .filter((line): line is string => line !== null)
+      .join("\n");
+
+    return {
+      summary,
+      description,
+      ...this.workflowTaskEventDates(workflowTask),
+      source: {
+        title: "AGENCIE",
+        url: link,
+      },
+      extendedProperties: {
+        private: {
+          agencieSourceType: GoogleCalendarSourceType.WORKFLOW_TASK,
+          agencieSourceId: workflowTask.id,
+          agencieAgencyId: workflowTask.agencyId,
+        },
+      },
+    };
+  }
+
+  private workOrderEventDates(workOrder: WorkOrderForSync) {
+    const timezone = workOrder.assignee?.user?.timezone ?? "UTC";
     if (this.isDateOnly(workOrder.dueAt)) {
-      const start = this.isoDate(workOrder.dueAt);
-      const end = new Date(workOrder.dueAt);
-      end.setUTCDate(end.getUTCDate() + 1);
-      return {
-        start: { date: start },
-        end: { date: this.isoDate(end) },
-      };
+      return this.allDayDates(workOrder.dueAt);
     }
 
     const start = workOrder.dueAt;
@@ -378,6 +653,35 @@ export class GoogleCalendarSyncService {
     return {
       start: { dateTime: start.toISOString(), timeZone: timezone },
       end: { dateTime: end.toISOString(), timeZone: timezone },
+    };
+  }
+
+  private workflowTaskEventDates(workflowTask: WorkflowTaskForSync) {
+    const timezone = workflowTask.owner?.user?.timezone ?? "UTC";
+    if (this.isDateOnly(workflowTask.deadlineAt)) {
+      return this.allDayDates(workflowTask.deadlineAt);
+    }
+
+    const start = workflowTask.deadlineAt;
+    const end = new Date(start);
+    end.setMinutes(
+      end.getMinutes() +
+        Math.max(30, workflowTask.workflowStep?.expectedDurationMinutes ?? 60),
+    );
+
+    return {
+      start: { dateTime: start.toISOString(), timeZone: timezone },
+      end: { dateTime: end.toISOString(), timeZone: timezone },
+    };
+  }
+
+  private allDayDates(date: Date) {
+    const start = this.isoDate(date);
+    const end = new Date(date);
+    end.setUTCDate(end.getUTCDate() + 1);
+    return {
+      start: { date: start },
+      end: { date: this.isoDate(end) },
     };
   }
 

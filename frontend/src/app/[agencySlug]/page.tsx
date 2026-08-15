@@ -10,6 +10,7 @@ import { getWorkspaceHref } from "@/lib/workspace-url";
 import { queryKeys, staleTimes, useActivationQuery, useDashboardQuery } from "@/lib/query";
 import { getCalendarEvents } from "@/lib/api/calendar";
 import { getWorkOrders } from "@/lib/api/work-orders";
+import { rememberedEntityKey, useRememberedEntityId } from "@/lib/remembered-tab";
 
 type StepId = "agency" | "team" | "client" | "campaign" | "content" | "workflow";
 
@@ -26,7 +27,7 @@ const stepTemplates: Step[] = [
   { id: "team", label: "Team", description: "Onboard your team", href: "team" },
   { id: "client", label: "Client", description: "Create your first client", href: "clients" },
   { id: "campaign", label: "Campaign", description: "Launch the first campaign", href: "campaigns" },
-  { id: "content", label: "Content", description: "Drop the first asset", href: "content" },
+  { id: "content", label: "Content Plan", description: "Plan campaign deliverables", href: "campaigns" },
   { id: "workflow", label: "Workflow", description: "Start production", href: "workflow" },
 ];
 
@@ -42,6 +43,18 @@ export default function WorkspaceDashboard() {
   const isMyWork = isProductionWorkspaceRole(agency);
   const homeLabel = workspaceHomeLabel(agency);
   const safeAgencySlug = agencySlug ?? "";
+  const rememberedClientId = useRememberedEntityId(
+    rememberedEntityKey("client", agencyId),
+  );
+  const rememberedCampaignId = useRememberedEntityId(
+    rememberedEntityKey("campaign", agencyId),
+  );
+  const rememberedGigId = useRememberedEntityId(
+    rememberedEntityKey("gig", agencyId),
+  );
+  const rememberedWorkflowId = useRememberedEntityId(
+    rememberedEntityKey("workflow", agencyId),
+  );
 
   const steps = useMemo(
     () => stepTemplates.map((step) => ({ ...step, done: activation?.steps[step.id] ?? false })),
@@ -65,7 +78,7 @@ export default function WorkspaceDashboard() {
     : [
       { label: "Active clients", value: dashboardData?.riskSummary.activeClients ?? 0, href: "clients" },
       { label: "Active campaigns", value: dashboardData?.riskSummary.activeCampaigns ?? 0, href: "campaigns" },
-      { label: "Active content", value: dashboardData?.riskSummary.activeContent ?? 0, href: "content" },
+      { label: "Active content", value: dashboardData?.riskSummary.activeContent ?? 0, href: "campaigns" },
       { label: "Blocked", value: dashboardData?.riskSummary.blockedItems ?? 0, href: "workflow" },
     ];
 
@@ -78,7 +91,31 @@ export default function WorkspaceDashboard() {
       router.push(getWorkspaceHref(safeAgencySlug, "/clients/new"));
       return;
     }
+    if (stepId === "content") {
+      router.push(getWorkspaceHref(safeAgencySlug, "/campaigns"));
+      return;
+    }
     router.push(getWorkspaceHref(safeAgencySlug, `/${stepTemplates.find((step) => step.id === stepId)?.href ?? ""}/new`));
+  };
+
+  const workspaceSectionHref = (href: string) => {
+    if (href === "clients" && rememberedClientId) {
+      return getWorkspaceHref(safeAgencySlug, `/clients/${rememberedClientId}`);
+    }
+
+    if (href === "campaigns" && rememberedCampaignId) {
+      return getWorkspaceHref(safeAgencySlug, `/campaigns/${rememberedCampaignId}`);
+    }
+
+    if (href === "gigs" && rememberedGigId) {
+      return getWorkspaceHref(safeAgencySlug, `/gigs/${rememberedGigId}`);
+    }
+
+    if (href === "workflow" && rememberedWorkflowId) {
+      return getWorkspaceHref(safeAgencySlug, `/workflow/${rememberedWorkflowId}`);
+    }
+
+    return getWorkspaceHref(safeAgencySlug, `/${href}`);
   };
 
   useEffect(() => {
@@ -162,7 +199,7 @@ export default function WorkspaceDashboard() {
               <button
                 key={card.label}
                 type="button"
-                onClick={() => router.push(`/${card.href}`)}
+                onClick={() => router.push(workspaceSectionHref(card.href))}
                 className="min-h-24 rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 text-left shadow-lg shadow-black/10 transition hover:border-indigo-500/40 hover:bg-zinc-900/70 lg:rounded-3xl lg:p-6 lg:shadow-2xl"
               >
                 <p className="text-sm text-zinc-500">{card.label}</p>
@@ -192,8 +229,8 @@ export default function WorkspaceDashboard() {
                       key={task.id}
                       type="button"
                       onClick={() => {
-                        if (task.workOrderId) router.push(`/gigs/${task.workOrderId}`);
-                        else if (task.contentAssetId) router.push(`/workflow/${task.contentAssetId}`);
+                        if (task.workOrderId) router.push(getWorkspaceHref(safeAgencySlug, `/gigs/${task.workOrderId}`));
+                        else if (task.contentAssetId) router.push(getWorkspaceHref(safeAgencySlug, `/workflow/${task.contentAssetId}`));
                       }}
                       className="min-h-20 w-full rounded-md border border-zinc-800 bg-zinc-900/70 p-3 text-left transition hover:border-indigo-500/40 hover:bg-zinc-900 lg:rounded-2xl lg:p-4"
                     >
@@ -230,7 +267,7 @@ export default function WorkspaceDashboard() {
                       key={item.id}
                       type="button"
                       disabled={!item.contentAssetId}
-                      onClick={() => item.contentAssetId && router.push(`/workflow/${item.contentAssetId}`)}
+                      onClick={() => item.contentAssetId && router.push(getWorkspaceHref(safeAgencySlug, `/workflow/${item.contentAssetId}`))}
                       className="min-h-16 w-full rounded-md border border-zinc-800 bg-zinc-900/70 p-3 text-left transition hover:border-indigo-500/40 hover:bg-zinc-900 disabled:cursor-default disabled:hover:border-zinc-800 disabled:hover:bg-zinc-900/70 lg:rounded-2xl lg:p-4"
                     >
                       <p className="text-sm font-semibold text-white">
@@ -251,8 +288,8 @@ export default function WorkspaceDashboard() {
           </div>
         </div>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[1.3fr_0.9fr]">
-          <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl shadow-black/20">
+        <div className="grid gap-3 lg:grid-cols-[1.3fr_0.9fr]">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-950/80 p-2 shadow-2xl shadow-black/20">
             <div className="flex items-center justify-between text-sm text-zinc-400">
               <span>Workspace setup</span>
               <span>{progress}%</span>
@@ -261,7 +298,7 @@ export default function WorkspaceDashboard() {
               <div className="h-2 rounded-full bg-indigo-500 transition-all duration-500" style={{ width: `${progress}%` }} />
             </div>
 
-            <div className="mt-8 space-y-4">
+            <div className="mt-4 space-y-3">
               {steps.map((step) => (
                 <div key={step.id} className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-900/70 px-4 py-4">
                   <div>
@@ -276,14 +313,14 @@ export default function WorkspaceDashboard() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl shadow-black/20">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-950/80 p-2 shadow-2xl shadow-black/20">
             <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">Activation</p>
             <h2 className="mt-3 text-3xl font-semibold text-white">Your agency is ready.</h2>
             <p className="mt-3 text-sm leading-7 text-zinc-400">
               Start with the work that creates momentum. The rest of the workspace can follow.
             </p>
 
-            <div className="mt-8 space-y-3">
+            <div className="mt-4 space-y-3">
               <button
                 onClick={() => completeStep("team")}
                 className="flex w-full items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-900/70 px-4 py-4 text-left text-sm font-medium text-zinc-200 transition hover:border-indigo-500/50"
@@ -312,7 +349,7 @@ export default function WorkspaceDashboard() {
                 onClick={() => completeStep("content")}
                 className="flex w-full items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-900/70 px-4 py-4 text-left text-sm font-medium text-zinc-200 transition hover:border-indigo-500/50"
               >
-                <span>Create Content</span>
+                <span>Open Content Plans</span>
                 <span className="text-zinc-400">Next</span>
               </button>
             </div>

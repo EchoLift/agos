@@ -18,6 +18,7 @@ import {
 } from "@/lib/api/campaigns";
 import { Member } from "@/lib/api/team";
 import { invalidateWorkspaceQueries, queryKeys, setListItem, useClientsQuery, useTeamQuery } from "@/lib/query";
+import { getWorkspaceHref } from "@/lib/workspace-url";
 
 const defaultDeliverable: CampaignDeliverablePlan = {
   contentType: "REEL",
@@ -56,7 +57,7 @@ export default function NewCampaignPage() {
   const [deliverables, setDeliverables] = useState<CampaignDeliverablePlan[]>([defaultDeliverable]);
   const [schedules, setSchedules] = useState<PublishingSchedule[]>([]);
   const [teamDrafts, setTeamDrafts] = useState<TeamDraft[]>([]);
-
+  const safeAgencySlug = useAgency().agencySlug ?? "";
   const { register, handleSubmit, formState } = useForm<CreateCampaignInput>({
     mode: "onChange",
     defaultValues: {
@@ -91,8 +92,8 @@ export default function NewCampaignPage() {
       }
       queryClient.setQueryData(queryKeys.campaign(agencyId, campaign.id), campaign);
       queryClient.setQueryData(queryKeys.campaigns(agencyId), (current: Campaign[] | undefined) => setListItem(current, campaign));
-      invalidateWorkspaceQueries(queryClient, agencyId, ["campaigns", "dashboard", "calendar", "workflow"]);
-      router.push(`/campaigns/${campaign.id}`);
+      invalidateWorkspaceQueries(queryClient, agencyId, ["campaigns", "dashboard", "schedule","calendar", "workflow"]);
+      router.push(getWorkspaceHref(safeAgencySlug, `/campaigns/${campaign.id}`));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create campaign.");
       setIsSubmitting(false);
@@ -139,7 +140,7 @@ export default function NewCampaignPage() {
 
         <div className="flex justify-end gap-3 pt-2">
           <Link
-            href={`/campaigns`}
+            href={getWorkspaceHref(safeAgencySlug, "/campaigns")}
             className="rounded-full border border-zinc-800 px-6 py-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
           >
             Cancel

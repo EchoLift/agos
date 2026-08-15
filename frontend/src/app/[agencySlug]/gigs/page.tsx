@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAgency } from "@/components/AgencyProvider";
 import { formatLabel, statusPillClasses } from "@/lib/status-style";
 import { hasAnyRole } from "@/lib/workspace-access";
-import { getWorkspaceHref } from "@/lib/workspace-url";
+import { getHelpHref, getWorkspaceHref } from "@/lib/workspace-url";
 import { useGigsQuery } from "@/lib/query";
 
 export default function GigsPage() {
@@ -35,27 +35,27 @@ export default function GigsPage() {
 
   return (
     <div className="space-y-3 lg:space-y-4">
-      <div className="flex items-end justify-between gap-3">
+      <div className="flex items-end justify-between gap-1">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">Work orders</p>
           <h1 className="mt-1 text-2xl font-semibold text-white sm:text-3xl">Gigs</h1>
           <p className="mt-2 text-sm text-zinc-400">
             Fast one-off assignments for scripts, edits, shoots, designs, and overflow work.
           </p>
-          <Link href="/help/gigs/when-to-use-gigs" className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200">
+          <Link href={getHelpHref("gigs/when-to-use-gigs")} className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200">
             When should I use a Gig?
           </Link>
         </div>
         {canCreate ? (
-          <Link href={getWorkspaceHref(safeAgencySlug, "/gigs/new")} className="flex min-h-11 items-center rounded-md bg-indigo-500 px-4 text-sm font-semibold text-white hover:bg-indigo-400 lg:rounded-full lg:px-5">
-            New Gig
+          <Link href={getWorkspaceHref(safeAgencySlug, "/gigs/new")} className="flex min-h-8 items-center rounded-md bg-indigo-500 px-2 text-sm font-semibold text-white hover:bg-indigo-400 lg:rounded-full lg:px-2">
+            Create
           </Link>
         ) : null}
       </div>
 
-      <details className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 lg:hidden">
-        <summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-zinc-300">Search and filters</summary>
-        <div className="grid gap-2 pt-2">
+      <details className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-1 lg:hidden">
+        <summary className="min-h-7 cursor-pointer p-1 text-sm font-semibold text-zinc-300">Search and filters</summary>
+        <div className="grid gap-2 p-1">
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -97,7 +97,7 @@ export default function GigsPage() {
             {filtered.map((gig) => (
               <Link
                 key={gig.id}
-                href={`/gigs/${gig.id}`}
+                href={getWorkspaceHref(safeAgencySlug, `/gigs/${gig.id}`)}
                 className="relative grid min-h-24 gap-2 rounded-md p-3 transition hover:bg-zinc-900/50 md:grid-cols-[1fr_160px_180px_150px] md:rounded-none md:py-4"
               >
                 <div>

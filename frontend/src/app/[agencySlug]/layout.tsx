@@ -37,7 +37,7 @@ export default async function WorkspaceLayout({
             {children}
           </main>
 
-          <footer className="border-t border-zinc-800/70 bg-[#09090b]/95 py-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))] text-center text-xs text-zinc-500 lg:pb-3">
+          <footer className="border-t border-zinc-800/70 bg-[#09090b]/95 py-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] text-center text-xs text-zinc-500 lg:pb-3">
             Powered by AGENCIE
           </footer>
         </div>

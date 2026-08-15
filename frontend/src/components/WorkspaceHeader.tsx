@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Search } from "lucide-react";
 import { useAgency } from "@/components/AgencyProvider";
@@ -9,8 +9,9 @@ import { logout } from "@/lib/auth";
 import { Agency } from "@/lib/api/organization";
 import { useActivateAgencyMutation, useMembershipsQuery, useProfileQuery } from "@/lib/query";
 import { visibleWorkspaceNavItems } from "@/lib/workspace-access";
-import { getWorkspaceUrl, getRootDomainUrl, getWorkspaceHref } from "@/lib/workspace-url";
+import { getWorkspaceUrl, getRootDomainUrl, getWorkspaceHref, getHelpHref } from "@/lib/workspace-url";
 import { clearAgencyScopedUiState } from "@/lib/workspace-cache";
+import { rememberedEntityKey, useRememberedEntityId } from "@/lib/remembered-tab";
 import GlobalSearch from "@/components/GlobalSearch";
 import MobileWorkspaceNav from "@/components/MobileWorkspaceNav";
 
@@ -29,7 +30,53 @@ export default function WorkspaceHeader({
   const { data: memberships } = useMembershipsQuery();
   const activateAgencyMutation = useActivateAgencyMutation();
   const agencies = memberships?.agencies ?? [];
-  const navItems = visibleWorkspaceNavItems(agency, agencySlug, profile?.id);
+  const baseNavItems = visibleWorkspaceNavItems(agency, agencySlug, profile?.id);
+  const rememberedClientId = useRememberedEntityId(
+    rememberedEntityKey("client", agency?.id),
+  );
+  const rememberedCampaignId = useRememberedEntityId(
+    rememberedEntityKey("campaign", agency?.id),
+  );
+  const rememberedGigId = useRememberedEntityId(
+    rememberedEntityKey("gig", agency?.id),
+  );
+  const rememberedWorkflowId = useRememberedEntityId(
+    rememberedEntityKey("workflow", agency?.id),
+  );
+  const navItems = useMemo(() => {
+    const rememberedByKey = {
+      clients: rememberedClientId
+        ? `/clients/${rememberedClientId}`
+        : null,
+      campaigns: rememberedCampaignId
+        ? `/campaigns/${rememberedCampaignId}`
+        : null,
+      gigs: rememberedGigId ? `/gigs/${rememberedGigId}` : null,
+      workflow: rememberedWorkflowId
+        ? `/workflow/${rememberedWorkflowId}`
+        : null,
+    };
+
+    return baseNavItems.map((item) => {
+      const rememberedPath =
+        rememberedByKey[item.key as keyof typeof rememberedByKey];
+
+      return {
+        ...item,
+        baseHrefValue: getWorkspaceHref(agencySlug, item.href),
+        hrefValue: rememberedPath
+          ? getWorkspaceHref(agencySlug, rememberedPath)
+          : item.hrefValue,
+      };
+    });
+  }, [
+    agencySlug,
+    baseNavItems,
+    rememberedCampaignId,
+    rememberedClientId,
+    rememberedGigId,
+    rememberedWorkflowId,
+  ]);
   const [switchingAgencyId, setSwitchingAgencyId] = useState<string | null>(
     null,
   );
@@ -107,7 +154,7 @@ export default function WorkspaceHeader({
                 key={item.label}
                 href={item.hrefValue}
                 label={item.label}
-                isActive={isActivePath(pathname, item.hrefValue)}
+                isActive={isActivePath(pathname, item.baseHrefValue)}
               />
             ))}
           </nav>
@@ -241,7 +288,7 @@ export default function WorkspaceHeader({
 
                   <div className="p-2">
                     <MenuLink
-                      href="/help"
+                      href={getHelpHref()}
                       label="Help & Support"
                       onClick={() => setIsMenuOpen(false)}
                     />

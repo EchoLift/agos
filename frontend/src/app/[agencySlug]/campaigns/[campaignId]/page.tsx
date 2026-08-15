@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { CampaignPlanForm } from "@/components/CampaignPlanForm";
+import { CampaignContentPlan } from "@/components/CampaignContentPlan";
 import { useAgency } from "@/components/AgencyProvider";
 import {
   activateCampaign,
@@ -39,7 +40,13 @@ import { getMembers, Member } from "@/lib/api/team";
 import { publishingPlatformOptions } from "@/lib/campaign-options";
 import { statusPillClasses } from "@/lib/status-style";
 import { invalidateWorkspaceQueries, queryKeys, setListItem } from "@/lib/query";
-
+import { getWorkspaceHref } from "@/lib/workspace-url";
+import {
+  rememberedEntityKey,
+  rememberedTabKey,
+  useRememberLastVisitedEntity,
+  useRememberedTab,
+} from "@/lib/remembered-tab";
 const assignmentRoleOrder: CampaignAssignmentRole[] = [
   "CAMPAIGN_MANAGER",
   "RELATIONSHIP_MANAGER",
@@ -52,8 +59,13 @@ const assignmentRoleOrder: CampaignAssignmentRole[] = [
   "AGENCY_APPROVER",
 ];
 
+type CampaignTab = "overview" | "content" | "schedule" | "team" | "activity";
+
+const campaignTabs: CampaignTab[] = ["overview", "content", "schedule", "team", "activity"];
+
 export default function CampaignDetailPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const params = useParams<{ campaignId: string }>();
   const queryClient = useQueryClient();
   const { agencyId, agencySlug, agency } = useAgency();
@@ -65,14 +77,26 @@ export default function CampaignDetailPage() {
   const [publishingAgenda, setPublishingAgenda] = useState<PublishingScheduleAgendaResponse | null>(null);
   const [deliverables, setDeliverables] = useState<CampaignDeliverablePlan[]>([]);
   const [schedules, setSchedules] = useState<PublishingSchedule[]>([]);
-  const [activeTab, setActiveTab] = useState<"overview" | "content" | "calendar" | "team" | "activity">("overview");
+  const [activeTab, setActiveTab] = useRememberedTab<CampaignTab>({
+    defaultTab: "overview",
+    storageKey: agencyId
+      ? rememberedTabKey("campaign", agencyId, params.campaignId)
+      : null,
+    urlTab: searchParams.get("tab"),
+    validTabs: campaignTabs,
+  });
+  useRememberLastVisitedEntity({
+    storageKey: rememberedEntityKey("campaign", agencyId),
+    entityId: campaign?.id,
+    enabled: Boolean(campaign),
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [isManagingTeam, setIsManagingTeam] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  const safeAgencySlug = agencySlug ?? "";
   const { register, handleSubmit, reset, formState } = useForm<CreateCampaignInput>({
     mode: "onChange",
   });
@@ -205,6 +229,19 @@ export default function CampaignDetailPage() {
     ]);
     setTeamAssignments(team);
     setActivityItems(activity.items);
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.campaignTeam(agencyId, campaign.id),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.campaignContent(agencyId, campaign.id),
+    });
+    invalidateWorkspaceQueries(queryClient, agencyId, [
+      "dashboard",
+      "workflow",
+      "gigs",
+      "calendar",
+      "team",
+    ]);
   };
 
   const refreshPublishing = async () => {
@@ -222,12 +259,12 @@ export default function CampaignDetailPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+    <div className="mx-auto max-w-7xl space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => router.push(`/campaigns`)}
+            onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/campaigns"))}
             className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white"
           >
             ←
@@ -320,7 +357,7 @@ export default function CampaignDetailPage() {
         <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>
       ) : campaign ? (
         isEditing ? (
-          <form className="space-y-6" onSubmit={handleSubmit(save)}>
+          <form className="space-y-2" onSubmit={handleSubmit(save)}>
             <CampaignPlanForm
               register={register}
               clients={clients}
@@ -346,7 +383,7 @@ export default function CampaignDetailPage() {
             </div>
           </form>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-2">
             <section className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-6 shadow-2xl shadow-black/20">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -372,11 +409,11 @@ export default function CampaignDetailPage() {
               <Metric label="Completed" value={metrics.completed} />
               <Metric label="Pending" value={metrics.pending} />
               <Metric label="Blocked" value={metrics.blocked} />
-              <Metric label="Calendar" value={campaign.publishingSchedules?.length || 0} />
+              <Metric label="Schedule" value={campaign.publishingSchedules?.length || 0} />
             </div>
 
             <div className="flex flex-wrap gap-2 rounded-3xl border border-zinc-800 bg-zinc-950/80 p-2">
-              {(["overview", "content", "calendar", "team", "activity"] as const).map((tab) => (
+              {campaignTabs.map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -389,12 +426,12 @@ export default function CampaignDetailPage() {
             </div>
 
             {activeTab === "overview" ? (
-              <div className="grid gap-6 lg:grid-cols-2">
+              <div className="grid gap-2 lg:grid-cols-2">
                 <CampaignOverviewSections campaign={campaign} canViewOperationalFields={canViewOperationalFields} />
               </div>
             ) : null}
 
-            {activeTab === "calendar" ? (
+            {activeTab === "schedule" ? (
               <CampaignAgenda
                 campaign={campaign}
                 agenda={publishingAgenda}
@@ -406,7 +443,15 @@ export default function CampaignDetailPage() {
             ) : null}
 
             {activeTab === "content" ? (
-              <CampaignContentSection campaign={campaign} agencySlug={agencySlug!} />
+              <CampaignContentPlan
+                campaign={campaign}
+                agencyId={agencyId!}
+                agencySlug={agencySlug!}
+                agenda={publishingAgenda}
+                campaignTeam={teamAssignments}
+                canManage={canEditCampaign}
+                onChanged={refreshPublishing}
+              />
             ) : null}
 
             {activeTab === "team" ? (
@@ -690,6 +735,14 @@ function CampaignAgenda({
 
   return (
     <div className="space-y-6">
+      <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-6 shadow-2xl shadow-black/20">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.25em] text-zinc-500">Schedule</h2>
+        <p className="mt-3 text-xl font-semibold text-white">Campaign-specific timing.</p>
+        <p className="mt-1 text-sm text-zinc-500">
+          Publishing slots stay linked to content assets where possible. Shoot and production due dates come from workflow tasks when they exist.
+        </p>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-4">
         <Metric label="Upcoming" value={agenda?.summary.upcoming || 0} />
         <Metric label="Ready" value={agenda?.summary.ready || 0} />
@@ -722,7 +775,7 @@ function CampaignAgenda({
         </Section>
       ) : null}
 
-      <Section title="Agenda">
+      <Section title="Publishing Agenda">
         {agenda?.items.length ? (
           <div className="space-y-3">
             {agenda.items.map((slot) => (
@@ -738,7 +791,7 @@ function CampaignAgenda({
                     {slot.contentAsset ? (
                       <button
                         type="button"
-                        onClick={() => router.push(`/workflow/${slot.contentAsset!.id}`)}
+                        onClick={() => router.push(getWorkspaceHref(agencySlug, `/workflow/${slot.contentAsset!.id}`))}
                         className="mt-2 text-left text-sm font-semibold text-indigo-400 transition hover:text-indigo-300"
                       >
                         {slot.contentAsset.displayCode} · {slot.contentAsset.title}
@@ -768,37 +821,6 @@ function CampaignAgenda({
         )}
       </Section>
     </div>
-  );
-}
-
-function CampaignContentSection({ campaign, agencySlug }: { campaign: Campaign; agencySlug: string }) {
-  const router = useRouter();
-
-  return (
-    <Section title="Content">
-      {campaign.contentAssets?.length ? (
-        <div className="grid gap-3 md:grid-cols-2">
-          {campaign.contentAssets.map((asset) => (
-            <button
-              key={asset.id}
-              type="button"
-              onClick={() => router.push(`/workflow/${asset.id}`)}
-              className="rounded-2xl border border-zinc-800 p-4 text-left transition hover:border-indigo-500/40 hover:bg-zinc-900/60"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-white">{asset.displayCode || "CONTENT"}</div>
-                  <div className="mt-1 text-sm text-zinc-400">{asset.title || "Untitled content"}</div>
-                </div>
-                <span className="rounded-full bg-zinc-800 px-2 py-1 text-xs font-semibold text-zinc-400">{asset.status}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <Empty text="No content assets created for this campaign yet." />
-      )}
-    </Section>
   );
 }
 
@@ -1071,7 +1093,7 @@ function canViewFullCampaign(role?: string, roles?: Array<{ key: string; name: s
     .filter(Boolean)
     .map((item) => item!.toUpperCase());
 
-  return normalizedRoles.some((item) => ["OWNER", "MANAGER"].includes(item));
+  return normalizedRoles.some((item) => ["OWNER", "ADMIN", "MANAGER"].includes(item));
 }
 
 function canManageTeam(role?: string, roles?: Array<{ key: string; name: string }>, membershipId?: string, assignments: CampaignTeamAssignment[] = []) {
@@ -1092,7 +1114,7 @@ function canManagePublishing(role?: string, roles?: Array<{ key: string; name: s
     .filter(Boolean)
     .map((item) => item!.toUpperCase());
 
-  return normalizedRoles.some((item) => ["OWNER", "MANAGER", "SOCIAL_MEDIA_MANAGER"].includes(item));
+  return normalizedRoles.some((item) => ["OWNER", "ADMIN", "MANAGER", "SOCIAL_MEDIA_MANAGER"].includes(item));
 }
 
 function formatDate(value?: string | null) {
@@ -1133,5 +1155,5 @@ function inferContentType(slot: PublishingSchedule) {
 function cacheCampaign(queryClient: ReturnType<typeof useQueryClient>, agencyId: string, campaign: Campaign) {
   queryClient.setQueryData(queryKeys.campaign(agencyId, campaign.id), campaign);
   queryClient.setQueryData(queryKeys.campaigns(agencyId), (current: Campaign[] | undefined) => setListItem(current, campaign));
-  invalidateWorkspaceQueries(queryClient, agencyId, ["campaigns", "dashboard", "calendar", "workflow"]);
+  invalidateWorkspaceQueries(queryClient, agencyId, ["campaigns", "dashboard", "schedule", "calendar", "workflow"]);
 }

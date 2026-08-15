@@ -1,0 +1,1 @@
+ALTER TYPE "GoogleCalendarSourceType" ADD VALUE IF NOT EXISTS 'WORKFLOW_TASK';

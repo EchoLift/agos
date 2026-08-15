@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { getHelpHref } from "@/lib/workspace-url";
 
 export type DocStatus = "AVAILABLE" | "PARTIAL" | "DEVELOPMENT_ONLY" | "PLANNED" | "NOT_FOUND";
 
@@ -36,7 +37,7 @@ export function getAllDocs() {
 
       return {
         slug,
-        href: `/help/${slug}`,
+        href: getHelpHref(slug),
         title: frontmatterString(frontmatter.title, titleFromSlug(slug)),
         description: frontmatterString(frontmatter.description),
         category: frontmatterString(frontmatter.category, "Help"),

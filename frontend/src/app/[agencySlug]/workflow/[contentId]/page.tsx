@@ -9,7 +9,8 @@ import { performWorkflowAction, WorkflowActionType } from "@/lib/api/workflow";
 import { formatLabel, statusPillClasses } from "@/lib/status-style";
 import { getAgencyRoleKeys } from "@/lib/workspace-access";
 import { invalidateWorkspaceQueries, queryKeys, setListItem, useContentAssetQuery } from "@/lib/query";
-
+import { getWorkspaceHref } from "@/lib/workspace-url";
+import { rememberedEntityKey, useRememberLastVisitedEntity } from "@/lib/remembered-tab";
 const contentTypes = ["REEL", "CAROUSEL", "STATIC", "STORY", "BLOG", "YOUTUBE", "AD", "OTHER"];
 
 export default function WorkflowDetailPage() {
@@ -17,10 +18,16 @@ export default function WorkflowDetailPage() {
   const params = useParams<{ contentId: string }>();
   const queryClient = useQueryClient();
   const { agencyId, agency } = useAgency();
+  const safeAgencySlug = agency?.slug ?? "";
   const roleKeys = useMemo(() => getAgencyRoleKeys(agency), [agency]);
   const canEditAsset = roleKeys.some((roleKey) => ["OWNER", "ADMIN", "MANAGER"].includes(roleKey));
   const assetQuery = useContentAssetQuery(agencyId, params.contentId);
   const asset = assetQuery.data ?? null;
+  useRememberLastVisitedEntity({
+    storageKey: rememberedEntityKey("workflow", agencyId),
+    entityId: asset?.id,
+    enabled: Boolean(asset),
+  });
   const [draft, setDraft] = useState({ title: "", type: "REEL", brief: "" });
   const [actionDraft, setActionDraft] = useState({ externalLink: "", comment: "" });
   const [isEditing, setIsEditing] = useState(false);
@@ -94,7 +101,7 @@ export default function WorkflowDetailPage() {
         <div className="flex min-w-0 items-center gap-2 lg:gap-4">
           <button
             type="button"
-            onClick={() => router.push(`/workflow`)}
+            onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/workflow"))}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white lg:rounded-full"
           >
             ←
@@ -187,7 +194,7 @@ export default function WorkflowDetailPage() {
                   <ClientContext
                     client={asset.clientSummary}
                     fallbackName={asset.clientSummary?.name || asset.clientId}
-                    onView={() => router.push(`/clients/${asset.clientId}`)}
+                    onView={() => router.push(getWorkspaceHref(safeAgencySlug, `/clients/${asset.clientId}`))}
                   />
                 </section>
                 <LatestSubmissionCard submission={asset.latestSubmission} />

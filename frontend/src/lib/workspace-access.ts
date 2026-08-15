@@ -6,7 +6,6 @@ export type WorkspaceNavKey =
   | "clients"
   | "campaigns"
   | "gigs"
-  | "content"
   | "workflow"
   | "calendar"
   | "team";
@@ -42,12 +41,6 @@ export const workspaceNavItems: WorkspaceNavItem[] = [
     label: "Gigs",
     shortLabel: "GG",
     href: "/gigs",
-  },
-  {
-    key: "content",
-    label: "Content",
-    shortLabel: "CT",
-    href: "/content",
   },
   {
     key: "workflow",
@@ -94,7 +87,6 @@ const roleAccess: Record<string, WorkspaceNavKey[]> = {
     "clients",
     "campaigns",
     "gigs",
-    "content",
     "workflow",
     "calendar",
     "team",
@@ -104,7 +96,6 @@ const roleAccess: Record<string, WorkspaceNavKey[]> = {
     "clients",
     "campaigns",
     "gigs",
-    "content",
     "workflow",
     "calendar",
     "team",
@@ -301,7 +292,7 @@ export function canAccessWorkspacePath(
   }
 
   if (relativePath.startsWith("/content")) {
-    return allowed.has("content");
+    return allowed.has("campaigns");
   }
 
   if (relativePath.startsWith("/workflow")) {

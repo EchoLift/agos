@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAgency } from "@/components/AgencyProvider";
 import { useRouter } from "next/navigation";
 import { statusPillClasses } from "@/lib/status-style";
-import {getWorkspaceHref} from "@/lib/workspace-url";
+import { getHelpHref, getWorkspaceHref } from "@/lib/workspace-url";
 import { useCampaignsQuery, useClientsQuery } from "@/lib/query";
 
 export default function CampaignsPage() {
@@ -32,12 +32,12 @@ export default function CampaignsPage() {
   }, [campaigns, clientById, filters]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">Initiatives</p>
           <h1 className="mt-2 text-3xl font-semibold text-white">Campaigns</h1>
-          <Link href="/help/campaigns/campaign-planning" className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200">
+          <Link href={getHelpHref("campaigns/campaign-planning")} className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200">
             Learn how campaigns work
           </Link>
         </div>
@@ -49,7 +49,7 @@ export default function CampaignsPage() {
         </button>
       </div>
 
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-4 shadow-2xl shadow-black/20">
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950/80 p-2 shadow-2xl shadow-black/20">
         <div className="grid gap-3 md:grid-cols-4">
           <input value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Search campaigns" className="rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500 md:col-span-2" />
           <select value={filters.clientId} onChange={(event) => setFilters((current) => ({ ...current, clientId: event.target.value }))} className="rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-sm text-white outline-none transition focus:border-indigo-500">
@@ -65,7 +65,7 @@ export default function CampaignsPage() {
         </div>
       </div>
 
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl shadow-black/20">
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950/80 p-8 shadow-2xl shadow-black/20">
         {isLoading ? (
           <div className="text-sm text-zinc-500">Loading campaigns...</div>
         ) : (campaignsQuery.error || clientsQuery.error) && !campaigns.length ? (
@@ -101,7 +101,7 @@ export default function CampaignsPage() {
                 {filteredCampaigns.map((campaign) => (
                   <tr
                     key={campaign.id}
-                    onClick={() => router.push(`/campaigns/${campaign.id}`)}
+                    onClick={() => router.push(getWorkspaceHref(safeAgencySlug, `/campaigns/${campaign.id}`))}
                     className="cursor-pointer transition-colors hover:bg-zinc-900/30"
                   >
                     <td className="py-4 pr-6 font-medium text-zinc-200">{campaign.name}</td>
@@ -116,7 +116,7 @@ export default function CampaignsPage() {
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
-                          router.push(`/campaigns/${campaign.id}`);
+                          router.push(getWorkspaceHref(safeAgencySlug, `/campaigns/${campaign.id}`));
                         }}
                         className="text-indigo-400 hover:text-indigo-300"
                       >

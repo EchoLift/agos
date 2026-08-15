@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import {
   ApprovalStatus,
@@ -21,6 +22,7 @@ import {
 import { PrismaService } from "@packages/database/prisma.service";
 import { DomainEventName, DomainEvents } from "@packages/events/domain-event";
 import { EventBusService } from "@packages/events/event-bus.service";
+import { GoogleCalendarSyncService } from "@modules/google-calendar/google-calendar-sync.service";
 import { isEmailChannelRequired } from "@modules/notification/notification.policy";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import { ApproveContentDto } from "./dto/approve-content.dto";
@@ -41,6 +43,8 @@ export class WorkflowService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventBus: EventBusService,
+    @Optional()
+    private readonly googleCalendarSync?: GoogleCalendarSyncService,
   ) {}
 
   async getBoard(
@@ -343,6 +347,7 @@ export class WorkflowService {
       },
     });
 
+    this.queueWorkflowTaskSync(result.initialTask.id);
     return result.asset;
   }
 
@@ -526,7 +531,7 @@ export class WorkflowService {
         },
       );
 
-      return { workflowInstance, task };
+      return { workflowInstance, previousTaskId: previousTask?.id, task };
     });
 
     await this.eventBus.publish(DomainEvents.ContentAssigned, {
@@ -542,6 +547,7 @@ export class WorkflowService {
       },
     });
 
+    this.queueWorkflowTaskSync(result.previousTaskId, result.task.id);
     return result.task;
   }
 
@@ -608,6 +614,7 @@ export class WorkflowService {
       },
     });
 
+    this.queueWorkflowTaskSync(task.id);
     return submission;
   }
 
@@ -698,6 +705,7 @@ export class WorkflowService {
       },
     });
 
+    this.queueWorkflowTaskSync(submission.workflowTaskId);
     return updated;
   }
 
@@ -809,7 +817,8 @@ export class WorkflowService {
       }
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    const approvedTaskIds = await this.prisma.$transaction(async (tx) => {
+      let nextTaskId: string | null = null;
       await tx.workflowTask.update({
         where: { id: task.id },
         data: {
@@ -890,6 +899,7 @@ export class WorkflowService {
             deadlineAt: new Date(nextDeadlineAt),
           },
         });
+        nextTaskId = nextTask.id;
 
         await tx.workflowInstance.update({
           where: { id: task.workflowInstanceId },
@@ -964,6 +974,8 @@ export class WorkflowService {
           },
         );
       }
+
+      return { nextTaskId };
     });
 
     await this.eventBus.publish(DomainEvents.ApprovalGranted, {
@@ -977,6 +989,7 @@ export class WorkflowService {
       },
     });
 
+    this.queueWorkflowTaskSync(task.id, approvedTaskIds.nextTaskId);
     return approval;
   }
 
@@ -1005,7 +1018,7 @@ export class WorkflowService {
       },
     });
 
-    await this.prisma.$transaction(async (tx) => {
+    const changedTaskIds = await this.prisma.$transaction(async (tx) => {
       await tx.workflowTask.update({
         where: { id: task.id },
         data: {
@@ -1072,6 +1085,8 @@ export class WorkflowService {
           eventType: DomainEvents.ChangesRequested,
         },
       );
+
+      return { returnTaskId: returnTask.id };
     });
 
     await this.eventBus.publish(DomainEvents.ChangesRequested, {
@@ -1085,6 +1100,7 @@ export class WorkflowService {
       },
     });
 
+    this.queueWorkflowTaskSync(task.id, changedTaskIds.returnTaskId);
     return approval;
   }
 
@@ -1128,6 +1144,7 @@ export class WorkflowService {
       },
     });
 
+    this.queueWorkflowTaskSync(task.id);
     return blocker;
   }
 
@@ -1165,6 +1182,7 @@ export class WorkflowService {
       },
     });
 
+    this.queueWorkflowTaskSync(taskId);
     return updatedTask;
   }
 
@@ -1375,6 +1393,7 @@ export class WorkflowService {
       return { submission, reviewTask };
     });
 
+    this.queueWorkflowTaskSync(task.id, result.reviewTask.id);
     return result;
   }
 
@@ -1455,6 +1474,7 @@ export class WorkflowService {
     const next = await this.nextStageAfterApproval(task, stage, contentAssetId);
 
     const result = await this.prisma.$transaction(async (tx) => {
+      let nextTaskId: string | null = null;
       const approval = await tx.approval.create({
         data: {
           agencyId: task.agencyId,
@@ -1521,6 +1541,7 @@ export class WorkflowService {
             deadlineAt: next.deadlineAt,
           },
         });
+        nextTaskId = nextTask.id;
 
         await tx.workflowInstance.update({
           where: { id: task.workflowInstanceId },
@@ -1634,10 +1655,11 @@ export class WorkflowService {
         );
       }
 
-      return approval;
+      return { approval, nextTaskId };
     });
 
-    return result;
+    this.queueWorkflowTaskSync(task.id, result.nextTaskId);
+    return result.approval;
   }
 
   private async returnAction(
@@ -1834,10 +1856,11 @@ export class WorkflowService {
         },
       );
 
-      return createdApproval;
+      return { approval: createdApproval, returnTaskId: returnTask.id };
     });
 
-    return approval;
+    this.queueWorkflowTaskSync(task.id, approval.returnTaskId);
+    return approval.approval;
   }
 
   private async currentTaskForAction(contentAssetId: string, agencyId: string) {
@@ -2366,13 +2389,18 @@ export class WorkflowService {
     assignmentRole: CampaignAssignmentRole,
     message: string,
   ) {
-    const assignment = assignments.find(
+    const matching = assignments.filter(
       (item) => item.assignmentRole === assignmentRole,
     );
-    if (!assignment) {
+    if (!matching.length) {
       throw new BadRequestException(message);
     }
-    return assignment.membershipId;
+    if (matching.length > 1) {
+      throw new BadRequestException(
+        `Multiple ${assignmentRole.replaceAll("_", " ").toLowerCase()} assignees exist on this campaign; choose one before activating this work`,
+      );
+    }
+    return matching[0].membershipId;
   }
 
   private relativeDeadline(
@@ -2718,5 +2746,12 @@ export class WorkflowService {
         linkedin: client.linkedinUrl,
       },
     };
+  }
+
+  private queueWorkflowTaskSync(...taskIds: Array<string | null | undefined>) {
+    if (!this.googleCalendarSync) return;
+    for (const taskId of new Set(taskIds.filter(Boolean) as string[])) {
+      this.googleCalendarSync.queueWorkflowTaskSync(taskId);
+    }
   }
 }

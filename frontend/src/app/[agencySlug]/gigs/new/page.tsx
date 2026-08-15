@@ -8,12 +8,14 @@ import { Member } from "@/lib/api/team";
 import { createWorkOrder, WorkOrder, WorkOrderPriority, WorkOrderType } from "@/lib/api/work-orders";
 import { formatLabel } from "@/lib/status-style";
 import { invalidateWorkspaceQueries, queryKeys, setListItem, useClientsQuery, useTeamQuery } from "@/lib/query";
+import { getWorkspaceHref } from "@/lib/workspace-url";
 
 const workTypes: WorkOrderType[] = ["SCRIPT", "EDIT", "DESIGN", "SHOOT", "THUMBNAIL", "CAPTION", "RESEARCH", "OTHER"];
 const priorities: WorkOrderPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
 export default function NewGigPage() {
   const router = useRouter();
+  const safeAgencySlug = useAgency().agencySlug ?? "";
   const queryClient = useQueryClient();
   const { agencyId } = useAgency();
   const clientsQuery = useClientsQuery(agencyId);
@@ -68,7 +70,7 @@ export default function NewGigPage() {
       queryClient.setQueryData(queryKeys.gig(agencyId, gig.id), gig);
       queryClient.setQueryData(queryKeys.gigs(agencyId), (current: WorkOrder[] | undefined) => setListItem(current, gig));
       invalidateWorkspaceQueries(queryClient, agencyId, ["gigs", "dashboard", "calendar"]);
-      router.push(`/gigs/${gig.id}`);
+      router.push(getWorkspaceHref(safeAgencySlug, `/gigs/${gig.id}`));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create gig");
     } finally {

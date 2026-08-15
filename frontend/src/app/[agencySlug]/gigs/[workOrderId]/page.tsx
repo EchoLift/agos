@@ -13,6 +13,8 @@ import {
 import { formatLabel, statusPillClasses } from "@/lib/status-style";
 import { getAgencyRoleKeys } from "@/lib/workspace-access";
 import { invalidateWorkspaceQueries, queryKeys, setListItem, useGigQuery } from "@/lib/query";
+import { getWorkspaceHref } from "@/lib/workspace-url";
+import { rememberedEntityKey, useRememberLastVisitedEntity } from "@/lib/remembered-tab";
 
 export default function GigDetailPage() {
   const router = useRouter();
@@ -22,11 +24,17 @@ export default function GigDetailPage() {
   const roleKeys = useMemo(() => getAgencyRoleKeys(agency), [agency]);
   const workOrderQuery = useGigQuery(agencyId, params.workOrderId);
   const workOrder = workOrderQuery.data ?? null;
+  useRememberLastVisitedEntity({
+    storageKey: rememberedEntityKey("gig", agencyId),
+    entityId: workOrder?.id,
+    enabled: Boolean(workOrder),
+  });
   const [submissionDraft, setSubmissionDraft] = useState({ body: "", externalLink: "" });
   const [reviewComment, setReviewComment] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isLoading = workOrderQuery.isLoading && !workOrder;
+  const safeAgencySlug = agency?.slug ?? "";
   const firstLoadError = !workOrder && workOrderQuery.error
     ? workOrderQuery.error instanceof Error
       ? workOrderQuery.error.message
@@ -103,7 +111,7 @@ export default function GigDetailPage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => router.push(`/gigs`)}
+            onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/gigs"))}
             className="flex h-11 w-11 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white lg:rounded-full"
           >
             ←

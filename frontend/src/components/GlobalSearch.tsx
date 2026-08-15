@@ -12,8 +12,9 @@ import { getWorkflowBoard } from "@/lib/api/workflow";
 import { getMembers } from "@/lib/api/team";
 import { getCalendarEvents } from "@/lib/api/calendar";
 import { allowedNavKeys, visibleWorkspaceNavItems } from "@/lib/workspace-access";
-import { getWorkspaceHref } from "@/lib/workspace-url";
+import { getHelpHref, getWorkspaceHref } from "@/lib/workspace-url";
 import { queryKeys, staleTimes } from "@/lib/query";
+import { rememberedEntityKey, useRememberedEntityId } from "@/lib/remembered-tab";
 
 type SearchResultType = "PAGE" | "CLIENT" | "CAMPAIGN" | "CONTENT" | "WORKFLOW" | "GIG" | "MEMBER" | "CALENDAR" | "HELP";
 
@@ -26,11 +27,11 @@ interface SearchResult {
 }
 
 const helpResults: SearchResult[] = [
-  { id: "help-getting-started", type: "HELP", title: "Getting started", subtitle: "Set up your agency and first client", href: "/help/getting-started/what-is-agos" },
-  { id: "help-workflow", type: "HELP", title: "How Workflow works", subtitle: "Submissions, handoffs, reviews, and approvals", href: "/help/daily-operations/workflow" },
-  { id: "help-calendar", type: "HELP", title: "How AGENCIE Calendar works", subtitle: "Role-aware deadlines and publishing", href: "/help/daily-operations/calendar" },
-  { id: "help-gigs", type: "HELP", title: "When to use Gigs", subtitle: "Assign one-off work without a campaign", href: "/help/gigs/when-to-use-gigs" },
-  { id: "help-roles", type: "HELP", title: "Roles and access", subtitle: "Understand workspace permissions", href: "/help/team-access/roles" },
+  { id: "help-getting-started", type: "HELP", title: "Getting started", subtitle: "Set up your agency and first client", href: getHelpHref("getting-started/what-is-agos") },
+  { id: "help-workflow", type: "HELP", title: "How Workflow works", subtitle: "Submissions, handoffs, reviews, and approvals", href: getHelpHref("daily-operations/workflow") },
+  { id: "help-calendar", type: "HELP", title: "How AGENCIE Calendar works", subtitle: "Role-aware deadlines and publishing", href: getHelpHref("daily-operations/calendar") },
+  { id: "help-gigs", type: "HELP", title: "When to use Gigs", subtitle: "Assign one-off work without a campaign", href: getHelpHref("gigs/when-to-use-gigs") },
+  { id: "help-roles", type: "HELP", title: "Roles and access", subtitle: "Understand workspace permissions", href: getHelpHref("team-access/roles") },
 ];
 
 export default function GlobalSearch({
@@ -53,15 +54,57 @@ export default function GlobalSearch({
   const [remoteResults, setRemoteResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const navKeys = useMemo(() => allowedNavKeys(agency, userId), [agency, userId]);
+  const rememberedClientId = useRememberedEntityId(
+    rememberedEntityKey("client", agency?.id),
+  );
+  const rememberedCampaignId = useRememberedEntityId(
+    rememberedEntityKey("campaign", agency?.id),
+  );
+  const rememberedGigId = useRememberedEntityId(
+    rememberedEntityKey("gig", agency?.id),
+  );
+  const rememberedWorkflowId = useRememberedEntityId(
+    rememberedEntityKey("workflow", agency?.id),
+  );
   const pageResults = useMemo<SearchResult[]>(
-    () => visibleWorkspaceNavItems(agency, agencySlug, userId).map((item) => ({
-      id: `page-${item.key}`,
-      type: "PAGE",
-      title: item.label,
-      subtitle: "Page",
-      href: item.hrefValue,
-    })),
-    [agency, agencySlug, userId],
+    () => {
+      const rememberedByKey = {
+        clients: rememberedClientId
+          ? `/clients/${rememberedClientId}`
+          : null,
+        campaigns: rememberedCampaignId
+          ? `/campaigns/${rememberedCampaignId}`
+          : null,
+        gigs: rememberedGigId ? `/gigs/${rememberedGigId}` : null,
+        workflow: rememberedWorkflowId
+          ? `/workflow/${rememberedWorkflowId}`
+          : null,
+      };
+
+      return visibleWorkspaceNavItems(agency, agencySlug, userId).map((item) => {
+        const rememberedPath =
+          rememberedByKey[item.key as keyof typeof rememberedByKey];
+
+        return {
+          id: `page-${item.key}`,
+          type: "PAGE",
+          title: item.label,
+          subtitle: rememberedPath ? "Last opened" : "Page",
+          href: rememberedPath
+            ? getWorkspaceHref(agencySlug, rememberedPath)
+            : item.hrefValue,
+        };
+      });
+    },
+    [
+      agency,
+      agencySlug,
+      rememberedCampaignId,
+      rememberedClientId,
+      rememberedGigId,
+      rememberedWorkflowId,
+      userId,
+    ],
   );
 
   useEffect(() => {
@@ -111,7 +154,7 @@ export default function GlobalSearch({
           .slice(0, 6)
           .map((item) => ({ id: item.id, type: "CAMPAIGN" as const, title: item.name, subtitle: item.client?.name || "Campaign", href: `/campaigns/${item.id}` }))));
       }
-      if (navKeys.has("content")) {
+      if (navKeys.has("campaigns")) {
         requests.push(queryClient.fetchQuery({
           queryKey: queryKeys.content(agency.id),
           queryFn: () => getContentAssets(agency.id),
@@ -119,7 +162,13 @@ export default function GlobalSearch({
         }).then((items) => items
           .filter((item) => `${item.displayCode ?? ""} ${item.title} ${item.stage ?? ""}`.toLowerCase().includes(needle))
           .slice(0, 6)
-          .map((item) => ({ id: item.id, type: "CONTENT" as const, title: `${item.displayCode ?? item.type} - ${item.title}`, subtitle: item.stage || "Content", href: `/content/${item.id}` }))));
+          .map((item) => ({
+            id: item.id,
+            type: "CONTENT" as const,
+            title: `${item.displayCode ?? item.type} - ${item.title}`,
+            subtitle: item.campaignSummary?.name || item.stage || "Campaign content",
+            href: `/campaigns/${item.campaignId}?tab=content`,
+          }))));
       }
       if (navKeys.has("gigs")) {
         requests.push(queryClient.fetchQuery({
@@ -256,7 +305,7 @@ function formatType(type: SearchResultType) {
     PAGE: "Quick navigation",
     CLIENT: "Clients",
     CAMPAIGN: "Campaigns",
-    CONTENT: "Content",
+    CONTENT: "Campaign Content",
     WORKFLOW: "Workflow",
     GIG: "Gigs",
     MEMBER: "People",

@@ -2,6 +2,8 @@ import assert from "node:assert";
 import {
   parseSubdomainFromHost,
   isReservedSubdomain,
+  getCentralAppHref,
+  getHelpHref,
   getWorkspaceUrl,
 } from "../workspace-url";
 
@@ -64,6 +66,9 @@ assert.strictEqual(
   "http://localhost:3000/socia-expert/campaigns",
 );
 
+assert.strictEqual(getCentralAppHref("/help/team-access/roles"), "/help/team-access/roles");
+assert.strictEqual(getHelpHref("campaigns/campaign-planning"), "/help/campaigns/campaign-planning");
+
 (process.env as Record<string, string | undefined>).NODE_ENV =
   "production";
 
@@ -72,6 +77,16 @@ process.env.NEXT_PUBLIC_ROOT_DOMAIN = "agencie.in";
 assert.strictEqual(
   getWorkspaceUrl("socia-expert", "campaigns"),
   "https://socia-expert.agencie.in/campaigns",
+);
+
+assert.strictEqual(
+  getCentralAppHref("/help/team-access/roles"),
+  "https://app.agencie.in/help/team-access/roles",
+);
+
+assert.strictEqual(
+  getHelpHref("campaigns/campaign-planning"),
+  "https://app.agencie.in/help/campaigns/campaign-planning",
 );
 
 console.log("✓ All workspace-url assertions passed successfully.");
