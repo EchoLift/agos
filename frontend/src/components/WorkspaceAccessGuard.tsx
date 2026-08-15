@@ -29,7 +29,7 @@ export default function WorkspaceAccessGuard({ children }: { children: ReactNode
     };
   }, []);
 
-  if (!slug || canAccessWorkspacePath(pathname, agency, profile?.id)) {
+  if (!slug || canAccessWorkspacePath(pathname, agency, slug, profile?.id)) {
     return <>{children}</>;
   }
 

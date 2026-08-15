@@ -13,6 +13,7 @@ import { PrismaService } from "@packages/database/prisma.service";
 import { DomainEvents } from "@packages/events/domain-event";
 import { EventBusService } from "@packages/events/event-bus.service";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
+import { GoogleCalendarSyncService } from "@modules/google-calendar/google-calendar-sync.service";
 import { CreateWorkOrderDto } from "./dto/create-work-order.dto";
 import { UpdateWorkOrderDto } from "./dto/update-work-order.dto";
 import {
@@ -25,6 +26,7 @@ export class WorkOrderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventBus: EventBusService,
+    private readonly googleCalendarSync: GoogleCalendarSyncService,
   ) {}
 
   async create(dto: CreateWorkOrderDto, actor: IdentityContext) {
@@ -51,7 +53,7 @@ export class WorkOrderService {
     if (dto.clientId && !client)
       throw new BadRequestException("Client does not belong to this agency");
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const workOrder = await tx.workOrder.create({
         data: {
           agencyId,
@@ -69,7 +71,8 @@ export class WorkOrderService {
             dto.rewardAmount == null
               ? undefined
               : new Prisma.Decimal(dto.rewardAmount),
-          rewardCurrency: dto.rewardAmount == null ? undefined : dto.rewardCurrency,
+          rewardCurrency:
+            dto.rewardAmount == null ? undefined : dto.rewardCurrency,
         },
         include: this.includeGraph(),
       });
@@ -93,6 +96,8 @@ export class WorkOrderService {
 
       return this.serialize(workOrder);
     });
+    this.googleCalendarSync.queueWorkOrderSync(created.id);
+    return created;
   }
 
   async findMany(actor: IdentityContext) {
@@ -152,7 +157,7 @@ export class WorkOrderService {
         throw new BadRequestException("Client does not belong to this agency");
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const updatedResult = await this.prisma.$transaction(async (tx) => {
       const workOrder = await tx.workOrder.update({
         where: { id },
         data: {
@@ -205,6 +210,8 @@ export class WorkOrderService {
 
       return this.serialize(workOrder);
     });
+    this.googleCalendarSync.queueWorkOrderSync(updatedResult.id);
+    return updatedResult;
   }
 
   async submit(id: string, dto: SubmitWorkOrderDto, actor: IdentityContext) {
@@ -226,7 +233,7 @@ export class WorkOrderService {
       throw new BadRequestException("Add notes or a link before submitting");
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const submittedResult = await this.prisma.$transaction(async (tx) => {
       const lastSubmission = await tx.workOrderSubmission.findFirst({
         where: { workOrderId: id },
         orderBy: { version: "desc" },
@@ -268,6 +275,8 @@ export class WorkOrderService {
 
       return this.serialize(updated);
     });
+    this.googleCalendarSync.queueWorkOrderSync(submittedResult.id);
+    return submittedResult;
   }
 
   async approve(id: string, dto: ReviewWorkOrderDto, actor: IdentityContext) {
@@ -302,7 +311,7 @@ export class WorkOrderService {
       throw new BadRequestException("Add a reason before requesting changes");
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const reviewedResult = await this.prisma.$transaction(async (tx) => {
       const latestSubmission = await tx.workOrderSubmission.findFirst({
         where: { workOrderId: id },
         orderBy: { version: "desc" },
@@ -356,6 +365,8 @@ export class WorkOrderService {
 
       return this.serialize(updated);
     });
+    this.googleCalendarSync.queueWorkOrderSync(reviewedResult.id);
+    return reviewedResult;
   }
 
   private async findVisibleWorkOrder(id: string, actor: IdentityContext) {

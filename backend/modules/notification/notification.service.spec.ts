@@ -1,8 +1,13 @@
+import { describe, expect, it, beforeEach, jest } from "@jest/globals";
 import { Test, TestingModule } from "@nestjs/testing";
 import { NotificationService } from "./notification.service";
 import { PrismaService } from "@packages/database/prisma.service";
 import { EventBusService } from "@packages/events/event-bus.service";
 import { DomainEvents } from "@packages/events/domain-event";
+import {
+  NotificationDeliveryIntent,
+  isEmailChannelRequired,
+} from "./notification.policy";
 
 describe("NotificationService", () => {
   let service: NotificationService;
@@ -113,5 +118,61 @@ describe("NotificationService", () => {
     expect(prisma.notificationDelivery.create).not.toHaveBeenCalled();
     expect(eventBus.publish).not.toHaveBeenCalled();
     expect(result.deliveryId).toBeNull();
+  });
+
+  it("keeps campaign visibility events in-app only", async () => {
+    const mockNotification = {
+      id: "notif_campaign",
+      agencyId: "agency_1",
+      userId: "user_1",
+      title: "Campaign created",
+      body: "Nike Summer Reel is visible in your workspace.",
+      eventType: DomainEvents.CampaignCreated,
+    };
+
+    prisma.notification.create.mockResolvedValue(mockNotification);
+
+    const result = await service.notify({
+      agencyId: "agency_1",
+      userId: "user_1",
+      title: "Campaign created",
+      body: "Nike Summer Reel is visible in your workspace.",
+      eventType: DomainEvents.CampaignCreated,
+    });
+
+    expect(prisma.notificationDelivery.create).not.toHaveBeenCalled();
+    expect(eventBus.publish).not.toHaveBeenCalled();
+    expect(result.deliveryId).toBeNull();
+  });
+
+  it("does not email generic workflow stage visibility changes", async () => {
+    expect(isEmailChannelRequired(DomainEvents.WorkflowStageChanged)).toBe(
+      false,
+    );
+  });
+
+  it("allows workflow stage events to email only when explicitly action-required", async () => {
+    expect(
+      isEmailChannelRequired({
+        eventType: DomainEvents.WorkflowStageChanged,
+        deliveryIntent: NotificationDeliveryIntent.TimeSensitiveAction,
+      }),
+    ).toBe(true);
+  });
+
+  it("emails only material assignment updates", async () => {
+    expect(
+      isEmailChannelRequired({
+        eventType: DomainEvents.WorkOrderUpdated,
+        metadata: { materialUpdateType: "DUE_DATE_CHANGED" },
+      }),
+    ).toBe(true);
+
+    expect(
+      isEmailChannelRequired({
+        eventType: DomainEvents.WorkOrderUpdated,
+        metadata: { materialUpdateType: "COLOR_CHANGED" },
+      }),
+    ).toBe(false);
   });
 });

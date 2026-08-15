@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAgency } from "@/components/AgencyProvider";
 import { getRoles, inviteMember, Role } from "@/lib/api/team";
+import { getWorkspaceHref } from "@/lib/workspace-url";
 
 export default function InviteMemberPage() {
   const router = useRouter();
@@ -16,7 +17,7 @@ export default function InviteMemberPage() {
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
   const [rolesError, setRolesError] = useState("");
-
+  const safeAgencySlug = agencySlug ?? "";
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -56,7 +57,7 @@ export default function InviteMemberPage() {
         roleId: primaryRoleId,
         roleIds: selectedRoleIds,
       });
-      router.push(`/team`);
+      router.push(getWorkspaceHref(safeAgencySlug, "/team"));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to invite member");
       setIsSubmitting(false);
@@ -83,7 +84,7 @@ export default function InviteMemberPage() {
           </p>
         </div>
         <Link
-          href={`/team`}
+          href={getWorkspaceHref(safeAgencySlug, "/team")}
           className="rounded-full border border-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-900 hover:text-white"
         >
           Close
@@ -171,7 +172,7 @@ export default function InviteMemberPage() {
             </button>
             <button
               type="button"
-              onClick={() => router.push(`/team`)}
+              onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/team"))}
               className="mt-3 w-full rounded-full border border-zinc-800 px-4 py-3 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-900 hover:text-white"
             >
               Back to team

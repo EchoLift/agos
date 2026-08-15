@@ -7,7 +7,7 @@ import { useAgency } from "@/components/AgencyProvider";
 import { useRouter } from "next/navigation";
 import { formatLabel, statusPillClasses } from "@/lib/status-style";
 import { isProductionWorkspaceRole, workspaceHomeLabel } from "@/lib/workspace-access";
-
+import { getWorkspaceHref } from "@/lib/workspace-url";
 
 type StepId = "agency" | "team" | "client" | "campaign" | "content" | "workflow";
 
@@ -36,6 +36,7 @@ export default function WorkspaceDashboard() {
   const name = agency?.displayName || agency?.name || "Agency";
   const isMyWork = isProductionWorkspaceRole(agency);
   const homeLabel = workspaceHomeLabel(agency);
+  const safeAgencySlug = agencySlug ?? "";
 
   useEffect(() => {
     let isMounted = true;
@@ -109,14 +110,14 @@ export default function WorkspaceDashboard() {
 
   const completeStep = (stepId: StepId) => {
     if (stepId === "team") {
-      router.push(`/team/new`);
+      router.push(getWorkspaceHref(safeAgencySlug, "/team/new"));
       return;
     }
     if (stepId === "client") {
-      router.push(`/clients/new`);
+      router.push(getWorkspaceHref(safeAgencySlug, "/clients/new"));
       return;
     }
-    router.push(`/${stepTemplates.find((step) => step.id === stepId)?.href ?? ""}/new`);
+    router.push(getWorkspaceHref(safeAgencySlug, `/${stepTemplates.find((step) => step.id === stepId)?.href ?? ""}/new`));
   };
 
   return (

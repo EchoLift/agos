@@ -16,6 +16,7 @@ import {
 import type { Agency } from "@/lib/api/organization";
 import type { WorkspaceNavItem } from "@/lib/workspace-access";
 import { hasAnyRole } from "@/lib/workspace-access";
+import { getWorkspaceHref } from "@/lib/workspace-url";
 
 type VisibleNavItem = WorkspaceNavItem & { hrefValue: string };
 
@@ -39,21 +40,22 @@ export default function MobileWorkspaceNav({
   );
   const pinnedKeys = new Set(pinned.map((item) => item.key));
   const remaining = navItems.filter((item) => !pinnedKeys.has(item.key));
+  const safeAgencySlug = agency?.slug ?? "";
   const createLinks = [
-    { label: "New Gig", href: `/gigs/new`, visible: visibleKeys.has("gigs") },
+    { label: "New Gig", href: getWorkspaceHref(safeAgencySlug, "/gigs/new"), visible: visibleKeys.has("gigs") },
     {
       label: "New Campaign",
-      href: `/campaigns/new`,
+      href: getWorkspaceHref(safeAgencySlug, "/campaigns/new"),
       visible: visibleKeys.has("campaigns"),
     },
     {
       label: "New Client",
-      href: `/clients/new`,
+      href: getWorkspaceHref(safeAgencySlug, "/clients/new"),
       visible: visibleKeys.has("clients"),
     },
     {
       label: "New Content",
-      href: `/content/new`,
+      href: getWorkspaceHref(safeAgencySlug, "/content/new"),
       visible: visibleKeys.has("content"),
     },
   ].filter((item) => item.visible);

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAgency } from "@/components/AgencyProvider";
+import { getWorkspaceHref } from "@/lib/workspace-url";
 
 const plannedSettings = [
   "Workspace defaults",
@@ -14,6 +15,7 @@ const plannedSettings = [
 
 export default function AgencySettingsPage() {
   const { agency, agencySlug, agencyDisplayName } = useAgency();
+  const safeAgencySlug = agencySlug ?? "";
   const isOwner = agency?.roles?.some((role) => role.key === "OWNER") || agency?.role === "OWNER";
 
   if (!isOwner) {
@@ -58,14 +60,14 @@ export default function AgencySettingsPage() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Link
-          href={`/team`}
+          href={getWorkspaceHref(safeAgencySlug, "/team")}
           className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-6 transition hover:bg-zinc-900/30"
         >
           <div className="text-base font-semibold text-white">Team & Roles</div>
           <p className="mt-2 text-sm leading-6 text-zinc-400">Invite members, edit skills, and remove inactive employees.</p>
         </Link>
         <Link
-          href={`/settings/appearance`}
+          href={getWorkspaceHref(safeAgencySlug, "/settings/appearance")}
           className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-6 transition hover:bg-zinc-900/30"
         >
           <div className="text-base font-semibold text-white">Appearance</div>

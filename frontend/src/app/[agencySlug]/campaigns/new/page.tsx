@@ -16,6 +16,7 @@ import {
 } from "@/lib/api/campaigns";
 import { getClients, Client } from "@/lib/api/clients";
 import { getMembers, Member } from "@/lib/api/team";
+import { getWorkspaceHref } from "@/lib/workspace-url";
 
 const defaultDeliverable: CampaignDeliverablePlan = {
   contentType: "REEL",

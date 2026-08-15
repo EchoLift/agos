@@ -7,6 +7,7 @@ import { getCampaigns, Campaign } from "@/lib/api/campaigns";
 import { getClients, Client } from "@/lib/api/clients";
 import { useRouter } from "next/navigation";
 import { statusPillClasses } from "@/lib/status-style";
+import {getWorkspaceHref} from "@/lib/workspace-url";
 
 export default function CampaignsPage() {
   const { agencyId, agencySlug } = useAgency();
@@ -15,7 +16,7 @@ export default function CampaignsPage() {
   const [filters, setFilters] = useState({ search: "", clientId: "", status: "" });
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-
+  const safeAgencySlug = agencySlug ?? "";
   useEffect(() => {
     if (!agencyId) return;
     let isMounted = true;
@@ -63,7 +64,7 @@ export default function CampaignsPage() {
           </Link>
         </div>
         <button
-          onClick={() => router.push(`/campaigns/new`)}
+          onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/campaigns/new"))}
           className="rounded-full bg-indigo-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400"
         >
           Create Campaign
@@ -97,7 +98,7 @@ export default function CampaignsPage() {
             <h3 className="mt-4 text-lg font-semibold text-white">No campaigns yet</h3>
             <p className="mt-2 text-sm text-zinc-400">Launch your first campaign for a client.</p>
             <button
-              onClick={() => router.push(`/campaigns/new`)}
+              onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/campaigns/new"))}
               className="mt-6 rounded-full bg-zinc-800 px-5 py-2 text-sm font-semibold text-white transition hover:bg-zinc-700"
             >
               Create Campaign

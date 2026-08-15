@@ -7,14 +7,14 @@ import { getClients, Client } from "@/lib/api/clients";
 import { useRouter } from "next/navigation";
 import { industryOptions } from "@/lib/client-options";
 import { statusPillClasses } from "@/lib/status-style";
-
+import { getWorkspaceHref } from "@/lib/workspace-url";
 export default function ClientsPage() {
   const { agencyId, agencySlug } = useAgency();
   const [clients, setClients] = useState<Client[]>([]);
   const [filters, setFilters] = useState({ search: "", industry: "", status: "" });
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-
+  const safeAgencySlug = agencySlug ?? "";
   useEffect(() => {
     if (!agencyId) return;
     let isMounted = true;
@@ -59,7 +59,7 @@ export default function ClientsPage() {
           </Link>
         </div>
         <button
-          onClick={() => router.push(`/clients/new`)}
+          onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/clients/new"))}
           className="rounded-full bg-indigo-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400"
         >
           Create Client
@@ -93,7 +93,7 @@ export default function ClientsPage() {
             <h3 className="mt-4 text-lg font-semibold text-white">No clients yet</h3>
             <p className="mt-2 text-sm text-zinc-400">Add your first client to start organizing campaigns and content.</p>
             <button
-              onClick={() => router.push(`/clients/new`)}
+              onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/clients/new"))}
               className="mt-6 rounded-full bg-zinc-800 px-5 py-2 text-sm font-semibold text-white transition hover:bg-zinc-700"
             >
               Create Client

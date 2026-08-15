@@ -1,12 +1,13 @@
 # Transactional Email Delivery Architecture
 
 ## Overview
+
 This document details the transactional email delivery slice integrated into the AGENCIE Notification architecture. Email serves as an asynchronous, secondary delivery channel behind in-app notifications.
 
 ## Key Architectural Principles
 
 1. **Isolation**: Business modules call `NotificationService.notify(...)`. Email delivery happens asynchronously in the background worker via RabbitMQ and outbox events. Email API failures never roll back AGENCIE business operations.
-2. **Channel Policy Ownership**: `NotificationModule` owns event-to-channel policy (`eventType` → `IN_APP` / `EMAIL`). High-value operational events trigger `EMAIL` delivery records; generic or celebratory events remain `IN_APP` only.
+2. **Channel Policy Ownership**: `NotificationModule` owns event-to-channel policy (`eventType` + delivery intent → `IN_APP` / `EMAIL` / future `CALENDAR`). High-value operational events trigger `EMAIL` delivery records; visibility-only updates remain `IN_APP` only. Core rule: **Visibility does not deserve an email. Responsibility does.**
 3. **Reference-Only Payloads**: Outbox and RabbitMQ event payloads contain references ONLY (`deliveryId`, `invitationId`, `agencyId`). No raw recipient email addresses, decrypted emails, or credentials are place in event streams.
 4. **Authoritative DB Resolution**: The background worker loads the delivery/invitation record from the database and resolves recipient emails:
    - **Operational Emails**: Decrypts universal `AuthUser.emailEncrypted` using `FieldCryptoService`. Checks that `Membership.status === 'ACTIVE'` for the target agency. If suspended/removed, delivery is set to `CANCELLED`.
@@ -26,14 +27,14 @@ This document details the transactional email delivery slice integrated into the
 
 ## Environment Variables
 
-| Variable | Description | Example |
-|---|---|---|
-| `RESEND_API_KEY` | Primary email provider API key | `re_123456789...` |
-| `RESEND_FROM_EMAIL` | Verified sender address for Resend | `AGENCIE <notifications@calcie.fun>` |
-| `SENDGRID_API_KEY` | Fallback email provider API key | `SG.123456789...` |
-| `SENDGRID_FROM_EMAIL` | Sender address for SendGrid | `notifications@calcie.fun` |
-| `SENDGRID_FROM_NAME` | Sender display name for SendGrid | `AGENCIE` |
-| `FRONTEND_URL` | Base URL for deep links | `https://client-agos.calcie.fun` |
+| Variable              | Description                        | Example                              |
+| --------------------- | ---------------------------------- | ------------------------------------ |
+| `RESEND_API_KEY`      | Primary email provider API key     | `re_123456789...`                    |
+| `RESEND_FROM_EMAIL`   | Verified sender address for Resend | `AGENCIE <notifications@calcie.fun>` |
+| `SENDGRID_API_KEY`    | Fallback email provider API key    | `SG.123456789...`                    |
+| `SENDGRID_FROM_EMAIL` | Sender address for SendGrid        | `notifications@calcie.fun`           |
+| `SENDGRID_FROM_NAME`  | Sender display name for SendGrid   | `AGENCIE`                            |
+| `FRONTEND_URL`        | Base URL for deep links            | `https://client-agos.calcie.fun`     |
 
 ## High-Value Email Events (V1 Scope)
 
@@ -42,17 +43,34 @@ This document details the transactional email delivery slice integrated into the
 - `WorkflowTaskAssigned` / `ContentAssigned`: Task assigned + stage + asset title + deep link
 - `SubmissionCreated` / `WorkOrderSubmitted`: Review required + deep link
 - `ChangesRequested` / `WorkOrderChangesRequested`: Revisions / feedback requested + deep link
-- `WorkflowStageChanged`: Workflow stage handoff to next craft + deep link
+- `WorkflowStageChanged`: Email only when explicitly emitted with an action-required delivery intent; generic stage visibility is in-app/activity only
 - `ActionableApproval`: Approval requiring immediate next actor action + deep link
+
+## Quiet Notification Policy
+
+AGENCIE has three notification levels:
+
+| Level                 | Channels                             | Use                                                                                                      |
+| --------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| Awareness             | In-app only                          | Campaign created, team attached, stage visible but not actionable, generic metadata/activity             |
+| Action required       | In-app + email                       | Review required, revision requested, material instructions changed                                       |
+| Time-sensitive action | In-app + email + Calendar projection | Task/gig becomes directly actionable, handoff to the next responsible owner, due date materially changed |
+
+Clients live in a separate notification universe. Internal production machinery such as writer assignment, shoot handoff, editor intake, and manager internal review must not email clients. Client emails are reserved for business-facing moments: invitation/onboarding, approval requested, clarification requested, final approval/scheduling summaries, and campaign completion/reporting.
+
+Material assignment updates are email-worthy only when the change affects responsibility or planning: assignee changed, due date changed, priority materially changed, instructions changed, revision requested, submission ready for review, approval rejected, workflow handoff, or task reopened. Everything else belongs in the activity log.
 
 ## Testing & Verification
 
 Run tests:
+
 ```bash
 cd backend
 npx jest
 ```
+
 Build apps:
+
 ```bash
 cd backend
 npm run build

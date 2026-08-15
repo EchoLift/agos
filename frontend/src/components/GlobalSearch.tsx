@@ -11,6 +11,7 @@ import { getWorkflowBoard } from "@/lib/api/workflow";
 import { getMembers } from "@/lib/api/team";
 import { getCalendarEvents } from "@/lib/api/calendar";
 import { allowedNavKeys, visibleWorkspaceNavItems } from "@/lib/workspace-access";
+import { getWorkspaceHref } from "@/lib/workspace-url";
 
 type SearchResultType = "PAGE" | "CLIENT" | "CAMPAIGN" | "CONTENT" | "WORKFLOW" | "GIG" | "MEMBER" | "CALENDAR" | "HELP";
 
@@ -34,11 +35,13 @@ export default function GlobalSearch({
   agency,
   userId,
   open,
+  agencySlug,
   onOpenChange,
 }: {
   agency: Agency | null;
   userId?: string | null;
   open: boolean;
+  agencySlug: string;
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
@@ -48,7 +51,7 @@ export default function GlobalSearch({
   const [loading, setLoading] = useState(false);
   const navKeys = useMemo(() => allowedNavKeys(agency, userId), [agency, userId]);
   const pageResults = useMemo<SearchResult[]>(
-    () => visibleWorkspaceNavItems(agency, userId).map((item) => ({
+    () => visibleWorkspaceNavItems(agency, agencySlug, userId).map((item) => ({
       id: `page-${item.key}`,
       type: "PAGE",
       title: item.label,
@@ -137,7 +140,7 @@ export default function GlobalSearch({
         requests.push(getMembers(agency.id).then((items) => items
           .filter((item) => `${item.name ?? ""} ${item.email ?? ""} ${item.roleName}`.toLowerCase().includes(needle))
           .slice(0, 6)
-          .map((item) => ({ id: item.id, type: "MEMBER" as const, title: item.name || "Team member", subtitle: item.roles?.map((role) => role.name).join(", ") || item.roleName, href: `/team` }))));
+          .map((item) => ({ id: item.id, type: "MEMBER" as const, title: item.name || "Team member", subtitle: item.roles?.map((role) => role.name).join(", ") || item.roleName, href: getWorkspaceHref(agencySlug, "/team") }))));
       }
 
       const settled = await Promise.allSettled(requests);

@@ -21,6 +21,7 @@ import {
 import { PrismaService } from "@packages/database/prisma.service";
 import { DomainEventName, DomainEvents } from "@packages/events/domain-event";
 import { EventBusService } from "@packages/events/event-bus.service";
+import { isEmailChannelRequired } from "@modules/notification/notification.policy";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import { ApproveContentDto } from "./dto/approve-content.dto";
 import { AssignContentDto } from "./dto/assign-content.dto";
@@ -2399,7 +2400,7 @@ export class WorkflowService {
 
     if (!membership) return null;
 
-    return tx.notification.create({
+    const notification = await tx.notification.create({
       data: {
         agencyId,
         userId: membership.userId,
@@ -2408,6 +2409,15 @@ export class WorkflowService {
         eventType: input.eventType,
       },
     });
+
+    await this.queueEmailDeliveryForNotification(
+      tx,
+      agencyId,
+      notification.id,
+      input.eventType,
+    );
+
+    return notification;
   }
 
   private async publishWithinTransaction(
@@ -2439,7 +2449,7 @@ export class WorkflowService {
 
     if (!membership) return null;
 
-    return this.prisma.notification.create({
+    const notification = await this.prisma.notification.create({
       data: {
         agencyId,
         userId: membership.userId,
@@ -2448,6 +2458,55 @@ export class WorkflowService {
         eventType: input.eventType,
       },
     });
+
+    await this.queueEmailDeliveryForNotification(
+      this.prisma,
+      agencyId,
+      notification.id,
+      input.eventType,
+    );
+
+    return notification;
+  }
+
+  private async queueEmailDeliveryForNotification(
+    tx: Prisma.TransactionClient | PrismaService,
+    agencyId: string,
+    notificationId: string,
+    eventType: string,
+  ) {
+    if (!isEmailChannelRequired(eventType) || !("notificationDelivery" in tx)) {
+      return null;
+    }
+
+    const delivery = await tx.notificationDelivery.create({
+      data: {
+        agencyId,
+        notificationId,
+        channel: "EMAIL",
+        status: "QUEUED",
+      },
+    });
+
+    const event = {
+      agencyId,
+      actorId: null,
+      aggregateId: delivery.id,
+      aggregateType: "NotificationDelivery",
+      payload: { deliveryId: delivery.id },
+    };
+
+    if (typeof this.eventBus.publishWithinTransaction === "function") {
+      await this.eventBus.publishWithinTransaction(
+        tx as Prisma.TransactionClient,
+        DomainEvents.NotificationQueued,
+        event,
+      );
+    } else {
+      await this.eventBus.publish(DomainEvents.NotificationQueued, event);
+    }
+
+    return delivery;
   }
 
   private async ensureActiveWorkflowInstanceForContentAsset(

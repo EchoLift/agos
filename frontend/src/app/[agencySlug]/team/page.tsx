@@ -6,6 +6,7 @@ import { getMembers, getRoles, Member, removeMember, Role, updateMemberRole } fr
 import { useAgency } from "@/components/AgencyProvider";
 import { statusPillClasses } from "@/lib/status-style";
 import { roleAccessLabels } from "@/lib/workspace-access";
+import {getWorkspaceHref} from "@/lib/workspace-url";
 
 export default function TeamPage() {
   const [members, setMembers] = useState<Member[]>([]);
@@ -25,6 +26,7 @@ export default function TeamPage() {
   const canChangeRoles = currentRoleKeys.includes("OWNER") || currentRoleKeys.includes("MANAGER") || agency?.role === "OWNER" || agency?.role === "MANAGER";
   const isManagerOnly = !currentRoleKeys.includes("OWNER") && agency?.role !== "OWNER" && (currentRoleKeys.includes("MANAGER") || agency?.role === "MANAGER");
   const canUseSelfRoleTestingOverride = (member: Member) => member.id === agency?.membershipId;
+  const safeAgencySlug = agencySlug ?? "";
 
   const loadTeam = (options: { showLoading?: boolean } = {}) => {
     if (!agencyId) return;
@@ -211,7 +213,7 @@ export default function TeamPage() {
           </Link>
         </div>
         <Link
-          href={`/team/new`}
+          href={getWorkspaceHref(safeAgencySlug, "/team/new")}
           className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-indigo-500 px-3 text-sm font-semibold text-white hover:bg-indigo-400 sm:px-5"
         >
           Invite Member
@@ -252,7 +254,7 @@ export default function TeamPage() {
             <h3 className="mt-4 text-sm font-semibold text-white">No team members</h3>
             <p className="mt-1 text-sm text-zinc-500">Get started by inviting your team.</p>
             <Link
-              href={`/team/new`}
+              href={getWorkspaceHref(safeAgencySlug, "/team/new")}
               className="mt-6 rounded-full bg-indigo-500/10 px-4 py-2 text-sm font-semibold text-indigo-400 hover:bg-indigo-500/20"
             >
               Invite Member
