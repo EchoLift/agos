@@ -266,15 +266,13 @@ export default function TeamPage() {
     setError(null);
     setNotice(null);
     try {
-      const updated = await resendInvitation(agencyId, invitation.id);
-      setNotice(
-        updated.id === invitation.id
-          ? "Invitation email queued."
-          : "New invitation created and email queued.",
-      );
+      await resendInvitation(agencyId, invitation.id);
+      setNotice("Invitation resent.");
       loadInvitations();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to resend invite.");
+      setError(
+        applicationErrorMessage(err, "Unable to resend invitation right now."),
+      );
       loadInvitations();
     } finally {
       setBusyInvitationId(null);
@@ -305,7 +303,32 @@ export default function TeamPage() {
     }
   };
 
+  const shareInvitationLink = async (invitation: TeamInvitation) => {
+    if (!canUseInvitationLink(invitation)) return;
+    if (typeof navigator.share !== "function") {
+      await copyInvitationLink(invitation);
+      return;
+    }
+
+    try {
+      await navigator.share({
+        title: "AGENCIE invitation",
+        text: `Join ${agency?.displayName || agency?.name || "this agency"} on AGENCIE.`,
+        url: invitation.inviteUrl,
+      });
+      setNotice("Invite shared.");
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      await copyInvitationLink(invitation);
+    }
+  };
+
   const copyInvitationLink = async (invitation: TeamInvitation) => {
+    if (!canUseInvitationLink(invitation)) {
+      setError("Only valid pending invitations can be copied.");
+      return;
+    }
+
     try {
       await navigator.clipboard.writeText(invitation.inviteUrl);
       setNotice("Invite link copied.");
@@ -435,6 +458,7 @@ export default function TeamPage() {
             error={invitationsQuery.error}
             busyInvitationId={busyInvitationId}
             onResend={handleResendInvitation}
+            onShare={shareInvitationLink}
             onRevoke={handleRevokeInvitation}
             onCopy={copyInvitationLink}
           />
@@ -794,6 +818,7 @@ function InvitationsPanel({
   error,
   busyInvitationId,
   onResend,
+  onShare,
   onRevoke,
   onCopy,
 }: {
@@ -802,6 +827,7 @@ function InvitationsPanel({
   error: unknown;
   busyInvitationId: string | null;
   onResend: (invitation: TeamInvitation) => void;
+  onShare: (invitation: TeamInvitation) => void;
   onRevoke: (invitation: TeamInvitation) => void;
   onCopy: (invitation: TeamInvitation) => void;
 }) {
@@ -867,9 +893,10 @@ function InvitationsPanel({
               invitation={invitation}
               busyInvitationId={busyInvitationId}
               onResend={onResend}
+              onShare={onShare}
               onRevoke={onRevoke}
               onCopy={onCopy}
-              className="mt-3 grid grid-cols-2 gap-2 border-t border-zinc-800 pt-3"
+              className="mt-3 grid grid-cols-3 gap-2 border-t border-zinc-800 pt-3"
             />
           </article>
         ))}
@@ -933,6 +960,7 @@ function InvitationsPanel({
                     invitation={invitation}
                     busyInvitationId={busyInvitationId}
                     onResend={onResend}
+                    onShare={onShare}
                     onRevoke={onRevoke}
                     onCopy={onCopy}
                     className="flex justify-end gap-2"
@@ -951,6 +979,7 @@ function InvitationActions({
   invitation,
   busyInvitationId,
   onResend,
+  onShare,
   onRevoke,
   onCopy,
   className,
@@ -958,33 +987,54 @@ function InvitationActions({
   invitation: TeamInvitation;
   busyInvitationId: string | null;
   onResend: (invitation: TeamInvitation) => void;
+  onShare: (invitation: TeamInvitation) => void;
   onRevoke: (invitation: TeamInvitation) => void;
   onCopy: (invitation: TeamInvitation) => void;
   className: string;
 }) {
   const isBusy = busyInvitationId === invitation.id;
-  const canResend =
-    invitation.status === "PENDING" || invitation.status === "EXPIRED";
+  const canUseLink = canUseInvitationLink(invitation);
+  const canResend = canUseLink;
   const canRevoke = invitation.status === "PENDING";
+  const resendLabel =
+    canResend && !invitation.canResendEmail
+      ? `Resend available in ${formatResendWait(invitation.resendAvailableAt)}`
+      : "Resend email";
 
-  if (!canResend && !canRevoke) {
+  if (!canUseLink && !canRevoke) {
     return <div className={className} />;
   }
 
   return (
     <div className={className}>
-      {canResend ? (
+      {canUseLink ? (
         <button
           type="button"
           disabled={isBusy}
+          onClick={() => onShare(invitation)}
+          className="min-h-10 rounded-full border border-zinc-700 px-3 text-xs font-semibold text-zinc-300 transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Share
+        </button>
+      ) : null}
+      {canUseLink ? (
+        <button
+          type="button"
+          disabled={isBusy}
+          onClick={() => onCopy(invitation)}
+          className="min-h-10 rounded-full border border-zinc-700 px-3 text-xs font-semibold text-zinc-300 transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Copy link
+        </button>
+      ) : null}
+      {canResend ? (
+        <button
+          type="button"
+          disabled={isBusy || !invitation.canResendEmail}
           onClick={() => onResend(invitation)}
           className="min-h-10 rounded-full border border-zinc-700 px-3 text-xs font-semibold text-zinc-300 transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isBusy
-            ? "Working..."
-            : invitation.status === "EXPIRED"
-              ? "Create new invite"
-              : "Resend"}
+          {isBusy ? "Working..." : resendLabel}
         </button>
       ) : null}
       {canRevoke ? (
@@ -997,18 +1047,30 @@ function InvitationActions({
           Revoke
         </button>
       ) : null}
-      {invitation.status === "PENDING" ? (
-        <button
-          type="button"
-          disabled={isBusy}
-          onClick={() => onCopy(invitation)}
-          className="min-h-10 rounded-full border border-zinc-700 px-3 text-xs font-semibold text-zinc-300 transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Copy link
-        </button>
-      ) : null}
     </div>
   );
+}
+
+function applicationErrorMessage(error: unknown, fallback: string) {
+  if (!(error instanceof Error)) return fallback;
+  if (/unique constraint|prisma|p2002/i.test(error.message)) return fallback;
+  return error.message || fallback;
+}
+
+function canUseInvitationLink(invitation: TeamInvitation) {
+  return (
+    invitation.status === "PENDING" &&
+    new Date(invitation.expiresAt).getTime() > Date.now()
+  );
+}
+
+function formatResendWait(value: string | null) {
+  if (!value) return "48h";
+  const diffMs = new Date(value).getTime() - Date.now();
+  if (diffMs <= 0) return "now";
+  const hours = Math.ceil(diffMs / (60 * 60 * 1000));
+  if (hours >= 1) return `${hours}h`;
+  return `${Math.ceil(diffMs / (60 * 1000))}m`;
 }
 
 function memberHasRole(member: Member, roleName: string) {
