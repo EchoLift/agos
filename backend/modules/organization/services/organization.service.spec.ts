@@ -10,7 +10,6 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
-  ConflictException,
   HttpException,
   InternalServerErrorException,
 } from "@nestjs/common";
@@ -242,7 +241,7 @@ describe("OrganizationService Unit Tests", () => {
         status: "PENDING",
         expiresAt: new Date(),
         token: "rand-token",
-      } as Invitation;
+      } as unknown as Invitation;
 
       userLookup.findByAuthUserId.mockResolvedValue(mockInviter);
       repository.findMembership.mockResolvedValue(mockInviterMem);
@@ -601,7 +600,14 @@ describe("OrganizationService Unit Tests", () => {
         id: "inv-1",
         agencyId: "agency-1",
         roleId: "role-member",
-      } as Invitation;
+        status: "PENDING",
+        agency: {
+          id: "agency-1",
+          name: "socia-expert",
+          displayName: "Socia Expert",
+          slug: "socia-expert",
+        },
+      } as unknown as Invitation;
       const mockMembership = {
         id: "mem-new",
         agencyId: "agency-1",
@@ -617,21 +623,54 @@ describe("OrganizationService Unit Tests", () => {
 
       expect(result.membershipId).toBe("mem-new");
       expect(result.status).toBe("ACTIVE");
+      expect(result.agency.slug).toBe("socia-expert");
     });
 
-    it("should throw ConflictException if user is already a member", async () => {
+    it("should resolve an already accepted invitation for the active member", async () => {
       userLookup.findByAuthUserId.mockResolvedValue({ id: "user-2" } as User);
       repository.findInvitationByToken.mockResolvedValue({
         id: "inv-1",
         agencyId: "agency-1",
-      } as Invitation);
+        status: "ACCEPTED",
+        agency: {
+          id: "agency-1",
+          name: "socia-expert",
+          displayName: "Socia Expert",
+          slug: "socia-expert",
+        },
+      } as unknown as Invitation);
       repository.findMembership.mockResolvedValue({
         id: "mem-existing",
+        agencyId: "agency-1",
+        status: "ACTIVE",
+        deletedAt: null,
       } as Membership);
+
+      const result = await service.acceptInvitation("token-123", "auth-2");
+
+      expect(result.membershipId).toBe("mem-existing");
+      expect(result.agency.slug).toBe("socia-expert");
+      expect(repository.acceptInvitation).not.toHaveBeenCalled();
+    });
+
+    it("should reject an accepted invitation when the user is not an active member", async () => {
+      userLookup.findByAuthUserId.mockResolvedValue({ id: "user-2" } as User);
+      repository.findInvitationByToken.mockResolvedValue({
+        id: "inv-1",
+        agencyId: "agency-1",
+        status: "ACCEPTED",
+        agency: {
+          id: "agency-1",
+          name: "socia-expert",
+          displayName: "Socia Expert",
+          slug: "socia-expert",
+        },
+      } as unknown as Invitation);
+      repository.findMembership.mockResolvedValue(null);
 
       await expect(
         service.acceptInvitation("token-123", "auth-2"),
-      ).rejects.toThrow(ConflictException);
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

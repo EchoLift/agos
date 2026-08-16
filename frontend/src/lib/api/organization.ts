@@ -29,11 +29,27 @@ export interface CreateAgencyResponse {
   };
 }
 
+export interface AcceptInvitationResponse {
+  membershipId: string;
+  agencyId: string;
+  status: string;
+  agency: Agency;
+}
+
 export async function createAgency(displayName: string, slug: string): Promise<CreateAgencyResponse> {
   return apiClient<CreateAgencyResponse>("/organizations/agencies", {
     method: "POST",
     body: JSON.stringify({ displayName, slug }),
   });
+}
+
+export async function acceptInvitation(token: string): Promise<AcceptInvitationResponse> {
+  return apiClient<AcceptInvitationResponse>(
+    `/organizations/invitations/${encodeURIComponent(token)}/accept`,
+    {
+      method: "POST",
+    },
+  );
 }
 
 export async function getMyMemberships(): Promise<MyMembershipsResponse> {

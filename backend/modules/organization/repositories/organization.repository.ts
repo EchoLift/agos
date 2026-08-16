@@ -288,7 +288,7 @@ export class OrganizationRepository {
     return this.prisma.invitation.findFirst({
       where: {
         token,
-        status: "PENDING",
+        status: { in: ["PENDING", "ACCEPTED"] },
         expiresAt: { gt: new Date() },
       },
       include: {
