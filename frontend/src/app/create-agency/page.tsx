@@ -3,8 +3,11 @@
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useRouter } from "next/navigation";
-import { createAgency } from "@/lib/api/organization";
-import { getWorkspaceHref } from "@/lib/workspace-url";
+import { useQueryClient } from "@tanstack/react-query";
+import { createAgency, getMyMemberships } from "@/lib/api/organization";
+import { resolveDashboardAgency } from "@/lib/dashboard-navigation";
+import { queryKeys } from "@/lib/query";
+import { getWorkspaceHref, getWorkspaceUrl } from "@/lib/workspace-url";
 function normalizeSlug(value: string) {
   return value
     .toLowerCase()
@@ -21,6 +24,7 @@ type FormValues = {
 
 export default function CreateAgencyPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { register, handleSubmit, control, setValue, formState } = useForm<FormValues>({
     mode: "onChange",
     defaultValues: { displayName: "", slug: "" },
@@ -28,7 +32,9 @@ export default function CreateAgencyPage() {
 
   const slug = useWatch({ control, name: "slug" }) ?? "";
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFindingDashboard, setIsFindingDashboard] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dashboardNotice, setDashboardNotice] = useState<string | null>(null);
   const safeagencySlug = slug ? normalizeSlug(slug) : "";
   const onSubmit = async (data: FormValues) => {
     const finalSlug = normalizeSlug(data.slug || data.displayName);
@@ -45,6 +51,42 @@ export default function CreateAgencyPage() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create agency.");
       setIsSubmitting(false);
+    }
+  };
+
+  const goToDashboard = async () => {
+    if (isFindingDashboard) return;
+
+    setError(null);
+    setDashboardNotice(null);
+    setIsFindingDashboard(true);
+
+    try {
+      await queryClient.cancelQueries({ queryKey: queryKeys.memberships() });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.memberships(),
+        refetchType: "none",
+      });
+
+      const memberships = await getMyMemberships();
+      queryClient.setQueryData(queryKeys.memberships(), memberships);
+
+      const dashboardAgency = resolveDashboardAgency(memberships);
+
+      if (!dashboardAgency) {
+        setDashboardNotice("No active agency memberships found.");
+        setIsFindingDashboard(false);
+        return;
+      }
+
+      window.location.assign(getWorkspaceUrl(dashboardAgency.slug));
+    } catch (err: unknown) {
+      setDashboardNotice(
+        err instanceof Error
+          ? err.message
+          : "Unable to check your agency memberships. Please try again.",
+      );
+      setIsFindingDashboard(false);
     }
   };
 
@@ -139,6 +181,33 @@ export default function CreateAgencyPage() {
               )}
             </button>
           </form>
+
+          <div className="mt-8 rounded-2xl border border-zinc-800 bg-[#0b0b11] p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-white">
+                  Already part of an agency?
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-zinc-500">
+                  Check your current memberships and open your workspace.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={goToDashboard}
+                disabled={isFindingDashboard}
+                className="min-h-11 rounded-full border border-zinc-700 px-5 text-sm font-semibold text-zinc-200 transition hover:border-indigo-400 hover:text-white disabled:cursor-wait disabled:opacity-60"
+              >
+                {isFindingDashboard ? "Checking..." : "Go to Dashboard"}
+              </button>
+            </div>
+
+            {dashboardNotice ? (
+              <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-zinc-300">
+                {dashboardNotice}
+              </div>
+            ) : null}
+          </div>
         </div>
       </main>
     </div>

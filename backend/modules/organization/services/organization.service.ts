@@ -460,8 +460,16 @@ export class OrganizationService implements OnModuleInit {
       invitation.agencyId,
       user.id,
     );
-    if (existingMembership) {
-      throw new ConflictException("You are already a member of this agency.");
+
+    const isActiveMember =
+      existingMembership?.status === "ACTIVE" && !existingMembership.deletedAt;
+
+    if (invitation.status === "ACCEPTED") {
+      if (!isActiveMember) {
+        throw new BadRequestException("Invitation is invalid or has expired.");
+      }
+
+      return this.acceptInvitationResponse(existingMembership, invitation);
     }
 
     const context = this.requestContext.get();
@@ -474,10 +482,20 @@ export class OrganizationService implements OnModuleInit {
       context?.correlationId,
     );
 
+    return this.acceptInvitationResponse(membership, invitation);
+  }
+
+  private acceptInvitationResponse(membership: any, invitation: any) {
     return {
       membershipId: membership.id,
       agencyId: membership.agencyId,
       status: membership.status,
+      agency: {
+        id: invitation.agency.id,
+        name: invitation.agency.name,
+        displayName: invitation.agency.displayName || invitation.agency.name,
+        slug: invitation.agency.slug,
+      },
     };
   }
 

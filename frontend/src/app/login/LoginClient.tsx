@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -16,7 +17,9 @@ import {
   renderGoogleButton,
 } from "@/lib/google-auth";
 
-import { getMyMemberships } from "@/lib/api/organization";
+import { acceptInvitation, getMyMemberships } from "@/lib/api/organization";
+import { resolveDashboardAgency } from "@/lib/dashboard-navigation";
+import { queryKeys } from "@/lib/query";
 import { getWorkspaceUrl } from "@/lib/workspace-url";
 
 type MembershipsShape = {
@@ -58,6 +61,7 @@ function getSafeReturnTo(value: string | null): string | null {
 export default function LoginClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
 
   const googleButtonRef = useRef<HTMLDivElement>(null);
   const googleButtonMountedRef = useRef(false);
@@ -71,8 +75,29 @@ export default function LoginClient() {
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
   const returnTo = getSafeReturnTo(searchParams.get("returnTo"));
+  const inviteToken = searchParams.get("invite");
 
   const redirectAfterLogin = useCallback(async () => {
+    if (inviteToken) {
+      const acceptedInvite = await acceptInvitation(inviteToken);
+      const memberships = await getMyMemberships();
+      queryClient.setQueryData(queryKeys.memberships(), memberships);
+
+      const invitedAgency = resolveDashboardAgency(
+        memberships,
+        acceptedInvite.agencyId,
+      );
+
+      if (!invitedAgency) {
+        throw new Error(
+          "Invitation accepted, but no active workspace membership was found.",
+        );
+      }
+
+      window.location.href = getWorkspaceUrl(invitedAgency.slug);
+      return;
+    }
+
     if (returnTo) {
       window.location.href = returnTo;
       return;
@@ -88,7 +113,7 @@ export default function LoginClient() {
     }
 
     router.replace("/create-agency");
-  }, [returnTo, router]);
+  }, [inviteToken, queryClient, returnTo, router]);
 
   const showRecoverableRestoreError = useCallback((message: string) => {
     setSessionRestoreUnavailable(true);
