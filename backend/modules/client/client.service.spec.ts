@@ -8,6 +8,7 @@ describe("ClientService", () => {
 
   beforeEach(() => {
     prisma = {
+      $transaction: jest.fn((callback) => callback(prisma)),
       client: {
         create: jest.fn(),
         findUnique: jest.fn(),
@@ -27,6 +28,9 @@ describe("ClientService", () => {
       agencyId: "agency-1",
       name: "Northwind Studios",
       industry: "E-commerce",
+      primaryContactName: "Avery North",
+      primaryContactEmail: "avery@northwind.example",
+      invitePrimaryContact: false,
       brandVoice: "Confident",
       audience: "Founders",
       competitors: "Acme, Globex",
@@ -47,6 +51,8 @@ describe("ClientService", () => {
         agencyId: "agency-1",
         name: dto.name,
         industry: dto.industry,
+        primaryContactName: dto.primaryContactName,
+        primaryContactEmail: dto.primaryContactEmail,
         brandVoice: dto.brandVoice,
         audience: dto.audience,
         competitors: dto.competitors,

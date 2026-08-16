@@ -117,6 +117,7 @@ export class OrganizationRepository {
       where: { userId, status: "ACTIVE" },
       include: {
         agency: true,
+        client: true,
         role: { include: { systemRole: true } },
         roles: { include: { role: { include: { systemRole: true } } } },
       },
@@ -143,6 +144,7 @@ export class OrganizationRepository {
             },
           },
         },
+        client: true,
         roles: {
           include: {
             role: {
@@ -169,6 +171,7 @@ export class OrganizationRepository {
       },
       include: {
         role: { include: { systemRole: true } },
+        client: true,
         roles: { include: { role: { include: { systemRole: true } } } },
         user: true,
       },
@@ -239,6 +242,7 @@ export class OrganizationRepository {
     expiresAt: Date,
     roleIds: string[] = [roleId],
     mobileNumber: string | null = null,
+    clientId: string | null = null,
     correlationId?: string,
     emailEncrypted?: string | null,
   ): Promise<any> {
@@ -247,6 +251,7 @@ export class OrganizationRepository {
       const invitation = await tx.invitation.create({
         data: {
           agencyId,
+          clientId,
           emailHash,
           emailEncrypted,
           roleId,
@@ -273,6 +278,7 @@ export class OrganizationRepository {
             mobileNumber,
             roleId,
             roleIds: uniqueRoleIds,
+            clientId,
             invitedByMembershipId,
             occurredAt: new Date().toISOString(),
           },
@@ -295,6 +301,7 @@ export class OrganizationRepository {
         role: { include: { systemRole: true } },
         roles: { include: { role: { include: { systemRole: true } } } },
         agency: true,
+        client: true,
       },
     });
   }
@@ -305,6 +312,7 @@ export class OrganizationRepository {
     userId: string,
     roleId: string,
     roleIds: string[] = [roleId],
+    clientId: string | null = null,
     correlationId?: string,
   ): Promise<Membership> {
     return this.prisma.$transaction(async (tx) => {
@@ -322,11 +330,13 @@ export class OrganizationRepository {
         update: {
           status: "ACTIVE",
           deletedAt: null,
+          clientId,
         },
         create: {
           agencyId,
           userId,
           roleId,
+          clientId,
           status: "ACTIVE",
         },
       });
@@ -351,6 +361,7 @@ export class OrganizationRepository {
               userId,
               roleId,
               roleIds: uniqueRoleIds,
+              clientId,
               occurredAt: new Date().toISOString(),
             },
             correlationId,
@@ -402,6 +413,7 @@ export class OrganizationRepository {
     roleId: string,
     roleIds: string[],
     version: number,
+    clientId: string | null,
     actorAuthUserId: string,
     correlationId?: string,
   ): Promise<any> {
@@ -416,6 +428,7 @@ export class OrganizationRepository {
         },
         data: {
           roleId,
+          clientId,
           version: { increment: 1 },
         },
       });
@@ -436,6 +449,7 @@ export class OrganizationRepository {
         where: { id: membershipId },
         include: {
           role: { include: { systemRole: true } },
+          client: true,
           roles: { include: { role: { include: { systemRole: true } } } },
           user: {
             include: {
@@ -458,6 +472,7 @@ export class OrganizationRepository {
             agencyId,
             roleId,
             roleIds: uniqueRoleIds,
+            clientId,
             changedBy: actorAuthUserId,
             version: membership.version,
             occurredAt: new Date().toISOString(),
@@ -566,6 +581,7 @@ export class OrganizationRepository {
           },
         },
         role: { include: { systemRole: true } },
+        client: true,
         roles: { include: { role: { include: { systemRole: true } } } },
       },
       orderBy: { joinedAt: "desc" },

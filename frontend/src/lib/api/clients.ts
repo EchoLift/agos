@@ -64,6 +64,7 @@ export interface Client {
   status: string;
   createdAt: string;
   updatedAt: string;
+  primaryContactInvitationId?: string | null;
 }
 
 export interface CreateClientInput {
@@ -126,6 +127,7 @@ export interface CreateClientInput {
   internalNotes?: string | null;
   startDate?: string | null;
   timezone?: string | null;
+  invitePrimaryContact?: boolean;
 }
 
 export type UpdateClientInput = Partial<CreateClientInput>;

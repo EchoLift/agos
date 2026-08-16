@@ -66,12 +66,14 @@ export class InvitationClaimService {
               tx,
               existingMembership,
               primaryRoleId,
+              invitation.clientId ?? null,
             )
           : await tx.membership.create({
               data: {
                 agencyId: invitation.agencyId,
                 userId: input.userId,
                 roleId: primaryRoleId,
+                clientId: invitation.clientId ?? null,
                 status: "ACTIVE",
               },
             });
@@ -96,6 +98,7 @@ export class InvitationClaimService {
           authUserId: input.authUserId,
           roleId: primaryRoleId,
           roleIds: authoritativeRoleIds,
+          clientId: invitation.clientId ?? null,
           requestId: input.requestId ?? null,
           correlationId: input.correlationId ?? null,
           occurredAt: new Date().toISOString(),
@@ -137,13 +140,22 @@ export class InvitationClaimService {
     membership: {
       id: string;
       roleId: string;
+      clientId?: string | null;
       status: string;
       deletedAt: Date | null;
     },
     fallbackRoleId: string,
+    clientId: string | null,
   ) {
     if (membership.status === "ACTIVE" && !membership.deletedAt) {
-      return membership;
+      if (membership.clientId === clientId) {
+        return membership;
+      }
+
+      return tx.membership.update({
+        where: { id: membership.id },
+        data: { clientId, version: { increment: 1 } },
+      });
     }
 
     return tx.membership.update({
@@ -152,6 +164,7 @@ export class InvitationClaimService {
         status: "ACTIVE",
         deletedAt: null,
         roleId: membership.roleId ?? fallbackRoleId,
+        clientId,
         version: { increment: 1 },
       },
     });

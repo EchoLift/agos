@@ -19,6 +19,11 @@ import { DomainEvents } from "@packages/events/domain-event";
 import { EventBusService } from "@packages/events/event-bus.service";
 import { GoogleCalendarSyncService } from "@modules/google-calendar/google-calendar-sync.service";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
+import {
+  assertClientScope,
+  isClientUser,
+  requireClientScope,
+} from "@packages/security/client-scope";
 import { CreateContentAssetDto } from "./dto/create-content-asset.dto";
 import { UpdateContentPlanningDto } from "./dto/update-content-planning.dto";
 import { UpdateContentAssetDto } from "./dto/update-content-asset.dto";
@@ -400,7 +405,7 @@ export class ContentService {
     return this.withProjectedStage(updated.content!);
   }
 
-  async findById(id: string, agencyId: string) {
+  async findById(id: string, agencyId: string, actor?: IdentityContext) {
     const contentAsset = await this.prisma.contentAsset.findUnique({
       where: { id },
       include: {
@@ -429,15 +434,23 @@ export class ContentService {
     if (!contentAsset || contentAsset.agencyId !== agencyId) {
       throw new NotFoundException("Content asset not found");
     }
+    assertClientScope(actor, contentAsset.clientId);
 
     return this.withProjectedStage(contentAsset);
   }
 
-  async findMany(agencyId: string, campaignId?: string) {
+  async findMany(
+    agencyId: string,
+    campaignId?: string,
+    actor?: IdentityContext,
+  ) {
+    const clientId =
+      actor && isClientUser(actor) ? requireClientScope(actor) : null;
     const assets = await this.prisma.contentAsset.findMany({
       where: {
         agencyId,
         status: { not: "DELETED" },
+        ...(clientId ? { clientId } : {}),
         ...(campaignId ? { campaignId } : {}),
       },
       include: {

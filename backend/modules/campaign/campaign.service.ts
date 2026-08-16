@@ -23,6 +23,11 @@ import { EventBusService } from "@packages/events/event-bus.service";
 import { GoogleCalendarSyncService } from "@modules/google-calendar/google-calendar-sync.service";
 import { isEmailChannelRequired } from "@modules/notification/notification.policy";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
+import {
+  assertClientScope,
+  isClientUser,
+  requireClientScope,
+} from "@packages/security/client-scope";
 import { CampaignStatusActionDto } from "./dto/campaign-status-action.dto";
 import {
   CreateCampaignTeamAssignmentDto,
@@ -242,7 +247,7 @@ export class CampaignService {
     }
   }
 
-  async findById(id: string, agencyId: string) {
+  async findById(id: string, agencyId: string, actor?: IdentityContext) {
     const campaign = await this.prisma.campaign.findUnique({
       where: { id },
       include: this.campaignInclude(),
@@ -250,20 +255,27 @@ export class CampaignService {
     if (!campaign || campaign.agencyId !== agencyId) {
       throw new NotFoundException("Campaign not found");
     }
+    assertClientScope(actor, campaign.clientId);
 
     return campaign;
   }
 
-  async findMany(agencyId: string) {
+  async findMany(agencyId: string, actor?: IdentityContext) {
+    const clientId =
+      actor && isClientUser(actor) ? requireClientScope(actor) : null;
     return this.prisma.campaign.findMany({
-      where: { agencyId, status: { not: "DELETED" } },
+      where: {
+        agencyId,
+        status: { not: "DELETED" },
+        ...(clientId ? { clientId } : {}),
+      },
       include: this.campaignInclude(),
       orderBy: { updatedAt: "desc" },
     });
   }
 
-  async getTeam(id: string, agencyId: string) {
-    await this.ensureCampaign(id, agencyId);
+  async getTeam(id: string, agencyId: string, actor?: IdentityContext) {
+    await this.ensureCampaign(id, agencyId, actor);
 
     return this.prisma.campaignTeamAssignment.findMany({
       where: { agencyId, campaignId: id },
@@ -272,8 +284,8 @@ export class CampaignService {
     });
   }
 
-  async getActivity(id: string, agencyId: string) {
-    await this.ensureCampaign(id, agencyId);
+  async getActivity(id: string, agencyId: string, actor?: IdentityContext) {
+    await this.ensureCampaign(id, agencyId, actor);
 
     const events = await this.prisma.outboxEvent.findMany({
       where: {
@@ -349,7 +361,7 @@ export class CampaignService {
 
   async getPublishingSchedules(id: string, actor: IdentityContext) {
     const agencyId = actor.agencyId ?? "";
-    await this.ensureCampaign(id, agencyId);
+    await this.ensureCampaign(id, agencyId, actor);
     await this.syncMissedPublishingSlots(id, agencyId, actor.userId);
 
     const slots = await this.prisma.publishingSchedule.findMany({
@@ -1897,7 +1909,11 @@ export class CampaignService {
     return delivery;
   }
 
-  private async ensureCampaign(id: string, agencyId: string) {
+  private async ensureCampaign(
+    id: string,
+    agencyId: string,
+    actor?: IdentityContext,
+  ) {
     const campaign = await this.prisma.campaign.findUnique({ where: { id } });
     if (
       !campaign ||
@@ -1906,6 +1922,7 @@ export class CampaignService {
     ) {
       throw new NotFoundException("Campaign not found");
     }
+    assertClientScope(actor, campaign.clientId);
 
     return campaign;
   }

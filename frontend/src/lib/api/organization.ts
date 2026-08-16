@@ -12,6 +12,12 @@ export interface Agency {
     name: string;
   }>;
   membershipId?: string;
+  clientId?: string | null;
+  client?: {
+    id: string;
+    name: string;
+    displayName: string;
+  } | null;
 }
 
 export interface MyMembershipsResponse {
@@ -33,6 +39,7 @@ export interface AcceptInvitationResponse {
   membershipId: string;
   agencyId: string;
   status: string;
+  clientId?: string | null;
   agency: Agency;
 }
 

@@ -24,6 +24,12 @@ export interface Member {
   email: string | null;
   mobileNumber: string | null;
   avatarUrl: string | null;
+  clientId?: string | null;
+  client?: {
+    id: string;
+    name: string;
+    displayName: string;
+  } | null;
 }
 
 export interface InviteMemberParams {
@@ -31,6 +37,7 @@ export interface InviteMemberParams {
   mobileNumber?: string;
   roleId: string;
   roleIds?: string[];
+  clientId?: string;
 }
 
 export type InvitationStatus =
@@ -48,6 +55,12 @@ export interface TeamInvitation {
     key?: string;
     name: string;
   }>;
+  clientId: string | null;
+  client: {
+    id: string;
+    name: string;
+    displayName: string;
+  } | null;
   invitedBy: {
     membershipId: string;
     name: string | null;
@@ -125,7 +138,12 @@ export async function revokeInvitation(
 export async function updateMemberRole(
   agencyId: string,
   membershipId: string,
-  params: { roleId: string; roleIds?: string[]; version: number },
+  params: {
+    roleId: string;
+    roleIds?: string[];
+    version: number;
+    clientId?: string;
+  },
 ): Promise<Member> {
   return apiClient<Member>(
     `/organizations/${agencyId}/members/${membershipId}/role`,

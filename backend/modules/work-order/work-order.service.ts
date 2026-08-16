@@ -13,6 +13,11 @@ import { PrismaService } from "@packages/database/prisma.service";
 import { DomainEvents } from "@packages/events/domain-event";
 import { EventBusService } from "@packages/events/event-bus.service";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
+import {
+  assertClientScope,
+  isClientUser,
+  requireClientScope,
+} from "@packages/security/client-scope";
 import { GoogleCalendarSyncService } from "@modules/google-calendar/google-calendar-sync.service";
 import { CreateWorkOrderDto } from "./dto/create-work-order.dto";
 import { UpdateWorkOrderDto } from "./dto/update-work-order.dto";
@@ -103,10 +108,13 @@ export class WorkOrderService {
   async findMany(actor: IdentityContext) {
     const agencyId = this.requireAgency(actor);
     const membershipId = this.requireMembership(actor);
+    const clientId = isClientUser(actor) ? requireClientScope(actor) : null;
     const where: Prisma.WorkOrderWhereInput = {
       agencyId,
       deletedAt: null,
-      ...(this.canManage(actor)
+      ...(clientId
+        ? { clientId }
+        : this.canManage(actor)
         ? {}
         : {
             OR: [
@@ -377,7 +385,9 @@ export class WorkOrderService {
       include: this.includeGraph(),
     });
     if (!workOrder) throw new NotFoundException("Gig not found");
+    assertClientScope(actor, workOrder.clientId);
     if (
+      !isClientUser(actor) &&
       !this.canManage(actor) &&
       workOrder.assigneeMembershipId !== membershipId &&
       workOrder.reviewerMembershipId !== membershipId

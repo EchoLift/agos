@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAgency } from "@/components/AgencyProvider";
 import { getRoles, inviteMember, Role } from "@/lib/api/team";
+import { useClientsQuery } from "@/lib/query";
 import { getWorkspaceHref } from "@/lib/workspace-url";
 
 export default function InviteMemberPage() {
@@ -15,11 +16,19 @@ export default function InviteMemberPage() {
   const [email, setEmail] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState("");
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
   const [rolesError, setRolesError] = useState("");
   const safeAgencySlug = agencySlug ?? "";
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const clientsQuery = useClientsQuery(agencyId);
+  const clients = clientsQuery.data ?? [];
+  const selectedRoles = useMemo(
+    () => roles.filter((role) => selectedRoleIds.includes(role.id)),
+    [roles, selectedRoleIds],
+  );
+  const requiresClient = selectedRoles.some((role) => role.key === "CLIENT");
 
   useEffect(() => {
     if (!agencyId) return;
@@ -50,12 +59,18 @@ export default function InviteMemberPage() {
         setIsSubmitting(false);
         return;
       }
+      if (requiresClient && !selectedClientId) {
+        setError("Select the business client this CLIENT user represents.");
+        setIsSubmitting(false);
+        return;
+      }
 
       await inviteMember(agencyId, {
         email,
         mobileNumber: mobileNumber || undefined,
         roleId: primaryRoleId,
         roleIds: selectedRoleIds,
+        clientId: requiresClient ? selectedClientId : undefined,
       });
       router.push(getWorkspaceHref(safeAgencySlug, "/team"));
     } catch (err: unknown) {
@@ -65,13 +80,17 @@ export default function InviteMemberPage() {
   };
 
   const toggleRole = (roleId: string) => {
-    setSelectedRoleIds((current) => {
-      if (current.includes(roleId)) {
-        return current.filter((id) => id !== roleId);
-      }
+    const nextRoleIds = selectedRoleIds.includes(roleId)
+      ? selectedRoleIds.filter((id) => id !== roleId)
+      : [...selectedRoleIds, roleId];
+    setSelectedRoleIds(nextRoleIds);
 
-      return [...current, roleId];
-    });
+    const nextRequiresClient = roles
+      .filter((role) => nextRoleIds.includes(role.id))
+      .some((role) => role.key === "CLIENT");
+    if (!nextRequiresClient) {
+      setSelectedClientId("");
+    }
   };
 
   return (
@@ -162,10 +181,47 @@ export default function InviteMemberPage() {
             </p>
           </div>
 
+          {requiresClient ? (
+            <div>
+              <label className="block text-sm font-medium text-zinc-300">
+                Business Client
+              </label>
+              {clientsQuery.isLoading && !clientsQuery.data ? (
+                <div className="mt-2 rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-sm text-zinc-400">
+                  Loading clients...
+                </div>
+              ) : clientsQuery.error ? (
+                <div className="mt-2 rounded-xl bg-red-500/10 p-4 text-sm text-red-400">
+                  {clientsQuery.error instanceof Error
+                    ? clientsQuery.error.message
+                    : "Unable to load clients."}
+                </div>
+              ) : clients.length === 0 ? (
+                <div className="mt-2 rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-sm text-zinc-400">
+                  Create a business client before inviting a CLIENT user.
+                </div>
+              ) : (
+                <select
+                  required
+                  value={selectedClientId}
+                  onChange={(event) => setSelectedClientId(event.target.value)}
+                  className="mt-2 block w-full rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="">Select a business client...</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.displayName || client.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          ) : null}
+
           <div className="pt-4">
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || (requiresClient && !selectedClientId)}
               className="w-full rounded-full bg-indigo-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:opacity-50"
             >
               {isSubmitting ? "Sending Invitation..." : "Send Invitation"}

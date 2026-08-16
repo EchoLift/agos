@@ -1,4 +1,4 @@
-import { ConflictException } from "@nestjs/common";
+import { ConflictException, ForbiddenException } from "@nestjs/common";
 import { CampaignService } from "./campaign.service";
 import { DomainEvents } from "@packages/events/domain-event";
 
@@ -93,6 +93,55 @@ describe("CampaignService", () => {
         "user-1",
       ),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it("filters campaign lists to the assigned client for CLIENT users", async () => {
+    prisma.campaign.findMany.mockResolvedValue([]);
+
+    await service.findMany("agency-1", {
+      authUserId: "auth-client",
+      userId: "user-client",
+      sessionId: "session-1",
+      agencyId: "agency-1",
+      membershipId: "mem-client",
+      clientId: "client-1",
+      role: "CLIENT",
+      roles: ["CLIENT"],
+      permissions: [],
+    });
+
+    expect(prisma.campaign.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          agencyId: "agency-1",
+          clientId: "client-1",
+          status: { not: "DELETED" },
+        }),
+      }),
+    );
+  });
+
+  it("blocks CLIENT users from fetching another client's campaign by ID", async () => {
+    prisma.campaign.findUnique.mockResolvedValue({
+      id: "campaign-1",
+      agencyId: "agency-1",
+      clientId: "client-other",
+      status: "ACTIVE",
+    });
+
+    await expect(
+      service.findById("campaign-1", "agency-1", {
+        authUserId: "auth-client",
+        userId: "user-client",
+        sessionId: "session-1",
+        agencyId: "agency-1",
+        membershipId: "mem-client",
+        clientId: "client-1",
+        role: "CLIENT",
+        roles: ["CLIENT"],
+        permissions: [],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it("activates a draft campaign and publishes an activated event", async () => {

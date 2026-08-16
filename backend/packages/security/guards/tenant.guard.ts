@@ -63,6 +63,7 @@ export class TenantGuard implements CanActivate {
 
     user.agencyId = resolvedAgencyId;
     user.membershipId = membership.id;
+    user.clientId = (membership as any).clientId ?? null;
     const assignedRoles = this.authoritativeRoles(membership);
 
     const roleKeys = assignedRoles
@@ -86,6 +87,7 @@ export class TenantGuard implements CanActivate {
     this.securityContextService.append({
       agencyId: resolvedAgencyId,
       membershipId: membership.id,
+      clientId: user.clientId,
       role: user.role,
       roles: user.roles,
       permissions: user.permissions,

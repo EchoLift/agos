@@ -36,12 +36,12 @@ export class ContentController {
     @CurrentUser() user: IdentityContext,
     @Query("campaignId") campaignId?: string,
   ) {
-    return this.contentService.findMany(user.agencyId ?? "", campaignId);
+    return this.contentService.findMany(user.agencyId ?? "", campaignId, user);
   }
 
   @Get(":id")
   findById(@Param("id") id: string, @CurrentUser() user: IdentityContext) {
-    return this.contentService.findById(id, user.agencyId ?? "");
+    return this.contentService.findById(id, user.agencyId ?? "", user);
   }
 
   @Patch(":id")

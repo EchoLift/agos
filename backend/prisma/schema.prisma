@@ -119,6 +119,7 @@ model Membership {
   agencyId                   String
   userId                     String
   roleId                     String
+  clientId                   String?
   managerMembershipId        String?
   status                     MembershipStatus         @default(ACTIVE)
   joinedAt                   DateTime                 @default(now())
@@ -129,6 +130,7 @@ model Membership {
   managedClients             Client[]                 @relation("ClientManager")
   sentInvitations            Invitation[]             @relation("InvitedByMembership")
   agency                     Agency                   @relation(fields: [agencyId], references: [id])
+  client                     Client?                  @relation("ClientMemberships", fields: [clientId], references: [id], onDelete: SetNull)
   manager                    Membership?              @relation("MembershipManager", fields: [managerMembershipId], references: [id])
   directReports              Membership[]             @relation("MembershipManager")
   role                       Role                     @relation(fields: [roleId], references: [id])
@@ -147,6 +149,7 @@ model Membership {
 
   @@unique([agencyId, userId])
   @@index([agencyId, roleId])
+  @@index([agencyId, clientId])
   @@index([agencyId, managerMembershipId])
   @@map("memberships")
 }
@@ -199,6 +202,7 @@ model Role {
 model Invitation {
   id                    String           @id @default(uuid())
   agencyId              String
+  clientId              String?
   emailHash             String
   emailEncrypted        String?
   roleId                String
@@ -211,11 +215,13 @@ model Invitation {
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
   agency                Agency           @relation(fields: [agencyId], references: [id])
+  client                Client?          @relation("ClientInvitations", fields: [clientId], references: [id], onDelete: SetNull)
   invitedBy             Membership       @relation("InvitedByMembership", fields: [invitedByMembershipId], references: [id])
   role                  Role             @relation(fields: [roleId], references: [id])
   roles                 InvitationRole[]
 
   @@index([agencyId, emailHash])
+  @@index([agencyId, clientId])
   @@index([token])
   @@map("invitations")
 }
@@ -321,6 +327,8 @@ model Client {
   campaigns                   Campaign[]
   agency                      Agency          @relation(fields: [agencyId], references: [id])
   assignedManager             Membership?     @relation("ClientManager", fields: [assignedManagerMembershipId], references: [id])
+  clientMemberships           Membership[]    @relation("ClientMemberships")
+  invitations                 Invitation[]    @relation("ClientInvitations")
   contentAssets               ContentAsset[]
   clientContacts              ClientContact[]
   workOrders                  WorkOrder[]

@@ -1,4 +1,10 @@
-import { IsOptional, IsString, IsUUID } from "class-validator";
+import {
+  IsBoolean,
+  IsEmail,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from "class-validator";
 
 export class CreateClientDto {
   @IsOptional()
@@ -115,17 +121,15 @@ export class CreateClientDto {
   @IsString()
   competitors?: string | null;
 
-  @IsOptional()
   @IsString()
-  primaryContactName?: string | null;
+  primaryContactName!: string;
 
   @IsOptional()
   @IsString()
   primaryContactDesignation?: string | null;
 
-  @IsOptional()
-  @IsString()
-  primaryContactEmail?: string | null;
+  @IsEmail()
+  primaryContactEmail!: string;
 
   @IsOptional()
   @IsString()
@@ -246,4 +250,8 @@ export class CreateClientDto {
   @IsOptional()
   @IsString()
   timezone?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  invitePrimaryContact?: boolean;
 }

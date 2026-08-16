@@ -43,9 +43,9 @@ export const clientFormSections: ClientFormSection[] = [
   {
     title: "Primary Contact",
     fields: [
-      { name: "primaryContactName", label: "Contact Name", kind: "text" },
+      { name: "primaryContactName", label: "Contact Name *", kind: "text", required: true },
       { name: "primaryContactDesignation", label: "Designation", kind: "text" },
-      { name: "primaryContactEmail", label: "Email", kind: "email" },
+      { name: "primaryContactEmail", label: "Email *", kind: "email", required: true },
       { name: "primaryContactPhone", label: "Phone", kind: "text" },
       { name: "primaryContactWhatsapp", label: "WhatsApp", kind: "text" },
       { name: "preferredContactMethod", label: "Preferred Contact Method", kind: "select", options: contactMethodOptions },
