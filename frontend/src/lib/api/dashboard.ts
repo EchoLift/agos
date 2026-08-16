@@ -1,6 +1,12 @@
 import { apiClient } from "../api-client";
 
 export interface DashboardData {
+  clientAccess?: {
+    assigned: boolean;
+    clientId: string | null;
+    clientName: string | null;
+    message?: string;
+  };
   myTasks: Array<{
     sourceType?: "WORKFLOW_TASK" | "WORK_ORDER";
     id: string;

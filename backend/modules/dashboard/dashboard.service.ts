@@ -2,6 +2,10 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "@packages/database/prisma.service";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import {
+  clientScopeId,
+  isClientUser,
+} from "@packages/security/client-scope";
+import {
   ApprovalStatus,
   BlockerStatus,
   CampaignAssignmentRole,
@@ -18,6 +22,10 @@ export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getDashboard(agencyId: string, actor: IdentityContext) {
+    if (isClientUser(actor)) {
+      return this.getClientDashboard(agencyId, actor);
+    }
+
     const roleResponsibilities =
       this.canSeeAgencyWork(actor) || !actor.membershipId
         ? []
@@ -168,6 +176,232 @@ export class DashboardService {
         activeCampaigns: campaigns,
         activeContent: contentAssets,
         blockedItems: blockedContent,
+      },
+    };
+  }
+
+  private async getClientDashboard(agencyId: string, actor: IdentityContext) {
+    const clientId = clientScopeId(actor);
+    if (!clientId) {
+      return this.emptyClientDashboard(
+        "No client account has been assigned to your access. Contact your agency administrator.",
+      );
+    }
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+
+    const contentAssetWhere: Prisma.ContentAssetWhereInput = {
+      agencyId,
+      clientId,
+      status: ContentAssetStatus.ACTIVE,
+    };
+    const workflowTaskClientWhere: Prisma.WorkflowTaskWhereInput = {
+      agencyId,
+      workflowInstance: { contentAsset: { clientId } },
+    };
+
+    const [
+      client,
+      campaigns,
+      contentAssets,
+      blockedContent,
+      publishingToday,
+      tasks,
+      workOrders,
+      pendingReviews,
+      recentActivity,
+    ] = await Promise.all([
+      this.prisma.client.findFirst({
+        where: { id: clientId, agencyId, status: "ACTIVE", deletedAt: null },
+        select: { id: true, name: true, displayName: true },
+      }),
+      this.prisma.campaign.count({
+        where: { agencyId, clientId, status: "ACTIVE" },
+      }),
+      this.prisma.contentAsset.count({ where: contentAssetWhere }),
+      this.prisma.blocker.count({
+        where: {
+          agencyId,
+          status: BlockerStatus.ACTIVE,
+          workflowTask: {
+            workflowInstance: { contentAsset: { clientId } },
+          },
+        },
+      }),
+      this.prisma.publishingSchedule.count({
+        where: {
+          agencyId,
+          scheduledAt: { gte: todayStart, lt: todayEnd },
+          campaign: { clientId },
+        },
+      }),
+      this.prisma.workflowTask.findMany({
+        where: {
+          ...workflowTaskClientWhere,
+          status: {
+            in: [
+              TaskStatus.TODO,
+              TaskStatus.IN_PROGRESS,
+              TaskStatus.WAITING_REVIEW,
+              TaskStatus.WAITING_HANDOFF_ACCEPTANCE,
+              TaskStatus.BLOCKED,
+            ],
+          },
+        },
+        include: {
+          workflowInstance: { include: { contentAsset: true } },
+          workflowStep: true,
+        },
+        orderBy: { deadlineAt: "asc" },
+        take: 8,
+      }),
+      this.prisma.workOrder.findMany({
+        where: {
+          agencyId,
+          clientId,
+          deletedAt: null,
+          status: {
+            in: [
+              WorkOrderStatus.ASSIGNED,
+              WorkOrderStatus.IN_PROGRESS,
+              WorkOrderStatus.SUBMITTED,
+              WorkOrderStatus.CHANGES_REQUESTED,
+            ],
+          },
+        },
+        include: { client: true },
+        orderBy: { dueAt: "asc" },
+        take: 8,
+      }),
+      this.prisma.submission.count({
+        where: {
+          agencyId,
+          status: SubmissionStatus.SUBMITTED,
+          workflowTask: {
+            workflowInstance: { contentAsset: { clientId } },
+          },
+        },
+      }),
+      this.prisma.workflowTransition.findMany({
+        where: {
+          agencyId,
+          workflowInstance: { contentAsset: { clientId } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 8,
+        include: { workflowInstance: { include: { contentAsset: true } } },
+      }),
+    ]);
+
+    if (!client) {
+      return this.emptyClientDashboard(
+        "No client account has been assigned to your access. Contact your agency administrator.",
+      );
+    }
+
+    return {
+      clientAccess: {
+        assigned: true,
+        clientId,
+        clientName: client.displayName || client.name,
+      },
+      myTasks: [
+        ...tasks.map((task) => ({
+          sourceType: "WORKFLOW_TASK",
+          id: task.id,
+          title: task.displayName,
+          contentAssetId: task.workflowInstance.contentAssetId,
+          workOrderId: null,
+          displayCode: task.workflowInstance.contentAsset?.displayCode ?? null,
+          campaignId: task.workflowInstance.contentAsset?.campaignId ?? null,
+          clientId: task.workflowInstance.contentAsset?.clientId ?? null,
+          contentAssetTitle:
+            task.workflowInstance.contentAsset?.title ?? "Untitled content",
+          status: task.status,
+          deadlineAt: task.deadlineAt,
+          stage: task.workflowStep?.stage ?? null,
+        })),
+        ...workOrders.map((workOrder) => ({
+          sourceType: "WORK_ORDER",
+          id: `work-order:${workOrder.id}`,
+          title: workOrder.title,
+          contentAssetId: null,
+          workOrderId: workOrder.id,
+          displayCode: null,
+          campaignId: null,
+          clientId: workOrder.clientId,
+          contentAssetTitle:
+            workOrder.client?.displayName ??
+            workOrder.client?.name ??
+            "Standalone gig",
+          status: workOrder.status,
+          deadlineAt: workOrder.dueAt,
+          stage: workOrder.workType,
+        })),
+      ]
+        .sort(
+          (a, b) =>
+            new Date(a.deadlineAt ?? 0).getTime() -
+            new Date(b.deadlineAt ?? 0).getTime(),
+        )
+        .slice(0, 8),
+      pendingApprovals: pendingReviews,
+      blockedContent,
+      overdueContent:
+        tasks.filter((task) => task.deadlineAt && task.deadlineAt < new Date())
+          .length +
+        workOrders.filter(
+          (workOrder) =>
+            workOrder.dueAt < new Date() &&
+            !new Set<WorkOrderStatus>([
+              WorkOrderStatus.COMPLETED,
+              WorkOrderStatus.CANCELLED,
+            ]).has(workOrder.status),
+        ).length,
+      publishingToday,
+      activity: recentActivity.map((transition) => ({
+        id: transition.id,
+        contentAssetId: transition.workflowInstance.contentAssetId,
+        displayCode:
+          transition.workflowInstance.contentAsset?.displayCode ?? null,
+        campaignId:
+          transition.workflowInstance.contentAsset?.campaignId ?? null,
+        clientId: transition.workflowInstance.contentAsset?.clientId ?? null,
+        contentAssetTitle:
+          transition.workflowInstance.contentAsset?.title ?? "Untitled content",
+        toStage: transition.toStage,
+        createdAt: transition.createdAt,
+      })),
+      riskSummary: {
+        activeClients: 1,
+        activeCampaigns: campaigns,
+        activeContent: contentAssets,
+        blockedItems: blockedContent,
+      },
+    };
+  }
+
+  private emptyClientDashboard(message: string) {
+    return {
+      clientAccess: {
+        assigned: false,
+        clientId: null,
+        clientName: null,
+        message,
+      },
+      myTasks: [],
+      pendingApprovals: 0,
+      blockedContent: 0,
+      overdueContent: 0,
+      publishingToday: 0,
+      activity: [],
+      riskSummary: {
+        activeClients: 0,
+        activeCampaigns: 0,
+        activeContent: 0,
+        blockedItems: 0,
       },
     };
   }

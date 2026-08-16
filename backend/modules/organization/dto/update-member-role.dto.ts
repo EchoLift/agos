@@ -7,6 +7,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
 } from "class-validator";
 
@@ -39,4 +40,13 @@ export class UpdateMemberRoleDto {
   @IsInt()
   @Min(1)
   version!: number;
+
+  @ApiProperty({
+    example: "client-uuid",
+    description: "Business client required when assigning the CLIENT role",
+    required: false,
+  })
+  @IsOptional()
+  @IsUUID()
+  clientId?: string;
 }

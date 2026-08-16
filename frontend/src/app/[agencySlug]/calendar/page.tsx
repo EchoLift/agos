@@ -76,6 +76,10 @@ export default function CalendarPage() {
     () => roleKeys.includes("OWNER") || roleKeys.includes("MANAGER"),
     [roleKeys],
   );
+  const isClientWorkspace = useMemo(
+    () => roleKeys.includes("CLIENT"),
+    [roleKeys],
+  );
   const defaultScope = useMemo<CalendarScope>(() => {
     if (roleKeys.includes("OWNER")) return "AGENCY";
     if (roleKeys.includes("MANAGER")) return "MY_TEAM";
@@ -300,6 +304,10 @@ export default function CalendarPage() {
 
   const openCalendarEvent = useCallback(
     (event: CalendarEvent) => {
+      if (isClientWorkspace && event.campaign?.id) {
+        router.push(getWorkspaceHref(safeAgencySlug, `/campaigns/${event.campaign.id}`));
+        return;
+      }
       if (event.workOrder?.id) {
         router.push(getWorkspaceHref(safeAgencySlug, `/gigs/${event.workOrder.id}`));
         return;
@@ -312,7 +320,7 @@ export default function CalendarPage() {
         router.push(getWorkspaceHref(safeAgencySlug, `/campaigns/${event.campaign.id}`));
       }
     },
-    [router],
+    [isClientWorkspace, router, safeAgencySlug],
   );
 
   const toggleType = (type: string) => {

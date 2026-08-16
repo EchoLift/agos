@@ -10,6 +10,7 @@ import { EventBusService } from "@packages/events/event-bus.service";
 import { CryptoService } from "@modules/auth/services/crypto.service";
 import { UserLookupService } from "@modules/user/services/user-lookup.service";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
+import { assertClientScope } from "@packages/security/client-scope";
 import { CreateClientContactDto } from "./dto/create-client-contact.dto";
 import { UpdateClientContactDto } from "./dto/update-client-contact.dto";
 
@@ -357,7 +358,7 @@ export class ClientContactService {
   async findContactsByClient(
     clientId: string,
     agencyId: string,
-    _actor?: IdentityContext,
+    actor?: IdentityContext,
   ) {
     if (!agencyId) {
       throw new BadRequestException("Agency context is required");
@@ -370,6 +371,7 @@ export class ClientContactService {
     if (!client || client.agencyId !== agencyId) {
       throw new NotFoundException("Client not found");
     }
+    assertClientScope(actor, clientId);
 
     const contacts = await this.prisma.clientContact.findMany({
       where: { clientId, agencyId, deletedAt: null },

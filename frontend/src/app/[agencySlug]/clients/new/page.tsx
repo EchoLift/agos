@@ -25,6 +25,9 @@ export default function NewClientPage() {
       displayName: "",
       website: "",
       industry: "Technology",
+      primaryContactName: "",
+      primaryContactEmail: "",
+      invitePrimaryContact: true,
       businessDescription: "",
       businessSize: "",
       timezone: "Asia/Kolkata",
@@ -40,7 +43,10 @@ export default function NewClientPage() {
     setIsSubmitting(true);
 
     try {
-      const client = await createClient(agencyId, normalizeClientPayload(data));
+      const client = await createClient(agencyId, {
+        ...normalizeClientPayload(data),
+        invitePrimaryContact: data.invitePrimaryContact !== false,
+      });
       queryClient.setQueryData(queryKeys.clients(agencyId), (current: Client[] | undefined) => setListItem(current, client));
       invalidateWorkspaceQueries(queryClient, agencyId, ["clients"]);
       router.push(getWorkspaceHref(safeAgencySlug, "/clients"));
@@ -69,6 +75,22 @@ export default function NewClientPage() {
 
       <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
         <ClientPlaybookForm register={register} setValue={setValue} watch={watch} />
+
+        <label className="flex items-start gap-3 rounded-3xl border border-zinc-800 bg-zinc-950/80 p-5 text-sm text-zinc-300">
+          <input
+            type="checkbox"
+            {...register("invitePrimaryContact")}
+            className="mt-1 h-4 w-4 accent-indigo-500"
+          />
+          <span>
+            <span className="block font-medium text-white">
+              Invite primary contact to the client portal
+            </span>
+            <span className="mt-1 block text-zinc-500">
+              Creates a CLIENT invitation linked to this business client.
+            </span>
+          </span>
+        </label>
 
         {error ? <div className="rounded-xl bg-red-500/10 p-4 text-sm text-red-400">{error}</div> : null}
 

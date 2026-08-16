@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAgency } from "@/components/AgencyProvider";
 import { useRouter } from "next/navigation";
 import { formatLabel, statusPillClasses } from "@/lib/status-style";
-import { isProductionWorkspaceRole, workspaceHomeLabel } from "@/lib/workspace-access";
+import { hasAnyRole, isProductionWorkspaceRole, workspaceHomeLabel } from "@/lib/workspace-access";
 import { getWorkspaceHref } from "@/lib/workspace-url";
 import { queryKeys, staleTimes, useActivationQuery, useDashboardQuery } from "@/lib/query";
 import { getCalendarEvents } from "@/lib/api/calendar";
@@ -41,6 +41,7 @@ export default function WorkspaceDashboard() {
   const dashboardData = dashboardQuery.data ?? null;
   const name = agency?.displayName || agency?.name || "Agency";
   const isMyWork = isProductionWorkspaceRole(agency);
+  const isClientWorkspace = hasAnyRole(agency, ["CLIENT"]);
   const homeLabel = workspaceHomeLabel(agency);
   const safeAgencySlug = agencySlug ?? "";
   const rememberedClientId = useRememberedEntityId(
@@ -63,6 +64,8 @@ export default function WorkspaceDashboard() {
 
   const progress = activation?.progress ?? 0;
   const showDashboard = isMyWork ? true : (activation?.steps.client ?? false);
+  const missingClientAssignment =
+    isClientWorkspace && dashboardData?.clientAccess?.assigned === false;
   const myTasks = dashboardData?.myTasks ?? [];
   const dueTodayCount = myTasks.filter((task) => isToday(task.deadlineAt)).length;
   const waitingReviewCount = myTasks.filter((task) => /WAITING|REVIEW|APPROVAL/.test(task.status) || /REVIEW|APPROVAL/.test(task.stage || "")).length;
@@ -70,17 +73,60 @@ export default function WorkspaceDashboard() {
   const overdueTaskCount = myTasks.filter((task) => isOverdue(task.deadlineAt)).length;
   const metrics = isMyWork
     ? [
-      { label: "Assigned to me", value: myTasks.length, href: "workflow" },
-      { label: "Due today", value: dueTodayCount, href: "calendar" },
-      { label: "Waiting review", value: waitingReviewCount, href: "workflow" },
-      { label: "Returned / overdue", value: returnedCount + overdueTaskCount, href: "workflow" },
-    ]
-    : [
-      { label: "Active clients", value: dashboardData?.riskSummary.activeClients ?? 0, href: "clients" },
-      { label: "Active campaigns", value: dashboardData?.riskSummary.activeCampaigns ?? 0, href: "campaigns" },
-      { label: "Active content", value: dashboardData?.riskSummary.activeContent ?? 0, href: "campaigns" },
-      { label: "Blocked", value: dashboardData?.riskSummary.blockedItems ?? 0, href: "workflow" },
-    ];
+        { label: "Assigned to me", value: myTasks.length, href: "workflow" },
+        { label: "Due today", value: dueTodayCount, href: "calendar" },
+        { label: "Waiting review", value: waitingReviewCount, href: "workflow" },
+        {
+          label: "Returned / overdue",
+          value: returnedCount + overdueTaskCount,
+          href: "workflow",
+        },
+      ]
+    : isClientWorkspace
+      ? [
+          {
+            label: "Your client",
+            value: dashboardData?.riskSummary.activeClients ?? 0,
+            href: "campaigns",
+          },
+          {
+            label: "Active campaigns",
+            value: dashboardData?.riskSummary.activeCampaigns ?? 0,
+            href: "campaigns",
+          },
+          {
+            label: "Active content",
+            value: dashboardData?.riskSummary.activeContent ?? 0,
+            href: "campaigns",
+          },
+          {
+            label: "Publishing today",
+            value: dashboardData?.publishingToday ?? 0,
+            href: "calendar",
+          },
+        ]
+      : [
+          {
+            label: "Active clients",
+            value: dashboardData?.riskSummary.activeClients ?? 0,
+            href: "clients",
+          },
+          {
+            label: "Active campaigns",
+            value: dashboardData?.riskSummary.activeCampaigns ?? 0,
+            href: "campaigns",
+          },
+          {
+            label: "Active content",
+            value: dashboardData?.riskSummary.activeContent ?? 0,
+            href: "campaigns",
+          },
+          {
+            label: "Blocked",
+            value: dashboardData?.riskSummary.blockedItems ?? 0,
+            href: "workflow",
+          },
+        ];
 
   const completeStep = (stepId: StepId) => {
     if (stepId === "team") {
@@ -121,7 +167,9 @@ export default function WorkspaceDashboard() {
   useEffect(() => {
     if (!agencyId || !dashboardData) return;
     const calendarFilters = {
-      scope: isMyWork ? "MY_SCHEDULE" as const : "AGENCY" as const,
+      scope: isMyWork || isClientWorkspace
+        ? "MY_SCHEDULE" as const
+        : "AGENCY" as const,
       ...currentMonthRange(),
     };
     const prefetch = () => {
@@ -130,6 +178,7 @@ export default function WorkspaceDashboard() {
         queryFn: () => getCalendarEvents(agencyId, calendarFilters),
         staleTime: staleTimes.calendar,
       });
+      if (isClientWorkspace) return;
       void queryClient.prefetchQuery({
         queryKey: queryKeys.gigs(agencyId),
         queryFn: () => getWorkOrders(agencyId),
@@ -138,7 +187,7 @@ export default function WorkspaceDashboard() {
     };
     const idleId = window.requestIdleCallback(prefetch, { timeout: 2500 });
     return () => window.cancelIdleCallback(idleId);
-  }, [agencyId, dashboardData, isMyWork, queryClient]);
+  }, [agencyId, dashboardData, isClientWorkspace, isMyWork, queryClient]);
 
   const firstLoadError =
     !dashboardData && dashboardQuery.error
@@ -163,21 +212,50 @@ export default function WorkspaceDashboard() {
     );
   }
 
+  if (missingClientAssignment) {
+    return (
+      <div className="rounded-3xl border border-amber-500/20 bg-amber-500/10 p-6 text-amber-100">
+        <p className="text-sm uppercase tracking-[0.3em] text-amber-200/70">
+          Client access
+        </p>
+        <h1 className="mt-3 text-2xl font-semibold">
+          No client account assigned
+        </h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-amber-100/80">
+          {dashboardData?.clientAccess?.message ??
+            "No client account has been assigned to your access. Contact your agency administrator."}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3 sm:space-y-4 lg:space-y-8">
       <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-4 shadow-xl shadow-black/10 lg:rounded-3xl lg:p-8 lg:shadow-2xl">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
           <div>
             <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">
-              {isMyWork ? "My work" : "Founder command center"}
+              {isClientWorkspace
+                ? dashboardData?.clientAccess?.clientName ?? "Client dashboard"
+                : isMyWork
+                  ? "My work"
+                  : "Founder command center"}
             </p>
             <h1 className="mt-1 text-2xl font-semibold leading-tight text-white sm:text-3xl lg:mt-2 lg:text-4xl">
-              {showDashboard ? (isMyWork ? "What needs your attention today" : `Good morning, ${name}`) : "Let’s set up your first workspace."}
+              {showDashboard
+                ? isClientWorkspace
+                  ? "Your campaigns and approvals"
+                  : isMyWork
+                    ? "What needs your attention today"
+                    : `Good morning, ${name}`
+                : "Let’s set up your first workspace."}
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400 lg:mt-3 lg:leading-7">
               {showDashboard
                 ? isMyWork
                   ? "Assigned work appears here first. Finish what is due, respond to reviews, and keep your handoffs moving."
+                  : isClientWorkspace
+                    ? "Track active campaigns, upcoming publishing, and work awaiting your review."
                   : "Your agency is moving. Use this view to focus on what needs attention today."
                 : "Create your first client to unlock the dashboard and turn this workspace into a real operating system."}
             </p>

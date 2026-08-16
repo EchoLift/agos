@@ -89,6 +89,9 @@ describe("OrganizationService Unit Tests", () => {
         create: jest.fn(),
         update: jest.fn(),
       },
+      client: {
+        findFirst: jest.fn(),
+      },
       $transaction: jest.fn(),
     };
     mockPrisma.$transaction.mockImplementation(
@@ -263,6 +266,106 @@ describe("OrganizationService Unit Tests", () => {
       expect(cryptoService.hashEmailLookup).toHaveBeenCalledWith(
         "editor@example.com",
       );
+    });
+
+    it("requires a business client when inviting the CLIENT role", async () => {
+      const inviter = { id: "user-inviter" } as User;
+      const inviterMembership = { id: "mem-inviter", agencyId: "agency-1" };
+      const clientRole = {
+        id: "role-client",
+        displayName: "Client",
+        systemRole: { key: "CLIENT" },
+      } as any;
+
+      userLookup.findByAuthUserId.mockResolvedValue(inviter);
+      repository.findMembership.mockResolvedValue(inviterMembership as any);
+      repository.findRoleById.mockResolvedValue(clientRole);
+      repository.findRoles.mockResolvedValue([clientRole]);
+
+      await expect(
+        service.inviteMember(
+          "agency-1",
+          { email: "client@example.com", roleId: "role-client" },
+          "auth-inviter",
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.createInvitation).not.toHaveBeenCalled();
+    });
+
+    it("stores the selected business client on CLIENT invitations", async () => {
+      const inviter = { id: "user-inviter" } as User;
+      const inviterMembership = { id: "mem-inviter", agencyId: "agency-1" };
+      const clientRole = {
+        id: "role-client",
+        displayName: "Client",
+        systemRole: { key: "CLIENT" },
+      } as any;
+
+      userLookup.findByAuthUserId.mockResolvedValue(inviter);
+      repository.findMembership.mockResolvedValue(inviterMembership as any);
+      repository.findRoleById.mockResolvedValue(clientRole);
+      repository.findRoles.mockResolvedValue([clientRole]);
+      prisma.client.findFirst.mockResolvedValue({ id: "client-1" });
+      repository.createInvitation.mockResolvedValue({
+        id: "inv-1",
+        status: "PENDING",
+        expiresAt: new Date(),
+        token: "token-1",
+        roles: [{ role: clientRole }],
+      } as any);
+
+      await service.inviteMember(
+        "agency-1",
+        {
+          email: "client@example.com",
+          roleId: "role-client",
+          clientId: "client-1",
+        },
+        "auth-inviter",
+      );
+
+      expect(repository.createInvitation).toHaveBeenCalledWith(
+        "agency-1",
+        "hashed-email",
+        "role-client",
+        "mem-inviter",
+        expect.any(String),
+        expect.any(Date),
+        ["role-client"],
+        null,
+        "client-1",
+        "corr-123",
+        "encrypted-email",
+      );
+    });
+
+    it("rejects CLIENT invitations for clients outside the agency", async () => {
+      const inviter = { id: "user-inviter" } as User;
+      const inviterMembership = { id: "mem-inviter", agencyId: "agency-1" };
+      const clientRole = {
+        id: "role-client",
+        displayName: "Client",
+        systemRole: { key: "CLIENT" },
+      } as any;
+
+      userLookup.findByAuthUserId.mockResolvedValue(inviter);
+      repository.findMembership.mockResolvedValue(inviterMembership as any);
+      repository.findRoleById.mockResolvedValue(clientRole);
+      repository.findRoles.mockResolvedValue([clientRole]);
+      prisma.client.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.inviteMember(
+          "agency-1",
+          {
+            email: "client@example.com",
+            roleId: "role-client",
+            clientId: "client-other",
+          },
+          "auth-inviter",
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.createInvitation).not.toHaveBeenCalled();
     });
 
     it("should throw ForbiddenException if inviter is not a member of agency", async () => {
@@ -599,6 +702,7 @@ describe("OrganizationService Unit Tests", () => {
       const mockInvitation = {
         id: "inv-1",
         agencyId: "agency-1",
+        clientId: "client-1",
         roleId: "role-member",
         status: "PENDING",
         agency: {
@@ -611,6 +715,7 @@ describe("OrganizationService Unit Tests", () => {
       const mockMembership = {
         id: "mem-new",
         agencyId: "agency-1",
+        clientId: "client-1",
         status: "ACTIVE",
       } as Membership;
 
@@ -623,7 +728,17 @@ describe("OrganizationService Unit Tests", () => {
 
       expect(result.membershipId).toBe("mem-new");
       expect(result.status).toBe("ACTIVE");
+      expect(result.clientId).toBe("client-1");
       expect(result.agency.slug).toBe("socia-expert");
+      expect(repository.acceptInvitation).toHaveBeenCalledWith(
+        "inv-1",
+        "agency-1",
+        "user-2",
+        "role-member",
+        ["role-member"],
+        "client-1",
+        "corr-123",
+      );
     });
 
     it("should resolve an already accepted invitation for the active member", async () => {
@@ -809,6 +924,7 @@ describe("OrganizationService Unit Tests", () => {
         "role-owner",
         ["role-owner"],
         2,
+        null,
         "auth-allowed",
         "corr-123",
       );

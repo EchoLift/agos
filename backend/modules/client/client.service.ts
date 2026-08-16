@@ -2,11 +2,19 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
+import * as crypto from "crypto";
 import { PrismaService } from "@packages/database/prisma.service";
 import { DomainEvents } from "@packages/events/domain-event";
 import { EventBusService } from "@packages/events/event-bus.service";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
+import {
+  assertClientScope,
+  isClientUser,
+  requireClientScope,
+} from "@packages/security/client-scope";
+import { CryptoService } from "@modules/auth/services/crypto.service";
 import { CreateClientDto } from "./dto/create-client.dto";
 import { UpdateClientDto } from "./dto/update-client.dto";
 
@@ -203,32 +211,201 @@ export class ClientService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventBus: EventBusService,
+    @Optional()
+    private readonly cryptoService?: CryptoService,
   ) {}
 
-  async create(dto: CreateClientDto, agencyId?: string, actorId?: string) {
+  async create(
+    dto: CreateClientDto,
+    agencyId?: string,
+    actorId?: string,
+    actorMembershipId?: string,
+  ) {
     const resolvedAgencyId = agencyId ?? dto.agencyId;
 
     if (!resolvedAgencyId) {
       throw new BadRequestException("Agency context is required");
     }
 
-    const client = await this.prisma.client.create({
+    const primaryContactName = this.nullIfBlank(dto.primaryContactName);
+    const primaryContactEmail = this.nullIfBlank(dto.primaryContactEmail);
+    if (!primaryContactName || !primaryContactEmail) {
+      throw new BadRequestException(
+        "Primary contact name and email are required.",
+      );
+    }
+
+    const invitePrimaryContact = dto.invitePrimaryContact !== false;
+    const result = await this.prisma.$transaction(async (tx) => {
+      const client = await tx.client.create({
+        data: {
+          agencyId: resolvedAgencyId,
+          name: dto.name,
+          industry: dto.industry,
+          ...this.optionalClientData(dto),
+          status: "ACTIVE",
+        },
+      });
+
+      await this.createPrimaryContact(tx, client.id, resolvedAgencyId, dto);
+
+      const invitation = invitePrimaryContact
+        ? await this.createPrimaryContactInvitation(
+            tx,
+            client.id,
+            resolvedAgencyId,
+            primaryContactEmail,
+            actorMembershipId,
+          )
+        : null;
+
+      return { client, invitation };
+    });
+
+    await this.eventBus.publish(DomainEvents.ClientCreated, {
+      agencyId: result.client.agencyId,
+      actorId: actorId ?? dto.actorId ?? null,
+      payload: {
+        clientId: result.client.id,
+        name: result.client.name,
+        primaryContactInvitationId: result.invitation?.id ?? null,
+      },
+    });
+
+    return {
+      ...result.client,
+      primaryContactInvitationId: result.invitation?.id ?? null,
+    };
+  }
+
+  private async createPrimaryContact(
+    tx: any,
+    clientId: string,
+    agencyId: string,
+    dto: CreateClientDto,
+  ) {
+    const primaryContactName = this.nullIfBlank(dto.primaryContactName);
+    const primaryContactEmail = this.nullIfBlank(dto.primaryContactEmail);
+    if (!primaryContactName || !primaryContactEmail || !this.cryptoService) {
+      return null;
+    }
+
+    const emailNormalized =
+      this.cryptoService.normalizeEmail(primaryContactEmail);
+    const phoneNormalized = this.nullIfBlank(dto.primaryContactPhone);
+    const whatsappNormalized = this.nullIfBlank(dto.primaryContactWhatsapp);
+
+    const contact = await tx.clientContact.create({
       data: {
-        agencyId: resolvedAgencyId,
-        name: dto.name,
-        industry: dto.industry,
-        ...this.optionalClientData(dto),
+        agencyId,
+        clientId,
+        name: primaryContactName,
+        designation: this.nullIfBlank(dto.primaryContactDesignation),
+        emailEncrypted: this.cryptoService.encrypt(emailNormalized),
+        emailHash: this.cryptoService.hashEmailLookup(emailNormalized),
+        phoneEncrypted: phoneNormalized
+          ? this.cryptoService.encrypt(phoneNormalized)
+          : null,
+        phoneHash: phoneNormalized
+          ? this.cryptoService.hashLookup(phoneNormalized)
+          : null,
+        whatsappEncrypted: whatsappNormalized
+          ? this.cryptoService.encrypt(whatsappNormalized)
+          : null,
+        whatsappHash: whatsappNormalized
+          ? this.cryptoService.hashLookup(whatsappNormalized)
+          : null,
+        role: "PRIMARY",
+        isPrimary: true,
+        preferredContactMethod: dto.preferredContactMethod || null,
         status: "ACTIVE",
       },
     });
 
-    await this.eventBus.publish(DomainEvents.ClientCreated, {
-      agencyId: client.agencyId,
-      actorId: actorId ?? dto.actorId ?? null,
-      payload: { clientId: client.id, name: client.name },
+    await tx.outboxEvent.create({
+      data: {
+        agencyId,
+        aggregateId: contact.id,
+        aggregateType: "ClientContact",
+        eventType: DomainEvents.ClientContactCreated,
+        payload: {
+          contactId: contact.id,
+          clientId,
+          name: contact.name,
+          role: contact.role,
+          isPrimary: contact.isPrimary,
+        },
+      },
     });
 
-    return client;
+    return contact;
+  }
+
+  private async createPrimaryContactInvitation(
+    tx: any,
+    clientId: string,
+    agencyId: string,
+    email: string,
+    invitedByMembershipId?: string,
+  ) {
+    if (!this.cryptoService) {
+      throw new BadRequestException("Invitation encryption is not configured.");
+    }
+    if (!invitedByMembershipId) {
+      throw new BadRequestException("Inviter membership context is required.");
+    }
+
+    const role = await tx.role.findFirst({
+      where: {
+        agencyId,
+        deletedAt: null,
+        systemRole: { key: "CLIENT" },
+      },
+      include: { systemRole: true },
+    });
+    if (!role) {
+      throw new BadRequestException("CLIENT role is not configured.");
+    }
+
+    const normalizedEmail = this.cryptoService.normalizeEmail(email);
+    const emailHash = this.cryptoService.hashEmailLookup(normalizedEmail);
+    const invitation = await tx.invitation.create({
+      data: {
+        agencyId,
+        clientId,
+        emailHash,
+        emailEncrypted: this.cryptoService.encrypt(normalizedEmail),
+        roleId: role.id,
+        invitedByMembershipId,
+        token: crypto.randomBytes(24).toString("hex"),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        status: "PENDING",
+        roles: {
+          create: [{ roleId: role.id }],
+        },
+      },
+    });
+
+    await tx.outboxEvent.create({
+      data: {
+        agencyId,
+        aggregateId: invitation.id,
+        aggregateType: "Invitation",
+        eventType: DomainEvents.MemberInvited,
+        payload: {
+          invitationId: invitation.id,
+          agencyId,
+          emailHash,
+          roleId: role.id,
+          roleIds: [role.id],
+          clientId,
+          invitedByMembershipId,
+          occurredAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    return invitation;
   }
 
   async update(
@@ -338,11 +515,17 @@ export class ClientService {
     if (agencyId && client.agencyId !== agencyId) {
       throw new NotFoundException("Client not found");
     }
+    assertClientScope(actor, client.id);
 
     return this.toVisiblePlaybook(client, actor);
   }
 
-  async findMany(agencyId: string) {
+  async findMany(agencyId: string, actor?: IdentityContext) {
+    if (actor && isClientUser(actor)) {
+      const clientId = requireClientScope(actor);
+      return this.prisma.client.findMany({ where: { agencyId, id: clientId } });
+    }
+
     return this.prisma.client.findMany({ where: { agencyId } });
   }
 

@@ -46,25 +46,25 @@ export class CampaignController {
   @Get()
   @ApiOperation({ summary: "List campaigns for the active agency" })
   findMany(@CurrentUser() user: IdentityContext) {
-    return this.campaignService.findMany(user.agencyId ?? "");
+    return this.campaignService.findMany(user.agencyId ?? "", user);
   }
 
   @Get(":id")
   @ApiOperation({ summary: "Get a campaign dashboard payload" })
   findById(@Param("id") id: string, @CurrentUser() user: IdentityContext) {
-    return this.campaignService.findById(id, user.agencyId ?? "");
+    return this.campaignService.findById(id, user.agencyId ?? "", user);
   }
 
   @Get(":id/team")
   @ApiOperation({ summary: "Get structured campaign team assignments" })
   getTeam(@Param("id") id: string, @CurrentUser() user: IdentityContext) {
-    return this.campaignService.getTeam(id, user.agencyId ?? "");
+    return this.campaignService.getTeam(id, user.agencyId ?? "", user);
   }
 
   @Get(":id/activity")
   @ApiOperation({ summary: "Get campaign activity timeline" })
   getActivity(@Param("id") id: string, @CurrentUser() user: IdentityContext) {
-    return this.campaignService.getActivity(id, user.agencyId ?? "");
+    return this.campaignService.getActivity(id, user.agencyId ?? "", user);
   }
 
   @Get(":id/publishing-schedules")

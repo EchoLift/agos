@@ -21,8 +21,8 @@ export class WorkflowController {
   }
 
   @Get(":id")
-  findById(@Param("id") id: string) {
-    return this.workflowService.findById(id);
+  findById(@Param("id") id: string, @CurrentUser() user: IdentityContext) {
+    return this.workflowService.findById(id, user);
   }
 
   @Patch(":id")

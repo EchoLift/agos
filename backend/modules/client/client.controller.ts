@@ -26,13 +26,18 @@ export class ClientController {
     description: "Client playbook created",
   })
   create(@Body() dto: CreateClientDto, @CurrentUser() user: IdentityContext) {
-    return this.clientService.create(dto, user.agencyId, user.userId);
+    return this.clientService.create(
+      dto,
+      user.agencyId,
+      user.userId,
+      user.membershipId,
+    );
   }
 
   @Get()
   @ApiResponse({ status: HttpStatus.OK, description: "List of clients" })
   findMany(@CurrentUser() user: IdentityContext) {
-    return this.clientService.findMany(user.agencyId ?? "");
+    return this.clientService.findMany(user.agencyId ?? "", user);
   }
 
   @Get(":id")

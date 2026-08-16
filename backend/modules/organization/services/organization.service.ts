@@ -209,6 +209,14 @@ export class OrganizationService implements OnModuleInit {
       role: m.role.systemRole.key,
       roles: this.mapMembershipRoles(m),
       membershipId: m.id,
+      clientId: m.clientId ?? null,
+      client: m.client
+        ? {
+            id: m.client.id,
+            name: m.client.name,
+            displayName: m.client.displayName || m.client.name,
+          }
+        : null,
     }));
 
     const currentAgency = activeAgencyId
@@ -299,6 +307,40 @@ export class OrganizationService implements OnModuleInit {
       );
     }
 
+    const selectedRoles = roles.filter((item) => roleIds.includes(item.id));
+    const includesClientRole = selectedRoles.some(
+      (item) => item.systemRole?.key === "CLIENT",
+    );
+    let clientId: string | null = null;
+
+    if (includesClientRole) {
+      if (!dto.clientId) {
+        throw new BadRequestException(
+          "A business client is required for CLIENT invitations.",
+        );
+      }
+
+      const client = await this.prisma.client.findFirst({
+        where: {
+          id: dto.clientId,
+          agencyId,
+          status: "ACTIVE",
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!client) {
+        throw new BadRequestException(
+          "Business client must belong to this agency.",
+        );
+      }
+      clientId = client.id;
+    } else if (dto.clientId) {
+      throw new BadRequestException(
+        "Business client can only be set for CLIENT invitations.",
+      );
+    }
+
     const email = this.cryptoService.normalizeEmail(dto.email);
     const emailHash = this.cryptoService.hashEmailLookup(email);
     const emailEncrypted = this.cryptoService.encrypt(email);
@@ -315,6 +357,7 @@ export class OrganizationService implements OnModuleInit {
       expiresAt,
       roleIds,
       dto.mobileNumber ?? null,
+      clientId,
       context?.correlationId,
       emailEncrypted,
     );
@@ -329,6 +372,7 @@ export class OrganizationService implements OnModuleInit {
       roleNames: invitation.roles?.map(
         (item: any) => item.role.displayName,
       ) ?? [role.displayName],
+      clientId,
       status: invitation.status,
       expiresAt: invitation.expiresAt,
       token: invitation.token,
@@ -479,6 +523,7 @@ export class OrganizationService implements OnModuleInit {
       user.id,
       invitation.roleId,
       invitation.roles?.map((item: any) => item.roleId) ?? [invitation.roleId],
+      invitation.clientId ?? null,
       context?.correlationId,
     );
 
@@ -490,6 +535,7 @@ export class OrganizationService implements OnModuleInit {
       membershipId: membership.id,
       agencyId: membership.agencyId,
       status: membership.status,
+      clientId: membership.clientId ?? invitation.clientId ?? null,
       agency: {
         id: invitation.agency.id,
         name: invitation.agency.name,
@@ -517,6 +563,14 @@ export class OrganizationService implements OnModuleInit {
       roleId: m.roleId,
       roleName: m.role.displayName,
       roles: this.mapMembershipRoles(m),
+      clientId: m.clientId ?? null,
+      client: m.client
+        ? {
+            id: m.client.id,
+            name: m.client.name,
+            displayName: m.client.displayName || m.client.name,
+          }
+        : null,
       status: m.status,
       joinedAt: m.joinedAt,
       version: m.version,
@@ -556,6 +610,37 @@ export class OrganizationService implements OnModuleInit {
     if (targetRoles.length !== requestedRoleIds.length) {
       throw new BadRequestException(
         "Roles must be predefined roles for this agency.",
+      );
+    }
+
+    const assignsClient = targetRoles.some(
+      (role) => role.systemRole?.key === "CLIENT",
+    );
+    let clientId: string | null = null;
+    if (assignsClient) {
+      clientId = dto.clientId ?? targetMembership.clientId ?? null;
+      if (!clientId) {
+        throw new BadRequestException(
+          "A business client is required for CLIENT members.",
+        );
+      }
+      const client = await this.prisma.client.findFirst({
+        where: {
+          id: clientId,
+          agencyId,
+          status: "ACTIVE",
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!client) {
+        throw new BadRequestException(
+          "Business client must belong to this agency.",
+        );
+      }
+    } else if (dto.clientId) {
+      throw new BadRequestException(
+        "Business client can only be set for CLIENT members.",
       );
     }
 
@@ -617,6 +702,7 @@ export class OrganizationService implements OnModuleInit {
       targetRole.id,
       requestedRoleIds,
       dto.version,
+      clientId,
       actor.authUserId,
       context?.correlationId,
     );
@@ -633,6 +719,14 @@ export class OrganizationService implements OnModuleInit {
       roleId: updated.roleId,
       roleName: updated.role.displayName,
       roles: this.mapMembershipRoles(updated),
+      clientId: updated.clientId ?? null,
+      client: updated.client
+        ? {
+            id: updated.client.id,
+            name: updated.client.name,
+            displayName: updated.client.displayName || updated.client.name,
+          }
+        : null,
       status: updated.status,
       joinedAt: updated.joinedAt,
       version: updated.version,
@@ -741,6 +835,7 @@ export class OrganizationService implements OnModuleInit {
   private invitationInclude() {
     return {
       agency: true,
+      client: true,
       role: { include: { systemRole: true } },
       roles: { include: { role: { include: { systemRole: true } } } },
       invitedBy: {
@@ -762,6 +857,14 @@ export class OrganizationService implements OnModuleInit {
       roleId: invitation.roleId,
       roleName: invitation.role?.displayName ?? null,
       roles: this.mapInvitationRoles(invitation),
+      clientId: invitation.clientId ?? null,
+      client: invitation.client
+        ? {
+            id: invitation.client.id,
+            name: invitation.client.name,
+            displayName: invitation.client.displayName || invitation.client.name,
+          }
+        : null,
       invitedBy: invitation.invitedBy
         ? {
             membershipId: invitation.invitedBy.id,

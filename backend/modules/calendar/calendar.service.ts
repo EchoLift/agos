@@ -14,6 +14,10 @@ import {
 import { PrismaService } from "@packages/database/prisma.service";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import {
+  isClientUser,
+  requireClientScope,
+} from "@packages/security/client-scope";
+import {
   CalendarEventsQueryDto,
   CalendarScope,
 } from "./dto/calendar-events-query.dto";
@@ -48,6 +52,7 @@ export class CalendarService {
     const eventTypes = this.csv(query.eventTypes);
     const statuses = this.csv(query.statuses);
     const platforms = this.csv(query.platforms);
+    const clientId = isClientUser(actor) ? requireClientScope(actor) : null;
     this.ensureMemberFilterAccess(query.memberId, membershipId, actor);
     const accessibleCampaignIds = await this.resolveAccessibleCampaignIds(
       scope,
@@ -79,6 +84,7 @@ export class CalendarService {
             statuses: taskStatuses,
             rawStatuses: statuses,
             accessibleCampaignIds,
+            clientId,
           })
         : Promise.resolve([]),
       !eventTypes.length || eventTypes.includes("PUBLISHING")
@@ -95,6 +101,7 @@ export class CalendarService {
             platforms: publishingPlatforms,
             rawPlatforms: platforms,
             accessibleCampaignIds,
+            clientId,
           })
         : Promise.resolve([]),
       !eventTypes.length || eventTypes.includes("WORK_ORDER")
@@ -108,6 +115,7 @@ export class CalendarService {
             memberId: query.memberId,
             statuses: workOrderStatuses,
             rawStatuses: statuses,
+            clientId,
           })
         : Promise.resolve([]),
     ]);
@@ -150,6 +158,7 @@ export class CalendarService {
     statuses: TaskStatus[];
     rawStatuses: string[];
     accessibleCampaignIds?: string[];
+    clientId?: string | null;
   }) {
     if (params.rawStatuses.length && !params.statuses.length) return [];
     const roleResponsibilities =
@@ -174,7 +183,15 @@ export class CalendarService {
         : {}),
     };
 
-    if (params.scope === "MY_SCHEDULE") {
+    if (params.clientId) {
+      where.workflowInstance = {
+        ...(where.workflowInstance ?? {}),
+        contentAsset: {
+          ...(where.workflowInstance?.contentAsset ?? {}),
+          clientId: params.clientId,
+        },
+      };
+    } else if (params.scope === "MY_SCHEDULE") {
       where.OR = [
         { ownerMembershipId: params.membershipId },
         ...roleResponsibilities.map((responsibility) => ({
@@ -332,6 +349,7 @@ export class CalendarService {
     platforms: PublishingPlatform[];
     rawPlatforms: string[];
     accessibleCampaignIds?: string[];
+    clientId?: string | null;
   }) {
     if (
       (params.rawStatuses.length && !params.statuses.length) ||
@@ -349,7 +367,9 @@ export class CalendarService {
         : {}),
     };
 
-    if (params.scope === "MY_SCHEDULE") {
+    if (params.clientId) {
+      where.campaign = { clientId: params.clientId };
+    } else if (params.scope === "MY_SCHEDULE") {
       const campaignIds = await this.campaignIdsForDirectPublishing(
         params.agencyId,
         params.membershipId,
@@ -414,6 +434,7 @@ export class CalendarService {
     memberId?: string;
     statuses: WorkOrderStatus[];
     rawStatuses: string[];
+    clientId?: string | null;
   }) {
     if (params.rawStatuses.length && !params.statuses.length) return [];
 
@@ -424,7 +445,9 @@ export class CalendarService {
       ...(params.statuses.length ? { status: { in: params.statuses } } : {}),
     };
 
-    if (params.scope === "MY_SCHEDULE") {
+    if (params.clientId) {
+      where.clientId = params.clientId;
+    } else if (params.scope === "MY_SCHEDULE") {
       where.OR = [
         { assigneeMembershipId: params.membershipId },
         { reviewerMembershipId: params.membershipId },
@@ -589,6 +612,19 @@ export class CalendarService {
     actor: IdentityContext,
     campaignId: string,
   ) {
+    if (isClientUser(actor)) {
+      const clientId = requireClientScope(actor);
+      const campaign = await this.prisma.campaign.findFirst({
+        where: {
+          id: campaignId,
+          agencyId,
+          clientId,
+          status: { not: "DELETED" },
+        },
+        select: { id: true },
+      });
+      return Boolean(campaign);
+    }
     if (this.isOwnerOrManager(actor)) return true;
     const assignment = await this.prisma.campaignTeamAssignment.findFirst({
       where: { agencyId, campaignId, membershipId },

@@ -25,6 +25,11 @@ import { EventBusService } from "@packages/events/event-bus.service";
 import { GoogleCalendarSyncService } from "@modules/google-calendar/google-calendar-sync.service";
 import { isEmailChannelRequired } from "@modules/notification/notification.policy";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
+import {
+  assertClientScope,
+  clientScopeId,
+  isClientUser,
+} from "@packages/security/client-scope";
 import { ApproveContentDto } from "./dto/approve-content.dto";
 import { AssignContentDto } from "./dto/assign-content.dto";
 import { BlockContentDto } from "./dto/block-content.dto";
@@ -60,6 +65,12 @@ export class WorkflowService {
     const canViewBroadWorkflow = actor
       ? this.canViewBroadWorkflow(actor)
       : true;
+    const actorClientId =
+      actor && isClientUser(actor) ? clientScopeId(actor) : null;
+
+    if (actor && isClientUser(actor) && !actorClientId) {
+      return this.emptyBoard();
+    }
 
     if (
       actor &&
@@ -85,9 +96,13 @@ export class WorkflowService {
       where: {
         agencyId,
         status: { not: ContentAssetStatus.DELETED },
-        ...(query.clientId ? { clientId: query.clientId } : {}),
+        ...(actorClientId
+          ? { clientId: actorClientId }
+          : query.clientId
+            ? { clientId: query.clientId }
+            : {}),
         ...(query.campaignId ? { campaignId: query.campaignId } : {}),
-        ...(!canViewBroadWorkflow && actor?.membershipId
+        ...(!actorClientId && !canViewBroadWorkflow && actor?.membershipId
           ? {
               OR: [
                 {
@@ -351,7 +366,7 @@ export class WorkflowService {
     return result.asset;
   }
 
-  async findById(id: string) {
+  async findById(id: string, actor?: IdentityContext) {
     const contentAsset = await this.prisma.contentAsset.findUnique({
       where: { id },
       include: {
@@ -380,6 +395,7 @@ export class WorkflowService {
     if (!contentAsset) {
       throw new NotFoundException("Content asset not found");
     }
+    assertClientScope(actor, contentAsset.clientId);
 
     const { client, campaign, ...asset } = contentAsset;
     return {
@@ -394,6 +410,26 @@ export class WorkflowService {
         keyMessage: campaign.keyMessage,
         cta: campaign.cta,
       },
+    };
+  }
+
+  private emptyBoard() {
+    const columns = this.workflowBoardStages().map((stage) => ({
+      stage,
+      label: this.stageLabel(stage),
+      count: 0,
+      items: [],
+    }));
+
+    return {
+      summary: {
+        active: 0,
+        waitingReview: 0,
+        blocked: 0,
+        overdue: 0,
+        dueToday: 0,
+      },
+      columns,
     };
   }
 
