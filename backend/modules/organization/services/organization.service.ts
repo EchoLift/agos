@@ -618,7 +618,7 @@ export class OrganizationService implements OnModuleInit {
     );
     let clientId: string | null = null;
     if (assignsClient) {
-      clientId = dto.clientId ?? targetMembership.clientId ?? null;
+      clientId = dto.clientId ?? null;
       if (!clientId) {
         throw new BadRequestException(
           "A business client is required for CLIENT members.",

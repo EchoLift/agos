@@ -864,6 +864,19 @@ describe("OrganizationService Unit Tests", () => {
       displayName: "Owner",
       systemRole: { key: "OWNER" },
     };
+    const clientRole = {
+      id: "role-client",
+      displayName: "Client",
+      systemRole: { key: "CLIENT" },
+    };
+    const ownerActor = {
+      authUserId: "auth-owner",
+      userId: "user-owner",
+      agencyId: "agency-1",
+      membershipId: "mem-owner",
+      role: "OWNER",
+      roles: ["OWNER"],
+    } as any;
 
     beforeEach(() => {
       configService.get.mockImplementation((key: string) => {
@@ -931,6 +944,213 @@ describe("OrganizationService Unit Tests", () => {
       expect(result.roles).toEqual([
         { id: "role-owner", key: "OWNER", name: "Owner" },
       ]);
+    });
+
+    it("adds CLIENT to an existing member when a valid business client is selected", async () => {
+      const membership = {
+        id: "mem-editor",
+        agencyId: "agency-1",
+        userId: "user-editor",
+        status: "ACTIVE",
+        role: editorRole,
+        roles: [{ role: editorRole }],
+        user: { name: "Editor", avatarUrl: null, authUser: null },
+        version: 2,
+      };
+      const updatedMembership = {
+        ...membership,
+        roleId: editorRole.id,
+        role: editorRole,
+        roles: [{ role: editorRole }, { role: clientRole }],
+        clientId: "client-1",
+        client: { id: "client-1", name: "Taaza Kitchen", displayName: null },
+        joinedAt: new Date("2026-08-08T00:00:00.000Z"),
+        version: 3,
+      };
+
+      repository.findMembershipById.mockResolvedValue(membership as any);
+      repository.findAgencyRolesByIds.mockResolvedValue([
+        editorRole,
+        clientRole,
+      ] as any);
+      prisma.client.findFirst.mockResolvedValue({ id: "client-1" });
+      repository.updateMembershipRole.mockResolvedValue(
+        updatedMembership as any,
+      );
+
+      const result = await service.updateMemberRole(
+        "agency-1",
+        "mem-editor",
+        {
+          roleId: "role-editor",
+          roleIds: ["role-editor", "role-client"],
+          clientId: "client-1",
+          version: 2,
+        },
+        ownerActor,
+      );
+
+      expect(repository.updateMembershipRole).toHaveBeenCalledWith(
+        "agency-1",
+        "mem-editor",
+        "role-editor",
+        ["role-editor", "role-client"],
+        2,
+        "client-1",
+        "auth-owner",
+        "corr-123",
+      );
+      expect(result.clientId).toBe("client-1");
+      expect(repository.createInvitation).not.toHaveBeenCalled();
+      expect(prisma.notificationDelivery.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects adding CLIENT without a business client", async () => {
+      repository.findMembershipById.mockResolvedValue({
+        id: "mem-editor",
+        agencyId: "agency-1",
+        userId: "user-editor",
+        status: "ACTIVE",
+        role: editorRole,
+        roles: [{ role: editorRole }],
+      } as any);
+      repository.findAgencyRolesByIds.mockResolvedValue([
+        editorRole,
+        clientRole,
+      ] as any);
+
+      await expect(
+        service.updateMemberRole(
+          "agency-1",
+          "mem-editor",
+          {
+            roleId: "role-editor",
+            roleIds: ["role-editor", "role-client"],
+            version: 2,
+          },
+          ownerActor,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.updateMembershipRole).not.toHaveBeenCalled();
+    });
+
+    it("rejects assigning CLIENT to a business client outside the agency", async () => {
+      repository.findMembershipById.mockResolvedValue({
+        id: "mem-editor",
+        agencyId: "agency-1",
+        userId: "user-editor",
+        status: "ACTIVE",
+        role: editorRole,
+        roles: [{ role: editorRole }],
+      } as any);
+      repository.findAgencyRolesByIds.mockResolvedValue([
+        editorRole,
+        clientRole,
+      ] as any);
+      prisma.client.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.updateMemberRole(
+          "agency-1",
+          "mem-editor",
+          {
+            roleId: "role-editor",
+            roleIds: ["role-editor", "role-client"],
+            clientId: "client-other",
+            version: 2,
+          },
+          ownerActor,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.updateMembershipRole).not.toHaveBeenCalled();
+    });
+
+    it("updates the business client when CLIENT remains selected", async () => {
+      const membership = {
+        id: "mem-client",
+        agencyId: "agency-1",
+        userId: "user-client",
+        status: "ACTIVE",
+        role: clientRole,
+        roles: [{ role: clientRole }],
+        clientId: "client-1",
+        user: { name: "Client", avatarUrl: null, authUser: null },
+      };
+      repository.findMembershipById.mockResolvedValue(membership as any);
+      repository.findAgencyRolesByIds.mockResolvedValue([clientRole] as any);
+      prisma.client.findFirst.mockResolvedValue({ id: "client-2" });
+      repository.updateMembershipRole.mockResolvedValue({
+        ...membership,
+        clientId: "client-2",
+        client: { id: "client-2", name: "New Client", displayName: null },
+        joinedAt: new Date("2026-08-08T00:00:00.000Z"),
+        version: 3,
+      } as any);
+
+      await service.updateMemberRole(
+        "agency-1",
+        "mem-client",
+        {
+          roleId: "role-client",
+          roleIds: ["role-client"],
+          clientId: "client-2",
+          version: 2,
+        },
+        ownerActor,
+      );
+
+      expect(repository.updateMembershipRole).toHaveBeenCalledWith(
+        "agency-1",
+        "mem-client",
+        "role-client",
+        ["role-client"],
+        2,
+        "client-2",
+        "auth-owner",
+        "corr-123",
+      );
+    });
+
+    it("clears clientId when CLIENT is removed and leaves other roles intact", async () => {
+      const membership = {
+        id: "mem-client-editor",
+        agencyId: "agency-1",
+        userId: "user-client-editor",
+        status: "ACTIVE",
+        role: editorRole,
+        roles: [{ role: editorRole }, { role: clientRole }],
+        clientId: "client-1",
+        user: { name: "Editor", avatarUrl: null, authUser: null },
+      };
+      repository.findMembershipById.mockResolvedValue(membership as any);
+      repository.findAgencyRolesByIds.mockResolvedValue([editorRole] as any);
+      repository.updateMembershipRole.mockResolvedValue({
+        ...membership,
+        roles: [{ role: editorRole }],
+        clientId: null,
+        client: null,
+        joinedAt: new Date("2026-08-08T00:00:00.000Z"),
+        version: 3,
+      } as any);
+
+      await service.updateMemberRole(
+        "agency-1",
+        "mem-client-editor",
+        { roleId: "role-editor", roleIds: ["role-editor"], version: 2 },
+        ownerActor,
+      );
+
+      expect(repository.updateMembershipRole).toHaveBeenCalledWith(
+        "agency-1",
+        "mem-client-editor",
+        "role-editor",
+        ["role-editor"],
+        2,
+        null,
+        "auth-owner",
+        "corr-123",
+      );
+      expect(repository.createInvitation).not.toHaveBeenCalled();
     });
 
     it("does not let the local testing override change another member's roles", async () => {

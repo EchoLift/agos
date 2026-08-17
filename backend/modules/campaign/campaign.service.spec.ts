@@ -144,6 +144,31 @@ describe("CampaignService", () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it("does not client-scope a multi-role internal member that also has CLIENT", async () => {
+    prisma.campaign.findMany.mockResolvedValue([]);
+
+    await service.findMany("agency-1", {
+      authUserId: "auth-multi",
+      userId: "user-multi",
+      sessionId: "session-1",
+      agencyId: "agency-1",
+      membershipId: "mem-multi",
+      clientId: "client-1",
+      role: "WRITER",
+      roles: ["WRITER", "CLIENT"],
+      permissions: [],
+    });
+
+    expect(prisma.campaign.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          agencyId: "agency-1",
+          status: { not: "DELETED" },
+        },
+      }),
+    );
+  });
+
   it("activates a draft campaign and publishes an activated event", async () => {
     prisma.campaign.findUnique.mockResolvedValue({
       id: "campaign-1",
