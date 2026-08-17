@@ -69,7 +69,12 @@ export default function NewGigPage() {
       });
       queryClient.setQueryData(queryKeys.gig(agencyId, gig.id), gig);
       queryClient.setQueryData(queryKeys.gigs(agencyId), (current: WorkOrder[] | undefined) => setListItem(current, gig));
-      invalidateWorkspaceQueries(queryClient, agencyId, ["gigs", "dashboard", "calendar"]);
+      invalidateWorkspaceQueries(queryClient, agencyId, [
+        "gigs",
+        "dashboard",
+        "calendar",
+        "workflow",
+      ]);
       router.push(getWorkspaceHref(safeAgencySlug, `/gigs/${gig.id}`));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create gig");

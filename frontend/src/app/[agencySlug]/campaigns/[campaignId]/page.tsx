@@ -14,6 +14,7 @@ import {
   cancelPublishingSchedule,
   Campaign,
   CampaignActivityItem,
+  CampaignActivityResponse,
   CampaignAssignmentRole,
   CampaignDeliverablePlan,
   CampaignTeamAssignment,
@@ -161,6 +162,8 @@ export default function CampaignDetailPage() {
       ]);
       setActivityItems(activity.items);
       setPublishingAgenda(agenda);
+      cacheCampaignActivity(queryClient, agencyId, campaign.id, activity);
+      cachePublishingAgenda(queryClient, agencyId, campaign.id, agenda);
       setIsEditing(false);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to save campaign.");
@@ -188,6 +191,8 @@ export default function CampaignDetailPage() {
       ]);
       setActivityItems(activity.items);
       setPublishingAgenda(agenda);
+      cacheCampaignActivity(queryClient, agencyId, campaign.id, activity);
+      cachePublishingAgenda(queryClient, agencyId, campaign.id, agenda);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to activate campaign.");
     } finally {
@@ -213,6 +218,8 @@ export default function CampaignDetailPage() {
         ]);
         setActivityItems(activity.items);
         setPublishingAgenda(agenda);
+        cacheCampaignActivity(queryClient, agencyId, campaign.id, activity);
+        cachePublishingAgenda(queryClient, agencyId, campaign.id, agenda);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : `Failed to ${label.toLowerCase()} campaign.`);
@@ -229,8 +236,13 @@ export default function CampaignDetailPage() {
     ]);
     setTeamAssignments(team);
     setActivityItems(activity.items);
+    queryClient.setQueryData(queryKeys.campaignTeam(agencyId, campaign.id), team);
+    cacheCampaignActivity(queryClient, agencyId, campaign.id, activity);
     void queryClient.invalidateQueries({
       queryKey: queryKeys.campaignTeam(agencyId, campaign.id),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.campaignActivity(agencyId, campaign.id),
     });
     void queryClient.invalidateQueries({
       queryKey: queryKeys.campaignContent(agencyId, campaign.id),
@@ -256,6 +268,20 @@ export default function CampaignDetailPage() {
     cacheCampaign(queryClient, agencyId, campaignData);
     setPublishingAgenda(agenda);
     setActivityItems(activity.items);
+    cachePublishingAgenda(queryClient, agencyId, campaign.id, agenda);
+    cacheCampaignActivity(queryClient, agencyId, campaign.id, activity);
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.campaignContent(agencyId, campaign.id),
+    });
+    invalidateWorkspaceQueries(queryClient, agencyId, [
+      "dashboard",
+      "calendar",
+      "workflow",
+      "content",
+      "gigs",
+      "campaigns",
+      "schedule",
+    ]);
   };
 
   return (
@@ -1155,5 +1181,37 @@ function inferContentType(slot: PublishingSchedule) {
 function cacheCampaign(queryClient: ReturnType<typeof useQueryClient>, agencyId: string, campaign: Campaign) {
   queryClient.setQueryData(queryKeys.campaign(agencyId, campaign.id), campaign);
   queryClient.setQueryData(queryKeys.campaigns(agencyId), (current: Campaign[] | undefined) => setListItem(current, campaign));
-  invalidateWorkspaceQueries(queryClient, agencyId, ["campaigns", "dashboard", "schedule", "calendar", "workflow"]);
+  invalidateWorkspaceQueries(queryClient, agencyId, [
+    "campaigns",
+    "dashboard",
+    "schedule",
+    "calendar",
+    "workflow",
+    "content",
+    "gigs",
+  ]);
+}
+
+function cacheCampaignActivity(
+  queryClient: ReturnType<typeof useQueryClient>,
+  agencyId: string,
+  campaignId: string,
+  activity: CampaignActivityResponse,
+) {
+  queryClient.setQueryData(
+    queryKeys.campaignActivity(agencyId, campaignId),
+    activity,
+  );
+}
+
+function cachePublishingAgenda(
+  queryClient: ReturnType<typeof useQueryClient>,
+  agencyId: string,
+  campaignId: string,
+  agenda: PublishingScheduleAgendaResponse,
+) {
+  queryClient.setQueryData(
+    queryKeys.publishingSchedules(agencyId, campaignId),
+    agenda,
+  );
 }

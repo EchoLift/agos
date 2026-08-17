@@ -207,6 +207,16 @@ export function allowedNavKeys(
   return keys;
 }
 
+export function canUseRoleTestingOverride(
+  userId?: string | null,
+) {
+  return Boolean(
+    isRoleTestingOverrideEnabled &&
+      userId &&
+      roleTestingUserIds.has(userId),
+  );
+}
+
 export function roleAccessLabels(
   roleKeyOrName: string,
 ) {

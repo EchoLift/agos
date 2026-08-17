@@ -83,6 +83,23 @@ export default function WorkflowDetailPage() {
           : {}),
         ...(trimmedComment ? { comment: trimmedComment } : {}),
       });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.campaign(agencyId, asset.campaignId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.campaignContent(agencyId, asset.campaignId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.publishingSchedules(agencyId, asset.campaignId),
+      });
+      invalidateWorkspaceQueries(queryClient, agencyId, [
+        "workflow",
+        "dashboard",
+        "calendar",
+        "content",
+        "campaigns",
+        "gigs",
+      ]);
       const refreshed = await assetQuery.refetch();
       if (refreshed.data) {
         cacheContentAsset(queryClient, agencyId, refreshed.data);
@@ -267,7 +284,24 @@ function LatestSubmissionCard({ submission }: { submission: ContentAsset["latest
 function cacheContentAsset(queryClient: ReturnType<typeof useQueryClient>, agencyId: string, asset: ContentAsset) {
   queryClient.setQueryData(queryKeys.contentAsset(agencyId, asset.id), asset);
   queryClient.setQueryData(queryKeys.content(agencyId), (current: ContentAsset[] | undefined) => setListItem(current, asset));
-  invalidateWorkspaceQueries(queryClient, agencyId, ["content", "workflow", "dashboard", "calendar"]);
+  queryClient.setQueryData(
+    queryKeys.campaignContent(agencyId, asset.campaignId),
+    (current: ContentAsset[] | undefined) => setListItem(current, asset),
+  );
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.campaign(agencyId, asset.campaignId),
+  });
+  void queryClient.invalidateQueries({
+    queryKey: queryKeys.publishingSchedules(agencyId, asset.campaignId),
+  });
+  invalidateWorkspaceQueries(queryClient, agencyId, [
+    "content",
+    "workflow",
+    "dashboard",
+    "calendar",
+    "campaigns",
+    "gigs",
+  ]);
 }
 
 function CampaignContext({ campaign }: { campaign: ContentAsset["campaignSummary"] }) {

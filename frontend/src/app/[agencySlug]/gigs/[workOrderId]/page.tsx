@@ -270,7 +270,12 @@ function LatestSubmission({ workOrder }: { workOrder: WorkOrder }) {
 function cacheWorkOrder(queryClient: ReturnType<typeof useQueryClient>, agencyId: string, workOrder: WorkOrder) {
   queryClient.setQueryData(queryKeys.gig(agencyId, workOrder.id), workOrder);
   queryClient.setQueryData(queryKeys.gigs(agencyId), (current: WorkOrder[] | undefined) => setListItem(current, workOrder));
-  invalidateWorkspaceQueries(queryClient, agencyId, ["gigs", "dashboard", "calendar"]);
+  invalidateWorkspaceQueries(queryClient, agencyId, [
+    "gigs",
+    "dashboard",
+    "calendar",
+    "workflow",
+  ]);
 }
 
 function Detail({ label, value }: { label: string; value?: string | null }) {

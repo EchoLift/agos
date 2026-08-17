@@ -147,6 +147,7 @@ export function CampaignContentPlan({
       "schedule",
       "content",
       "campaigns",
+      "gigs",
     ]);
     await onChanged();
   };
@@ -185,6 +186,10 @@ export function CampaignContentPlan({
     queryClient.setQueryData(queryKeys.contentAsset(agencyId, asset.id), asset);
     queryClient.setQueryData(
       queryKeys.content(agencyId),
+      (current: ContentAsset[] | undefined) => setListItem(current, asset),
+    );
+    queryClient.setQueryData(
+      queryKeys.campaignContent(agencyId, campaign.id),
       (current: ContentAsset[] | undefined) => setListItem(current, asset),
     );
 
@@ -243,6 +248,11 @@ export function CampaignContentPlan({
       (current: ContentAsset[] | undefined) =>
         setListItem(current, updatedAsset),
     );
+    queryClient.setQueryData(
+      queryKeys.campaignContent(agencyId, campaign.id),
+      (current: ContentAsset[] | undefined) =>
+        setListItem(current, updatedAsset),
+    );
 
     if (values.publishDate) {
       if (schedule?.id && schedule.version) {
@@ -273,6 +283,16 @@ export function CampaignContentPlan({
       queryClient.setQueryData(
         queryKeys.contentAsset(agencyId, asset.id),
         plannedAsset,
+      );
+      queryClient.setQueryData(
+        queryKeys.content(agencyId),
+        (current: ContentAsset[] | undefined) =>
+          setListItem(current, plannedAsset),
+      );
+      queryClient.setQueryData(
+        queryKeys.campaignContent(agencyId, campaign.id),
+        (current: ContentAsset[] | undefined) =>
+          setListItem(current, plannedAsset),
       );
     }
 

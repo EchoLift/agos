@@ -48,7 +48,14 @@ export default function NewClientPage() {
         invitePrimaryContact: data.invitePrimaryContact !== false,
       });
       queryClient.setQueryData(queryKeys.clients(agencyId), (current: Client[] | undefined) => setListItem(current, client));
-      invalidateWorkspaceQueries(queryClient, agencyId, ["clients"]);
+      invalidateWorkspaceQueries(queryClient, agencyId, [
+        "clients",
+        "dashboard",
+        "campaigns",
+        "calendar",
+        "workflow",
+        "invitations",
+      ]);
       router.push(getWorkspaceHref(safeAgencySlug, "/clients"));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create client.");
