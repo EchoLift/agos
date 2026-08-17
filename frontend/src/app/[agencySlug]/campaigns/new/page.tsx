@@ -92,7 +92,15 @@ export default function NewCampaignPage() {
       }
       queryClient.setQueryData(queryKeys.campaign(agencyId, campaign.id), campaign);
       queryClient.setQueryData(queryKeys.campaigns(agencyId), (current: Campaign[] | undefined) => setListItem(current, campaign));
-      invalidateWorkspaceQueries(queryClient, agencyId, ["campaigns", "dashboard", "schedule","calendar", "workflow"]);
+      invalidateWorkspaceQueries(queryClient, agencyId, [
+        "campaigns",
+        "dashboard",
+        "schedule",
+        "calendar",
+        "workflow",
+        "content",
+        "gigs",
+      ]);
       router.push(getWorkspaceHref(safeAgencySlug, `/campaigns/${campaign.id}`));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create campaign.");

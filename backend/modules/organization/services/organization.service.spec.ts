@@ -50,6 +50,7 @@ describe("OrganizationService Unit Tests", () => {
       findMembershipById: jest.fn(),
       findAgencyRolesByIds: jest.fn(),
       updateMembershipRole: jest.fn(),
+      removeMembership: jest.fn(),
       countActiveOwners: jest.fn(),
     };
 
@@ -1034,6 +1035,43 @@ describe("OrganizationService Unit Tests", () => {
       expect(repository.updateMembershipRole).not.toHaveBeenCalled();
     });
 
+    it.each(["WRITER", "DOP"])(
+      "rejects direct role edits from %s memberships",
+      async (roleKey) => {
+        repository.findMembershipById.mockResolvedValue({
+          id: "mem-editor",
+          agencyId: "agency-1",
+          userId: "user-editor",
+          status: "ACTIVE",
+          role: editorRole,
+          roles: [{ role: editorRole }],
+        } as any);
+        repository.findAgencyRolesByIds.mockResolvedValue([editorRole] as any);
+
+        await expect(
+          service.updateMemberRole(
+            "agency-1",
+            "mem-editor",
+            {
+              roleId: "role-editor",
+              roleIds: ["role-editor"],
+              version: 2,
+            },
+            {
+              authUserId: `auth-${roleKey.toLowerCase()}`,
+              userId: `user-${roleKey.toLowerCase()}`,
+              agencyId: "agency-1",
+              membershipId: `mem-${roleKey.toLowerCase()}`,
+              role: roleKey,
+              roles: [roleKey],
+            } as any,
+          ),
+        ).rejects.toThrow(ForbiddenException);
+
+        expect(repository.updateMembershipRole).not.toHaveBeenCalled();
+      },
+    );
+
     it("rejects assigning CLIENT to a business client outside the agency", async () => {
       repository.findMembershipById.mockResolvedValue({
         id: "mem-editor",
@@ -1182,5 +1220,25 @@ describe("OrganizationService Unit Tests", () => {
 
       expect(repository.updateMembershipRole).not.toHaveBeenCalled();
     });
+  });
+
+  describe("removeMember", () => {
+    it.each(["WRITER", "DOP"])(
+      "rejects direct member removal from %s memberships",
+      async (roleKey) => {
+        await expect(
+          service.removeMember("agency-1", "mem-target", 1, {
+            authUserId: `auth-${roleKey.toLowerCase()}`,
+            userId: `user-${roleKey.toLowerCase()}`,
+            agencyId: "agency-1",
+            membershipId: `mem-${roleKey.toLowerCase()}`,
+            role: roleKey,
+            roles: [roleKey],
+          } as any),
+        ).rejects.toThrow(ForbiddenException);
+
+        expect(repository.removeMembership).not.toHaveBeenCalled();
+      },
+    );
   });
 });

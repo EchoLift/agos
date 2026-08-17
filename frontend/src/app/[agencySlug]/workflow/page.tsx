@@ -8,7 +8,7 @@ import { useAgency } from "@/components/AgencyProvider";
 import { performWorkflowAction, WorkflowActionType, WorkflowBoardItem } from "@/lib/api/workflow";
 import { formatLabel, statusPillClass, statusPillClasses } from "@/lib/status-style";
 import { getAgencyRoleKeys } from "@/lib/workspace-access";
-import { invalidateWorkspaceQueries, useWorkflowQuery } from "@/lib/query";
+import { invalidateWorkspaceQueries, queryKeys, useWorkflowQuery } from "@/lib/query";
 import { getHelpHref } from "@/lib/workspace-url";
 import { getWorkspaceHref } from "@/lib/workspace-url";
 import { rememberedEntityKey, useRememberLastVisitedEntity } from "@/lib/remembered-tab";
@@ -66,7 +66,29 @@ export default function WorkflowPage() {
         ...(trimmedComment ? { comment: trimmedComment } : {}),
         ...(trimmedReason ? { reason: trimmedReason } : {}),
       });
-      invalidateWorkspaceQueries(queryClient, agencyId, ["workflow", "dashboard", "calendar"]);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.contentAsset(agencyId, selectedItem.contentAssetId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.campaignContent(agencyId, selectedItem.campaignId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.campaign(agencyId, selectedItem.campaignId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.publishingSchedules(
+          agencyId,
+          selectedItem.campaignId,
+        ),
+      });
+      invalidateWorkspaceQueries(queryClient, agencyId, [
+        "workflow",
+        "dashboard",
+        "calendar",
+        "content",
+        "campaigns",
+        "gigs",
+      ]);
       const refreshed = await boardQuery.refetch();
 
       const nextSelected = refreshed.data?.columns.flatMap((column) => column.items).find((item) => item.contentAssetId === selectedItem.contentAssetId) ?? null;

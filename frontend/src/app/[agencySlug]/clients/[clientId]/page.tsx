@@ -49,7 +49,13 @@ export default function ClientDetailPage() {
       const updated: ClientPlaybookResponse = { ...playbook, client: updatedClient };
       queryClient.setQueryData(queryKeys.client(agencyId, updatedClient.id), updated);
       queryClient.setQueryData(queryKeys.clients(agencyId), (current: Client[] | undefined) => setListItem(current, updatedClient));
-      invalidateWorkspaceQueries(queryClient, agencyId, ["clients"]);
+      invalidateWorkspaceQueries(queryClient, agencyId, [
+        "clients",
+        "dashboard",
+        "campaigns",
+        "calendar",
+        "workflow",
+      ]);
       reset(toFormValues(updatedClient));
       setIsEditing(false);
     } catch (err: unknown) {

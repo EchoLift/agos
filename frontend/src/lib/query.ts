@@ -453,11 +453,56 @@ export function invalidateWorkspaceQueries(
     | "gigs"
     | "workflow"
     | "team"
+    | "invitations"
+    | "roles"
   >,
 ) {
   scopes.forEach((scope) => {
-    void queryClient.invalidateQueries({ queryKey: [scope, agencyId] });
+    void queryClient.invalidateQueries({
+      queryKey: workspaceScopeQueryKey(scope, agencyId),
+    });
   });
+}
+
+function workspaceScopeQueryKey(
+  scope:
+    | "dashboard"
+    | "calendar"
+    | "schedule"
+    | "campaigns"
+    | "clients"
+    | "content"
+    | "gigs"
+    | "workflow"
+    | "team"
+    | "invitations"
+    | "roles",
+  agencyId: string,
+) {
+  switch (scope) {
+    case "dashboard":
+      return queryKeys.dashboard(agencyId);
+    case "calendar":
+      return ["calendar", agencyId] as const;
+    case "schedule":
+      return ["publishing-schedules", agencyId] as const;
+    case "campaigns":
+      return queryKeys.campaigns(agencyId);
+    case "clients":
+      return queryKeys.clients(agencyId);
+    case "content":
+      return queryKeys.content(agencyId);
+    case "gigs":
+      return queryKeys.gigs(agencyId);
+    case "workflow":
+      return ["workflow", agencyId] as const;
+    case "team":
+      return queryKeys.team(agencyId);
+    case "invitations":
+      return queryKeys.invitations(agencyId);
+    case "roles":
+      return queryKeys.roles(agencyId);
+  }
 }
 
 export function setListItem<T extends { id: string }>(

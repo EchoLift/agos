@@ -14,12 +14,18 @@ import {
 } from "@/lib/api/team";
 import { useAgency } from "@/components/AgencyProvider";
 import { statusPillClasses } from "@/lib/status-style";
-import { roleAccessLabels } from "@/lib/workspace-access";
-import { getHelpHref, getWorkspaceHref } from "@/lib/workspace-url";
 import {
+  canUseRoleTestingOverride,
+  roleAccessLabels,
+} from "@/lib/workspace-access";
+import { getHelpHref, getWorkspaceHref } from "@/lib/workspace-url";
+import { getTeamCapabilities } from "@/lib/team-capabilities";
+import {
+  invalidateWorkspaceQueries,
   queryKeys,
   useClientsQuery,
   useInvitationsQuery,
+  useProfileQuery,
   useRolesQuery,
   useTeamQuery,
 } from "@/lib/query";
@@ -49,6 +55,7 @@ export default function TeamPage() {
     blockedReason?: string;
   } | null>(null);
   const { agency, agencyId, agencySlug } = useAgency();
+  const profileQuery = useProfileQuery();
   const teamQuery = useTeamQuery(agencyId);
   const rolesQuery = useRolesQuery(agencyId);
   const clientsQuery = useClientsQuery(agencyId);
@@ -69,16 +76,17 @@ export default function TeamPage() {
     memberHasRole(member, "OWNER"),
   ).length;
   const currentRoleKeys = agency?.roles?.map((role) => role.key) ?? [];
-  const canChangeRoles =
-    currentRoleKeys.includes("OWNER") ||
-    currentRoleKeys.includes("MANAGER") ||
-    agency?.role === "OWNER" ||
-    agency?.role === "MANAGER";
-  const canManageInvitations =
-    currentRoleKeys.includes("OWNER") ||
-    currentRoleKeys.includes("ADMIN") ||
-    agency?.role === "OWNER" ||
-    agency?.role === "ADMIN";
+  const teamCapabilities = useMemo(
+    () => getTeamCapabilities(agency),
+    [agency],
+  );
+  const {
+    canInviteMembers,
+    canManageInvitations,
+    canChangeRoles,
+    canRemoveMembers,
+    hasManagementAccess,
+  } = teamCapabilities;
   const teamTabs = canManageInvitations ? invitationTabs : memberTabs;
   const [activeTab, setActiveTab] = useRememberedTab<TeamTab>({
     defaultTab: "members",
@@ -92,14 +100,22 @@ export default function TeamPage() {
     !currentRoleKeys.includes("OWNER") &&
     agency?.role !== "OWNER" &&
     (currentRoleKeys.includes("MANAGER") || agency?.role === "MANAGER");
+  const canUseSelfRoleTestingOverrideForCurrentUser =
+    canUseRoleTestingOverride(profileQuery.data?.id);
   const canUseSelfRoleTestingOverride = (member: Member) =>
+    canUseSelfRoleTestingOverrideForCurrentUser &&
     member.id === agency?.membershipId;
+  const canEditRolesForMember = (member: Member) =>
+    canChangeRoles || canUseSelfRoleTestingOverride(member);
+  const canShowMemberActions =
+    canChangeRoles ||
+    canRemoveMembers ||
+    canUseSelfRoleTestingOverrideForCurrentUser;
   const safeAgencySlug = agencySlug ?? "";
 
   const loadTeam = () => {
     if (!agencyId) return;
-    void queryClient.invalidateQueries({ queryKey: queryKeys.team(agencyId) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.roles(agencyId) });
+    invalidateWorkspaceQueries(queryClient, agencyId, ["team", "roles"]);
   };
 
   const loadInvitations = () => {
@@ -142,12 +158,6 @@ export default function TeamPage() {
     const selfRoleTestingOverride = canUseSelfRoleTestingOverride(member);
 
     if (!canChangeRoles && !selfRoleTestingOverride) {
-      setPendingRoleChange({
-        member,
-        selectedRoleIds,
-        selectedClientId: member.clientId ?? "",
-        blockedReason: "Only Owners and Managers can change roles.",
-      });
       return;
     }
 
@@ -258,6 +268,17 @@ export default function TeamPage() {
         (current: Member[] | undefined) =>
           current?.map((item) => (item.id === member.id ? updated : item)),
       );
+      invalidateWorkspaceQueries(queryClient, agencyId, [
+        "team",
+        "dashboard",
+        "workflow",
+        "calendar",
+        "campaigns",
+        "gigs",
+      ]);
+      if (updated.id === agency?.membershipId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.memberships() });
+      }
       setPendingRoleChange(null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to change role.");
@@ -287,6 +308,17 @@ export default function TeamPage() {
         (current: Member[] | undefined) =>
           current?.filter((item) => item.id !== member.id),
       );
+      invalidateWorkspaceQueries(queryClient, agencyId, [
+        "team",
+        "dashboard",
+        "workflow",
+        "calendar",
+        "campaigns",
+        "gigs",
+      ]);
+      if (member.id === agency?.membershipId) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.memberships() });
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to remove member.");
       loadTeam();
@@ -301,9 +333,14 @@ export default function TeamPage() {
     setError(null);
     setNotice(null);
     try {
-      await resendInvitation(agencyId, invitation.id);
+      const updated = await resendInvitation(agencyId, invitation.id);
+      queryClient.setQueryData(
+        queryKeys.invitations(agencyId),
+        (current: TeamInvitation[] | undefined) =>
+          current?.map((item) => (item.id === updated.id ? updated : item)),
+      );
       setNotice("Invitation resent.");
-      loadInvitations();
+      invalidateWorkspaceQueries(queryClient, agencyId, ["invitations"]);
     } catch (err: unknown) {
       setError(
         applicationErrorMessage(err, "Unable to resend invitation right now."),
@@ -330,6 +367,7 @@ export default function TeamPage() {
           current?.map((item) => (item.id === updated.id ? updated : item)),
       );
       setNotice("Invitation revoked.");
+      invalidateWorkspaceQueries(queryClient, agencyId, ["invitations"]);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to revoke invite.");
       loadInvitations();
@@ -380,7 +418,9 @@ export default function TeamPage() {
             Team
           </h1>
           <p className="mt-2 text-sm text-zinc-400">
-            Manage your agency members and roles.
+            {hasManagementAccess
+              ? "Manage your agency members and roles."
+              : "View the people working in your agency."}
           </p>
           <Link
             href={getHelpHref("team-access/roles")}
@@ -389,12 +429,14 @@ export default function TeamPage() {
             Roles and workspace access
           </Link>
         </div>
-        <Link
-          href={getWorkspaceHref(safeAgencySlug, "/team/new")}
-          className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-indigo-500 px-3 text-sm font-semibold text-white hover:bg-indigo-400 sm:px-5"
-        >
-          Invite Member
-        </Link>
+        {canInviteMembers ? (
+          <Link
+            href={getWorkspaceHref(safeAgencySlug, "/team/new")}
+            className="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-indigo-500 px-3 text-sm font-semibold text-white hover:bg-indigo-400 sm:px-5"
+          >
+            Invite Member
+          </Link>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap gap-2 rounded-lg border border-zinc-800 bg-zinc-950/80 p-2 shadow-lg shadow-black/20">
@@ -524,14 +566,18 @@ export default function TeamPage() {
               No team members
             </h3>
             <p className="mt-1 text-sm text-zinc-500">
-              Get started by inviting your team.
+              {canInviteMembers
+                ? "Get started by inviting your team."
+                : "No team members are visible yet."}
             </p>
-            <Link
-              href={getWorkspaceHref(safeAgencySlug, "/team/new")}
-              className="mt-6 rounded-full bg-indigo-500/10 px-4 py-2 text-sm font-semibold text-indigo-400 hover:bg-indigo-500/20"
-            >
-              Invite Member
-            </Link>
+            {canInviteMembers ? (
+              <Link
+                href={getWorkspaceHref(safeAgencySlug, "/team/new")}
+                className="mt-6 rounded-full bg-indigo-500/10 px-4 py-2 text-sm font-semibold text-indigo-400 hover:bg-indigo-500/20"
+              >
+                Invite Member
+              </Link>
+            ) : null}
           </div>
         ) : filteredMembers.length === 0 ? (
           <div className="py-12 text-center text-sm text-zinc-500">
@@ -603,28 +649,36 @@ export default function TeamPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 border-t border-zinc-800 pt-3">
-                    <button
-                      type="button"
-                      disabled={
-                        busyMemberId === member.id ||
-                        (!canChangeRoles &&
-                          !canUseSelfRoleTestingOverride(member))
-                      }
-                      onClick={() => requestRoleChange(member)}
-                      className="min-h-11 rounded-lg border border-zinc-700 px-3 text-sm font-semibold text-zinc-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  {canEditRolesForMember(member) || canRemoveMembers ? (
+                    <div
+                      className={`mt-3 grid gap-2 border-t border-zinc-800 pt-3 ${
+                        canEditRolesForMember(member) && canRemoveMembers
+                          ? "grid-cols-2"
+                          : "grid-cols-1"
+                      }`}
                     >
-                      Edit roles
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busyMemberId === member.id}
-                      onClick={() => handleRemove(member)}
-                      className="min-h-11 rounded-lg border border-red-500/30 px-3 text-sm font-semibold text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Remove
-                    </button>
-                  </div>
+                      {canEditRolesForMember(member) ? (
+                        <button
+                          type="button"
+                          disabled={busyMemberId === member.id}
+                          onClick={() => requestRoleChange(member)}
+                          className="min-h-11 rounded-lg border border-zinc-700 px-3 text-sm font-semibold text-zinc-300 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Edit roles
+                        </button>
+                      ) : null}
+                      {canRemoveMembers ? (
+                        <button
+                          type="button"
+                          disabled={busyMemberId === member.id}
+                          onClick={() => handleRemove(member)}
+                          className="min-h-11 rounded-lg border border-red-500/30 px-3 text-sm font-semibold text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </div>
@@ -636,7 +690,9 @@ export default function TeamPage() {
                     <th className="pb-4 font-medium">Role</th>
                     <th className="pb-4 font-medium">Status</th>
                     <th className="pb-4 font-medium">Joined</th>
-                    <th className="pb-4 text-right font-medium">Actions</th>
+                    {canShowMemberActions ? (
+                      <th className="pb-4 text-right font-medium">Actions</th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/50">
@@ -705,30 +761,32 @@ export default function TeamPage() {
                       <td className="py-4">
                         {new Date(member.joinedAt).toLocaleDateString()}
                       </td>
-                      <td className="py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            disabled={
-                              busyMemberId === member.id ||
-                              (!canChangeRoles &&
-                                !canUseSelfRoleTestingOverride(member))
-                            }
-                            onClick={() => requestRoleChange(member)}
-                            className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            Edit roles
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busyMemberId === member.id}
-                            onClick={() => handleRemove(member)}
-                            className="rounded-full border border-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </td>
+                      {canShowMemberActions ? (
+                        <td className="py-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            {canEditRolesForMember(member) ? (
+                              <button
+                                type="button"
+                                disabled={busyMemberId === member.id}
+                                onClick={() => requestRoleChange(member)}
+                                className="rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                Edit roles
+                              </button>
+                            ) : null}
+                            {canRemoveMembers ? (
+                              <button
+                                type="button"
+                                disabled={busyMemberId === member.id}
+                                onClick={() => handleRemove(member)}
+                                className="rounded-full border border-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-300 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                Remove
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>
