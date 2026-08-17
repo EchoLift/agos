@@ -114,6 +114,7 @@ const roleAccess: Record<string, WorkspaceNavKey[]> = {
     "gigs",
     "workflow",
     "calendar",
+    "team"
   ],
   DOP: [
     "dashboard",
@@ -121,6 +122,7 @@ const roleAccess: Record<string, WorkspaceNavKey[]> = {
     "gigs",
     "workflow",
     "calendar",
+    "team"
   ],
   EDITOR: [
     "dashboard",
@@ -128,6 +130,7 @@ const roleAccess: Record<string, WorkspaceNavKey[]> = {
     "gigs",
     "workflow",
     "calendar",
+    "team"
   ],
   DESIGNER: [
     "dashboard",
@@ -135,14 +138,16 @@ const roleAccess: Record<string, WorkspaceNavKey[]> = {
     "gigs",
     "workflow",
     "calendar",
+    "team"
   ],
   SOCIAL_MEDIA_MANAGER: [
     "dashboard",
     "campaigns",
     "gigs",
     "calendar",
+    "team"
   ],
-  FINANCE: ["dashboard", "clients"],
+  FINANCE: ["dashboard", "clients","team"],
   HR: ["dashboard", "team"],
   CLIENT: ["dashboard", "campaigns", "calendar"],
   MEMBER: [
@@ -151,6 +156,7 @@ const roleAccess: Record<string, WorkspaceNavKey[]> = {
     "gigs",
     "workflow",
     "calendar",
+    "team"
   ],
 };
 
