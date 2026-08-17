@@ -8,7 +8,8 @@ export function roleKeys(actor?: IdentityContext): string[] {
 }
 
 export function isClientUser(actor?: IdentityContext): boolean {
-  return roleKeys(actor).includes("CLIENT");
+  const keys = roleKeys(actor);
+  return keys.includes("CLIENT") && keys.every((role) => role === "CLIENT");
 }
 
 export function clientScopeId(actor?: IdentityContext): string | null {

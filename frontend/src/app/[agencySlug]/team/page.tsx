@@ -18,6 +18,7 @@ import { roleAccessLabels } from "@/lib/workspace-access";
 import { getHelpHref, getWorkspaceHref } from "@/lib/workspace-url";
 import {
   queryKeys,
+  useClientsQuery,
   useInvitationsQuery,
   useRolesQuery,
   useTeamQuery,
@@ -44,13 +45,22 @@ export default function TeamPage() {
   const [pendingRoleChange, setPendingRoleChange] = useState<{
     member: Member;
     selectedRoleIds: string[];
+    selectedClientId: string;
     blockedReason?: string;
   } | null>(null);
   const { agency, agencyId, agencySlug } = useAgency();
   const teamQuery = useTeamQuery(agencyId);
   const rolesQuery = useRolesQuery(agencyId);
+  const clientsQuery = useClientsQuery(agencyId);
   const members = useMemo(() => teamQuery.data ?? [], [teamQuery.data]);
   const roles = rolesQuery.data ?? [];
+  const activeClients = useMemo(
+    () =>
+      (clientsQuery.data ?? []).filter(
+        (client) => client.status === "ACTIVE",
+      ),
+    [clientsQuery.data],
+  );
   const loading =
     (teamQuery.isLoading || rolesQuery.isLoading) &&
     !teamQuery.data &&
@@ -104,6 +114,9 @@ export default function TeamPage() {
         pendingRoleChange.selectedRoleIds.includes(role.id),
       )
     : [];
+  const roleChangeRequiresClient = selectedRoles.some(
+    (role) => role.key === "CLIENT",
+  );
   const filteredMembers = useMemo(() => {
     const search = filters.search.trim().toLowerCase();
     return members.filter((member) => {
@@ -132,6 +145,7 @@ export default function TeamPage() {
       setPendingRoleChange({
         member,
         selectedRoleIds,
+        selectedClientId: member.clientId ?? "",
         blockedReason: "Only Owners and Managers can change roles.",
       });
       return;
@@ -149,6 +163,7 @@ export default function TeamPage() {
     setPendingRoleChange({
       member,
       selectedRoleIds,
+      selectedClientId: member.clientId ?? "",
       blockedReason:
         (isSelfChangeByManager && "Managers cannot change their own role.") ||
         (isOwnerTargetByManager && "Managers cannot change an Owner role.") ||
@@ -165,12 +180,23 @@ export default function TeamPage() {
       } else {
         next.add(roleId);
       }
+      const selectedRoleIds = Array.from(next);
+      const nextRequiresClient = roles
+        .filter((role) => selectedRoleIds.includes(role.id))
+        .some((role) => role.key === "CLIENT");
 
       return {
         ...current,
-        selectedRoleIds: Array.from(next),
+        selectedRoleIds,
+        selectedClientId: nextRequiresClient ? current.selectedClientId : "",
       };
     });
+  };
+
+  const selectPendingClient = (clientId: string) => {
+    setPendingRoleChange((current) =>
+      current ? { ...current, selectedClientId: clientId } : current,
+    );
   };
 
   const confirmRoleChange = async () => {
@@ -203,6 +229,12 @@ export default function TeamPage() {
       return;
     }
 
+    const assignsClient = selectedRoles.some((role) => role.key === "CLIENT");
+    if (assignsClient && !pendingRoleChange.selectedClientId) {
+      setError("Select the business client this CLIENT member represents.");
+      return;
+    }
+
     if (isOwnerDemotion && activeOwnerCount <= 1 && !selfRoleTestingOverride) {
       setError(
         "This member is the last Owner. Add or promote another Owner before changing this role.",
@@ -217,6 +249,9 @@ export default function TeamPage() {
         roleId: primaryRole.id,
         roleIds: selectedRoleIds,
         version: member.version,
+        clientId: assignsClient
+          ? pendingRoleChange.selectedClientId
+          : undefined,
       });
       queryClient.setQueryData(
         queryKeys.team(agencyId),
@@ -772,6 +807,43 @@ export default function TeamPage() {
                     Select at least one role.
                   </p>
                 ) : null}
+                {roleChangeRequiresClient ? (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                      Business Client *
+                    </label>
+                    {clientsQuery.isLoading && !clientsQuery.data ? (
+                      <div className="mt-2 rounded-xl border border-zinc-800 bg-zinc-900/60 px-3 py-3 text-sm text-zinc-400">
+                        Loading clients...
+                      </div>
+                    ) : clientsQuery.error ? (
+                      <div className="mt-2 rounded-xl bg-red-500/10 px-3 py-3 text-sm text-red-400">
+                        Failed to load clients.
+                      </div>
+                    ) : activeClients.length === 0 ? (
+                      <div className="mt-2 rounded-xl border border-zinc-800 bg-zinc-900/60 px-3 py-3 text-sm text-zinc-400">
+                        Create an active business client before assigning the
+                        CLIENT role.
+                      </div>
+                    ) : (
+                      <select
+                        required
+                        value={pendingRoleChange.selectedClientId}
+                        onChange={(event) =>
+                          selectPendingClient(event.target.value)
+                        }
+                        className="mt-2 min-h-11 w-full rounded-xl border border-zinc-800 bg-[#0b0b11] px-3 text-sm text-white outline-none transition focus:border-indigo-500"
+                      >
+                        <option value="">Select business client...</option>
+                        {activeClients.map((client) => (
+                          <option key={client.id} value={client.id}>
+                            {client.displayName || client.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                ) : null}
                 {isManagerOnly ? (
                   <p className="text-xs text-zinc-500">
                     Managers can edit skills, but cannot assign or change Owner
@@ -794,7 +866,9 @@ export default function TeamPage() {
                   type="button"
                   disabled={
                     busyMemberId === pendingRoleChange.member.id ||
-                    pendingRoleChange.selectedRoleIds.length === 0
+                    pendingRoleChange.selectedRoleIds.length === 0 ||
+                    (roleChangeRequiresClient &&
+                      !pendingRoleChange.selectedClientId)
                   }
                   onClick={confirmRoleChange}
                   className="rounded-full bg-indigo-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:opacity-60"
