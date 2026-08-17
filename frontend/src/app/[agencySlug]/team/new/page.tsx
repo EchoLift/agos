@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAgency } from "@/components/AgencyProvider";
-import { getRoles, inviteMember, Role } from "@/lib/api/team";
+import { getRoles, getInvitations, inviteMember, Role } from "@/lib/api/team";
 import { invalidateWorkspaceQueries, queryKeys, useClientsQuery } from "@/lib/query";
 import { getWorkspaceHref } from "@/lib/workspace-url";
 
@@ -74,11 +74,17 @@ export default function InviteMemberPage() {
         roleIds: selectedRoleIds,
         clientId: requiresClient ? selectedClientId : undefined,
       });
-      await queryClient.invalidateQueries({
+      await queryClient.fetchQuery({
         queryKey: queryKeys.invitations(agencyId),
+        queryFn: () => getInvitations(agencyId),
+        staleTime: 0,
       });
-      invalidateWorkspaceQueries(queryClient, agencyId, ["invitations"]);
-      router.push(getWorkspaceHref(safeAgencySlug, "/team?tab=invitations"));
+      router.push(
+        getWorkspaceHref(
+          safeAgencySlug,
+          "/team?tab=invitations",
+        ),
+      );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to invite member");
       setIsSubmitting(false);
