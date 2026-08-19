@@ -188,5 +188,5 @@ function calloutTone(tone: string) {
   if (tone === "important") return "border-indigo-500/30 bg-indigo-500/10 text-indigo-200";
   if (tone === "not_available") return "border-red-500/30 bg-red-500/10 text-red-200";
   if (tone === "role") return "border-sky-500/30 bg-sky-500/10 text-sky-200";
-  return "border-emerald-500/30 bg-emerald-500/10 text-emerald-200";
+  return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600";
 }
