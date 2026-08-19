@@ -45,19 +45,19 @@ const features = [
       "Assign work to writers, designers, editors, DOPs, managers, freelancers, and other collaborators.",
   },
   {
-    title: "Founder dashboard",
+    title: "My Work",
     description:
-      "See pending approvals, blocked work, upcoming deadlines, and agency workload in one place.",
+      "A focused personal queue for every team member showing owned items, due dates, and next actions.",
+  },
+  {
+    title: "Gigs",
+    description:
+      "Fast standalone assignments: brief, assignee, deadline, submission and review.",
   },
   {
     title: "Google Calendar",
     description:
-      "Sync eligible AGENCIE assignments and deadlines to a connected Google Calendar.",
-  },
-  {
-    title: "Secure platform",
-    description:
-      "Google authentication, agency-scoped access, and role-based permissions protect workspace data.",
+      "Optional sync for eligible assignments and deadlines.",
   },
 ];
 
@@ -109,17 +109,32 @@ const faqItems = [
   {
     question: "Who is AGENCIE for?",
     answer:
-      "AGENCIE is built for creative agencies, social media agencies, content studios, production teams, freelance collectives, and other teams that manage recurring client content and approvals.",
+      "AGENCIE is built for creative agencies, content studios, production teams, and freelance collectives that need repeatable, accountable content workflows.",
   },
   {
-    question: "Is it ready for daily use?",
+    question: "How is AGENCIE different from a project management tool?",
     answer:
-      "The core platform is already in place, and the next step is polishing the founder experience.",
+      "AGENCIE models client work (campaigns and gigs) with built-in production stages, approvals, and clear ownership so teams avoid ad-hoc status chasing.",
   },
   {
-    question: "Do you support onboarding?",
+    question: "Do employees need to understand the entire system?",
     answer:
-      "Yes. The product is being shaped to make setup and first-week usage feel simple and obvious.",
+      "No. Team members get a focused 'My Work' queue showing only tasks they own, with clear next actions and deadlines.",
+  },
+  {
+    question: "Can clients access AGENCIE?",
+    answer:
+      "Yes. Clients can be invited with scoped access so they can review and approve work without seeing internal agency operations.",
+  },
+  {
+    question: "Does AGENCIE work with Google Calendar?",
+    answer:
+      "Yes. Optional Google Calendar sync exports eligible deadlines and schedules after you connect your account.",
+  },
+  {
+    question: "Can one account belong to multiple agencies?",
+    answer:
+      "Yes. Users can be part of multiple agency workspaces while data remains isolated per agency.",
   },
 ];
 
@@ -165,8 +180,11 @@ export default function Home() {
           <a href="#features" className="transition hover:text-foreground">
             Features
           </a>
+          <Link href="/help" className="transition hover:text-foreground">
+            Docs
+          </Link>
           <a href="#pricing" className="transition hover:text-foreground">
-            Pricing
+            Early Access
           </a>
         </nav>
       </header>
@@ -185,38 +203,45 @@ export default function Home() {
                 AGENCIE
               </span>
               <span className="block text-2xl font-semibold tracking-tight text-foreground sm:text-3xl mt-2">
-                Run your creative agency without WhatsApp, Notion, and Excel.
-              </span>
+                  Run every client, campaign, and creative workflow from one place.
+                </span>
             </h1>
-            <p className="mt-5 text-base font-medium leading-relaxed text-foreground/90">
-              AGENCIE is a multi-tenant agency operating system designed for marketing and creative teams to manage work orders, deadlines, workflows, approvals, and Google Calendar event syncs.
-            </p>
-            <p className="mt-3 text-base leading-7 text-muted-foreground">
-              Plan campaigns, assign work to writers, designers, editors and
-              production teams, track every deliverable through its workflow,
-              and keep everyone aligned from brief to publication.
-            </p>
+              <p className="mt-5 text-base font-medium leading-relaxed text-foreground/90">
+                Replace scattered WhatsApp follow-ups, spreadsheets, and status calls with clear ownership, deadlines, approvals, and production workflows.
+              </p>
+
+              <p className="mt-3 text-base leading-7 text-muted-foreground">
+                From campaign planning to scripts, shoots, edits, reviews and publishing, AGENCIE keeps everyone clear on what they own and what happens next.
+              </p>
             <div className="mt-8 flex flex-wrap gap-4">
-              <a
-                href="#pricing"
+              <Link
+                href="/login"
                 className="rounded-full bg-indigo-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400"
               >
-                Get started
-              </a>
-              <a
-                href="#how-it-works"
+                Create your agency
+              </Link>
+
+              <Link
+                href="/help"
                 className="rounded-full border border-border px-5 py-3 text-sm font-semibold text-foreground transition hover:bg-accent"
               >
-                How it works
+                Explore documentation
+              </Link>
+
+              <a
+                href="#how-it-works"
+                className="px-3 py-3 text-sm font-semibold text-muted-foreground transition hover:text-foreground"
+              >
+                See how it works ↓
               </a>
             </div>
           </div>
 
-          <div className="relative z-20 overflow-hidden rounded-3xl border border-border bg-background/80 p-4 shadow-black/20">
+            <div className="relative z-20 overflow-hidden rounded-3xl border border-border bg-background/80 p-4 shadow-black/20">
             <div className="rounded-2xl border border-border bg-card p-5 backdrop-blur">
               <div className="mb-5 flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Founder dashboard</p>
+                  <p className="text-sm text-muted-foreground">Operations overview</p>
                   <p className="text-lg font-semibold text-foreground">This week at a glance</p>
                 </div>
                 <div className="rounded-full bg-emerald-500/15 px-3 py-1 text-sm text-emerald-300">
@@ -246,24 +271,41 @@ export default function Home() {
         </section>
 
         {/* ── What AGENCIE does ── */}
+          {/* ── Trust & Security ── */}
+          <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
+            <div className="rounded-3xl border border-border bg-card p-8 lg:p-12">
+              <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">Built for agency boundaries</p>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <div className="rounded-2xl border border-border bg-background p-4">
+                  <p className="font-semibold text-foreground">Multi-agency isolation</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Each agency operates in an isolated workspace so client data stays private.</p>
+                </div>
+                <div className="rounded-2xl border border-border bg-background p-4">
+                  <p className="font-semibold text-foreground">Role-based access</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Owners, managers, production roles and clients see capabilities appropriate to them.</p>
+                </div>
+                <div className="rounded-2xl border border-border bg-background p-4">
+                  <p className="font-semibold text-foreground">Client-scoped access</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Invite clients with limited scopes for review and approval without exposing internal operations.</p>
+                </div>
+                <div className="rounded-2xl border border-border bg-background p-4">
+                  <p className="font-semibold text-foreground">Google authentication</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Secure sign-in and optional Calendar sync for convenience.</p>
+                </div>
+              </div>
+            </div>
+          </section>
         <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
           <div className="rounded-3xl border border-border bg-card p-8 lg:p-12">
             <div className="max-w-2xl">
               <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                What AGENCIE does
+                Everything stays connected
               </p>
               <h2 className="mt-3 text-3xl font-semibold text-foreground">
-                One workspace for the entire creative agency workflow.
+                One model for every piece of client work.
               </h2>
               <p className="mt-4 text-base leading-7 text-muted-foreground">
-                AGENCIE connects clients, campaigns, content deliverables, team
-                assignments, production workflows, approvals, schedules, and
-                publishing so everyone knows what they need to do next.
-              </p>
-              <p className="mt-3 text-base leading-7 text-muted-foreground">
-                AGENCIE replaces fragmented agency coordination with a structured
-                workflow where client work, ownership, deadlines, production
-                status, reviews, and approvals stay connected.
+                Client → Plan → Production → Review → Publish — with ownership, deadlines, and clear next actions at every step.
               </p>
             </div>
             <div className="mt-8 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -350,6 +392,33 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ── Two ways to run work (Campaigns vs Gigs) ── */}
+        <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
+          <div className="rounded-3xl border border-border bg-card p-8 lg:p-12">
+            <div className="max-w-2xl">
+              <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                How you can run work
+              </p>
+              <h2 className="mt-3 text-3xl font-semibold text-foreground">Two ways to run work: Campaigns or Gigs</h2>
+              <p className="mt-4 text-base leading-7 text-muted-foreground">
+                Campaigns for structured, multi-stage client work; Gigs for fast standalone assignments that need an owner, deadline, and review.
+              </p>
+            </div>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-background p-6">
+                <p className="text-sm font-medium text-muted-foreground">Campaigns</p>
+                <p className="mt-2 font-semibold text-foreground">Structured workflows for launches and retainers.</p>
+                <p className="mt-2 text-sm text-muted-foreground">Plan multiple deliverables, assign owners, and track progress across production stages.</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-background p-6">
+                <p className="text-sm font-medium text-muted-foreground">Gigs</p>
+                <p className="mt-2 font-semibold text-foreground">Quick assignments with a clear owner and deadline.</p>
+                <p className="mt-2 text-sm text-muted-foreground">Great for one-off tasks, freelance exchanges, or small requests that need review and approval.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* ── Workflow demo ── */}
         <section id="workflow" className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-[1fr_0.95fr]">
@@ -358,8 +427,11 @@ export default function Home() {
                 Workflow
               </p>
               <h2 className="mt-3 text-3xl font-semibold text-foreground">
-                Show one reel. Make the process obvious.
+                Know exactly where every deliverable stands.
               </h2>
+              <p className="mt-4 text-base leading-7 text-muted-foreground">
+                Follow content from writing through review, production, editing, approval and publishing without asking the team for status updates.
+              </p>
               <div className="mt-8 space-y-3">
                 {workflowRows.map((row) => (
                   <div
@@ -423,6 +495,60 @@ export default function Home() {
             ))}
           </div>
         </section>
+        {/* ── Documentation ── */}
+        <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
+          <div className="overflow-hidden rounded-3xl border border-indigo-500/20 bg-card p-8 lg:p-12">
+            <div className="grid gap-10 lg:grid-cols-[1fr_0.9fr] lg:items-center">
+              <div className="max-w-2xl">
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-indigo-300">
+                  Documentation
+                </p>
+
+                <h2 className="mt-3 text-3xl font-semibold text-foreground">
+                  You shouldn't need a training call to understand AGENCIE.
+                </h2>
+
+                <p className="mt-4 text-base leading-7 text-muted-foreground">
+                  AGENCIE includes practical documentation for setup, campaigns,
+                  clients, team access, workflows, gigs, calendars, approvals,
+                  permissions, and troubleshooting.
+                </p>
+
+                <p className="mt-3 text-base leading-7 text-muted-foreground">
+                  Start with the basics or jump directly to the workflow you're trying
+                  to complete.
+                </p>
+
+                <Link
+                  href="/help"
+                  className="mt-7 inline-flex rounded-full bg-indigo-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400"
+                >
+                  Explore AGENCIE Docs →
+                </Link>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {[
+                  "Getting Started",
+                  "Clients",
+                  "Campaigns",
+                  "Gigs",
+                  "Daily Operations",
+                  "Team & Access",
+                  "Calendar",
+                  "Troubleshooting",
+                ].map((category) => (
+                  <div
+                    key={category}
+                    className="rounded-2xl border border-border bg-background px-4 py-4 text-sm font-medium text-foreground"
+                  >
+                    {category}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* ── Google Calendar integration ── */}
         <section id="google-calendar" className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
@@ -481,19 +607,18 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── Founder dashboard ── */}
+        {/* ── Operations overview ── */}
         <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
           <div className="grid gap-8 rounded-3xl border border-border bg-card p-8 lg:grid-cols-[0.9fr_1.1fr] lg:p-12">
             <div>
               <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                Founder dashboard preview
+                Operations overview preview
               </p>
               <h2 className="mt-3 text-3xl font-semibold text-foreground">
-                Clarity for the person carrying the whole business.
+                See what needs attention before someone has to ask.
               </h2>
               <p className="mt-4 text-lg leading-8 text-muted-foreground">
-                A founder should not have to ask, "What is urgent?" The answer
-                should be obvious in seconds.
+                A concise operational view for owners, managers, and production leads showing pending approvals, blockers, and urgent deadlines.
               </p>
             </div>
             <div className="rounded-2xl border border-border bg-background p-6">
@@ -538,19 +663,18 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── Pricing ── */}
+        {/* ── Early Access ── */}
         <section id="pricing" className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
           <div className="rounded-3xl border border-indigo-500/20 bg-indigo-500/10 p-8 lg:p-12">
             <div className="max-w-2xl">
               <p className="text-sm font-medium uppercase tracking-[0.2em] text-indigo-300">
-                Pricing
+                Early Access
               </p>
               <h2 className="mt-3 text-3xl font-semibold text-foreground">
-                Early access is open for founding agencies.
+                Built with the first agencies, not just for them.
               </h2>
               <p className="mt-4 text-lg leading-8 text-muted-foreground">
-                Join the waitlist and help shape the product as it moves from
-                backend foundation to agency-ready workflow.
+                AGENCIE supports client management, campaigns, Gigs, production workflows, team assignments, reviews, calendars, and role-based access. Join early agencies using the product in real operations and help shape what gets built next.
               </p>
             </div>
             <div className="mt-8 flex flex-wrap gap-4">
@@ -558,7 +682,7 @@ export default function Home() {
                 href="/login"
                 className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-zinc-100"
               >
-                Request access
+                Create your agency
               </Link>
               <a
                 href="#faq"
@@ -618,13 +742,13 @@ export default function Home() {
                 </li>
                 <li>
                   <a href="#pricing" className="transition hover:text-foreground">
-                    Pricing
+                    Early Access
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="transition hover:text-foreground">
+                  <Link href="/help" className="transition hover:text-foreground">
                     Documentation
-                  </a>
+                  </Link>
                 </li>
               </ul>
             </div>
