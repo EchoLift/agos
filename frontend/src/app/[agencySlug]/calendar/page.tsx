@@ -362,19 +362,19 @@ export default function CalendarPage() {
   );
 
   return (
-    <div className="flex h-[calc(100dvh_-_8.75rem_-_env(safe-area-inset-bottom))] min-h-0 flex-col gap-2 overflow-hidden lg:block lg:h-auto lg:overflow-visible lg:space-y-5">
+    <div className="flex h-[calc(100dvh_-_8.75rem_-_env(safe-area-inset-bottom))] min-h-0 flex-col gap-1 overflow-hidden lg:block lg:h-auto lg:overflow-visible lg:space-y-2">
       <div className="hidden flex-wrap items-end justify-between gap-3 lg:flex">
         <div>
-          <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">
+          {/* <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">
             Schedule
           </p>
           <h1 className="mt-1 text-2xl font-semibold text-white lg:text-3xl">
             Calendar
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm leading-5 text-zinc-400">
+          </h1> */}
+          {/* <p className="mt-1 max-w-2xl text-sm leading-5 text-zinc-400">
             Work assigned to you appears here like a meeting invite, with
             broader schedules available when your role permits it.
-          </p>
+          </p> */}
           {calendarQuery.isFetching && calendar ? (
             <p className="mt-1 text-xs font-medium text-indigo-300">
               Refreshing calendar in the background
@@ -382,7 +382,7 @@ export default function CalendarPage() {
           ) : null}
           <Link
             href={getHelpHref("daily-operations/calendar")}
-            className="mt-2 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200"
+            className="mt-1 inline-flex text-sm font-medium text-indigo-300 hover:text-indigo-200"
           >
             How AGENCIE Calendar works
           </Link>
@@ -592,7 +592,7 @@ export default function CalendarPage() {
               {isFirstCalendarLoad ? (
                 <CalendarAgendaSkeleton />
               ) : calendarError ? (
-                <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                <div className="rounded-xl border border-red-500/20 bg-red-900/10 px-4 py-3 text-sm text-red-900">
                   {calendarError}
                 </div>
               ) : groupedEvents.length ? (
