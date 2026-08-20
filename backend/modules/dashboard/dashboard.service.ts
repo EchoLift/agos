@@ -19,7 +19,7 @@ import {
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async getDashboard(agencyId: string, actor: IdentityContext) {
     if (isClientUser(actor)) {
@@ -463,10 +463,8 @@ export class DashboardService {
       return { ...baseWhere, ownerMembershipId: "__missing_membership__" };
     }
 
-    const stages = this.productionStagesFor(actor);
     const directAssignment: Prisma.WorkflowTaskWhereInput = {
       ownerMembershipId: actor.membershipId,
-      ...(stages.length > 0 ? { workflowStep: { stage: { in: stages } } } : {}),
     };
     const campaignResponsibilities = roleResponsibilities.map(
       (responsibility) => ({
@@ -500,10 +498,8 @@ export class DashboardService {
       return { agencyId, workflowInstanceId: "__missing_membership__" };
     }
 
-    const stages = this.productionStagesFor(actor);
     const directAssignment: Prisma.WorkflowTaskWhereInput = {
       ownerMembershipId: actor.membershipId,
-      ...(stages.length > 0 ? { workflowStep: { stage: { in: stages } } } : {}),
     };
     const campaignResponsibilities = roleResponsibilities.map(
       (responsibility) => ({
@@ -531,31 +527,6 @@ export class DashboardService {
   private canSeeAgencyWork(actor: IdentityContext): boolean {
     const roles = this.roleKeys(actor);
     return roles.some((role) => ["OWNER", "ADMIN", "MANAGER"].includes(role));
-  }
-
-  private productionStagesFor(actor: IdentityContext): ContentStage[] {
-    const roles = this.roleKeys(actor);
-    const stages = new Set<ContentStage>();
-
-    if (roles.includes("WRITER")) {
-      stages.add(ContentStage.WRITING);
-    }
-
-    if (roles.includes("DOP")) {
-      stages.add(ContentStage.SHOOT);
-    }
-
-    if (roles.includes("EDITOR")) {
-      stages.add(ContentStage.EDITOR_INTAKE);
-      stages.add(ContentStage.EDITING);
-    }
-
-    if (roles.includes("SOCIAL_MEDIA_MANAGER")) {
-      stages.add(ContentStage.SCHEDULED);
-      stages.add(ContentStage.PUBLISHED);
-    }
-
-    return [...stages];
   }
 
   private async campaignRoleResponsibilities(
