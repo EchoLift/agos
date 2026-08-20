@@ -20,6 +20,11 @@ export interface ContentAsset {
   brief?: string;
   status: string;
   stage: string | null;
+  currentTask?: {
+    id: string;
+    ownerMembershipId: string | null;
+    status: string | null;
+  } | null;
   latestSubmission?: WorkflowSubmissionSummary | null;
   version?: number;
   createdAt: string;

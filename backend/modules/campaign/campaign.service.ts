@@ -945,6 +945,13 @@ export class CampaignService {
         },
       );
 
+      await this.reconcilePendingCampaignTasks(
+        id,
+        agencyId,
+        assignment.assignmentRole,
+        actor,
+      );
+
       return assignment;
     } catch (error: any) {
       if (error?.code === "P2002") {
@@ -1007,6 +1014,21 @@ export class CampaignService {
         },
       );
 
+      await this.reconcilePendingCampaignTasks(
+        id,
+        agencyId,
+        existing.assignmentRole,
+        actor,
+      );
+      if (nextRole !== existing.assignmentRole) {
+        await this.reconcilePendingCampaignTasks(
+          id,
+          agencyId,
+          nextRole,
+          actor,
+        );
+      }
+
       return assignment;
     } catch (error: any) {
       if (error?.code === "P2025") {
@@ -1055,6 +1077,13 @@ export class CampaignService {
         assignmentRole: assignment.assignmentRole,
       },
     });
+
+    await this.reconcilePendingCampaignTasks(
+      id,
+      agencyId,
+      assignment.assignmentRole,
+      actor,
+    );
 
     return { success: true };
   }
@@ -1249,6 +1278,176 @@ export class CampaignService {
         throw new ConflictException("Campaign was modified by another user");
       }
       throw error;
+    }
+  }
+
+  private workflowStagesForCampaignRole(
+    role: CampaignAssignmentRole,
+  ): ContentStage[] {
+    switch (role) {
+      case CampaignAssignmentRole.WRITER:
+        return [ContentStage.WRITING];
+
+      case CampaignAssignmentRole.DOP:
+        return [ContentStage.SHOOT];
+
+      case CampaignAssignmentRole.EDITOR:
+        return [ContentStage.EDITOR_INTAKE, ContentStage.EDITING];
+
+      case CampaignAssignmentRole.SOCIAL_MEDIA_MANAGER:
+        return [ContentStage.SCHEDULED];
+
+      default:
+        return [];
+    }
+  }
+
+  private isTaskEligibleForReconciliation(
+    stage: ContentStage,
+    status: TaskStatus,
+  ): boolean {
+    if (status === TaskStatus.COMPLETED || status === TaskStatus.CANCELLED) {
+      return false;
+    }
+
+    if (stage === ContentStage.EDITOR_INTAKE) {
+      return (
+        status === TaskStatus.TODO ||
+        status === TaskStatus.WAITING_REVIEW ||
+        status === TaskStatus.WAITING_HANDOFF_ACCEPTANCE
+      );
+    }
+
+    // For EDITING, WRITING, SHOOT, SCHEDULED: only unstarted (TODO) tasks are eligible.
+    // Tasks that are already IN_PROGRESS must NOT be stolen.
+    return status === TaskStatus.TODO;
+  }
+
+  private async reconcilePendingCampaignTasks(
+    campaignId: string,
+    agencyId: string,
+    assignmentRole: CampaignAssignmentRole,
+    actor: IdentityContext,
+  ) {
+    const stages = this.workflowStagesForCampaignRole(assignmentRole);
+    if (!stages.length) return;
+
+    // Fetch all current assignments for this campaign and role
+    const campaignAssignments =
+      await this.prisma.campaignTeamAssignment.findMany({
+        where: { campaignId, agencyId, assignmentRole },
+      });
+
+    // 0 members => null, 1 member => that member, >1 members => null (unassigned/ambiguous)
+    const targetMembershipId =
+      campaignAssignments.length === 1
+        ? campaignAssignments[0].membershipId
+        : null;
+
+    const workflows = await this.prisma.workflowInstance.findMany({
+      where: {
+        agencyId,
+        status: WorkflowInstanceStatus.ACTIVE,
+        contentAsset: {
+          campaignId,
+          status: ContentAssetStatus.ACTIVE,
+        },
+      },
+      include: {
+        currentStep: true,
+        currentTask: true,
+        contentAsset: true,
+        transitions: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+    });
+
+    const changerMembershipId =
+      actor.membershipId || actor.userId || "system";
+    const syncedTaskIds: string[] = [];
+
+    for (const workflow of workflows) {
+      const task = workflow.currentTask;
+      if (!task) continue;
+
+      const stage =
+        workflow.currentStep?.stage ?? workflow.transitions[0]?.toStage ?? null;
+
+      if (!stage || !stages.includes(stage)) continue;
+
+      // Only reconcile tasks that are eligible
+      if (!this.isTaskEligibleForReconciliation(stage, task.status)) {
+        continue;
+      }
+
+      // If already has this target membership, nothing to do
+      if (task.ownerMembershipId === targetMembershipId) {
+        continue;
+      }
+
+      const previousOwnerId = task.ownerMembershipId;
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.workflowTask.update({
+          where: { id: task.id },
+          data: {
+            ownerMembershipId: targetMembershipId,
+            version: { increment: 1 },
+          },
+        });
+
+        if (targetMembershipId) {
+          await tx.assignmentHistory.create({
+            data: {
+              agencyId,
+              workflowInstanceId: workflow.id,
+              workflowTaskId: task.id,
+              fromMembershipId: previousOwnerId,
+              toMembershipId: targetMembershipId,
+              workflowStepId: task.workflowStepId,
+              changedByMembershipId: changerMembershipId,
+              reason: `Reconciled ${assignmentRole.replaceAll("_", " ")} from campaign team`,
+            },
+          });
+
+          await this.createTaskNotification(tx, agencyId, targetMembershipId, {
+            title: `Task assigned: ${workflow.contentAsset.displayCode}`,
+            body: `${this.formatContentType(
+              workflow.contentAsset.type,
+            )} in ${stage.replaceAll("_", " ").toLowerCase()} is now assigned to you.`,
+            eventType: DomainEvents.ContentAssigned,
+          });
+
+          await this.eventBus.publishWithinTransaction(
+            tx,
+            DomainEvents.ContentAssigned,
+            {
+              agencyId,
+              actorId: actor.userId,
+              aggregateId: workflow.contentAsset.id,
+              aggregateType: "WorkflowTask",
+              payload: {
+                campaignId,
+                contentAssetId: workflow.contentAsset.id,
+                workflowInstanceId: workflow.id,
+                workflowTaskId: task.id,
+                assigneeId: targetMembershipId,
+                stage,
+                deadlineAt: task.deadlineAt.toISOString(),
+                reconciledFromCampaignRole: assignmentRole,
+              },
+            },
+          );
+        }
+      });
+
+      syncedTaskIds.push(task.id);
+    }
+
+    if (syncedTaskIds.length) {
+      this.queueWorkflowTaskSync(...syncedTaskIds);
     }
   }
 

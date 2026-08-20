@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MaxLength } from "class-validator";
+import { IsOptional, IsString, IsUrl, MaxLength } from "class-validator";
 
 export class SubmitWorkOrderDto {
   @IsOptional()
@@ -7,6 +7,10 @@ export class SubmitWorkOrderDto {
 
   @IsOptional()
   @IsString()
+  @IsUrl({
+    protocols: ["http", "https"],
+    require_protocol: true,
+  })
   @MaxLength(1000)
   externalLink?: string;
 }

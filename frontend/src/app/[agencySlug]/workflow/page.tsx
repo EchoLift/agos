@@ -12,14 +12,17 @@ import { invalidateWorkspaceQueries, queryKeys, useWorkflowQuery } from "@/lib/q
 import { getHelpHref } from "@/lib/workspace-url";
 import { getWorkspaceHref } from "@/lib/workspace-url";
 import { rememberedEntityKey, useRememberLastVisitedEntity } from "@/lib/remembered-tab";
+import { useDialog } from "@/components/ui/DialogProvider";
 const riskOptions = ["ON_TRACK", "NEEDS_ATTENTION", "AT_RISK", "BLOCKED", "OVERDUE"];
 
 export default function WorkflowPage() {
   const { agencyId, agency } = useAgency();
   const router = useRouter();
+  const dialog = useDialog();
   const queryClient = useQueryClient();
   const safeAgencySlug = agency?.slug ?? "";
   const roleKeys = useMemo(() => getAgencyRoleKeys(agency), [agency]);
+  const currentMembershipId = agency?.membershipId ?? null;
   const [selectedItem, setSelectedItem] = useState<WorkflowBoardItem | null>(null);
   useRememberLastVisitedEntity({
     storageKey: rememberedEntityKey("workflow", agencyId),
@@ -39,13 +42,15 @@ export default function WorkflowPage() {
       ? boardQuery.error.message
       : "Failed to load workflow board."
     : null;
-
   const selectItem = (item: WorkflowBoardItem | null) => {
     setSelectedItem(item);
     setActionDraft({ externalLink: "", comment: "", reason: "" });
   };
 
-  const runWorkflowAction = async (action: WorkflowActionType) => {
+  const runWorkflowAction = async (
+    action: WorkflowActionType,
+    allowMissingAssignee = false,
+  ) => {
     if (!agencyId || !selectedItem) return;
     setIsActionRunning(true);
     setError(null);
@@ -59,12 +64,13 @@ export default function WorkflowPage() {
         action,
         idempotencyKey: `${action}:${selectedItem.workflowTaskId ?? selectedItem.contentAssetId}:${Date.now()}`,
         ...(trimmedLink
-          ? trimmedLink.startsWith("http")
-            ? { externalLink: trimmedLink }
-            : { body: trimmedLink }
+          ? { externalLink: trimmedLink }
           : {}),
         ...(trimmedComment ? { comment: trimmedComment } : {}),
         ...(trimmedReason ? { reason: trimmedReason } : {}),
+        ...(allowMissingAssignee
+          ? { allowMissingAssignee: true }
+          : {}),
       });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.contentAsset(agencyId, selectedItem.contentAssetId),
@@ -94,7 +100,29 @@ export default function WorkflowPage() {
       const nextSelected = refreshed.data?.columns.flatMap((column) => column.items).find((item) => item.contentAssetId === selectedItem.contentAssetId) ?? null;
       selectItem(nextSelected);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Workflow action failed.");
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Workflow action failed.";
+      const isMissingAssignee =
+        action === "APPROVE" &&
+        /Assign a .* before approving|Assign an .* before/i.test(message);
+      if (isMissingAssignee && !allowMissingAssignee) {
+        const confirmed = await dialog.confirm({
+          title: "Approve without Next Assignee?",
+          description: `${message}. The workflow will pause in the next stage until an assignee is selected.`,
+          confirmText: "Approve anyway",
+          cancelText: "Cancel",
+          variant: "warning",
+        });
+        if (confirmed) {
+          setIsActionRunning(false);
+          await runWorkflowAction(action, true);
+          return;
+        }
+      }
+
+      setError(message);
     } finally {
       setIsActionRunning(false);
     }
@@ -175,7 +203,7 @@ export default function WorkflowPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-2 shadow-xl shadow-black/10 lg:rounded-3xl lg:p-4 lg:shadow-2xl">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-4 shadow-xl shadow-black/10 lg:rounded-3xl lg:p-4 lg:shadow-2xl">
         {isLoading ? (
           <div className="p-4 text-sm text-zinc-500">Loading workflow board...</div>
         ) : firstLoadError ? (
@@ -317,6 +345,7 @@ export default function WorkflowPage() {
               item={selectedItem}
               roleKeys={roleKeys}
               draft={actionDraft}
+              currentMembershipId={currentMembershipId}
               isRunning={isActionRunning}
               onDraftChange={setActionDraft}
               onAction={runWorkflowAction}
@@ -341,6 +370,7 @@ export default function WorkflowPage() {
 function WorkflowActionPanel({
   item,
   roleKeys,
+  currentMembershipId,
   draft,
   isRunning,
   onDraftChange,
@@ -348,15 +378,23 @@ function WorkflowActionPanel({
 }: {
   item: WorkflowBoardItem;
   roleKeys: string[];
+  currentMembershipId: string | null;
   draft: { externalLink: string; comment: string; reason: string };
   isRunning: boolean;
   onDraftChange: (value: { externalLink: string; comment: string; reason: string }) => void;
   onAction: (action: WorkflowActionType) => void;
 }) {
-  const submitAction = submitActionFor(item.stage, roleKeys);
-  const reviewActions = reviewActionsFor(item.stage, roleKeys);
-  const hasSubmissionContent = Boolean(draft.externalLink.trim());
-  const canSubmit = Boolean(submitAction) && hasSubmissionContent && !item.hasActiveBlocker && item.taskStatus !== "COMPLETED";
+  const isTaskOwner =
+    Boolean(currentMembershipId) &&
+    item.owner?.membershipId === currentMembershipId;
+  const submitAction = submitActionFor(item.stage, isTaskOwner);
+  const reviewActions = reviewActionsFor(
+    item.stage,
+    roleKeys,
+    isTaskOwner,
+  );
+  const hasValidUrl = isValidSubmissionUrl(draft.externalLink);
+  const canSubmit = Boolean(submitAction) && hasValidUrl && !item.hasActiveBlocker && item.taskStatus !== "COMPLETED";
   const canShowSubmit = Boolean(submitAction) && !item.hasActiveBlocker && item.taskStatus !== "COMPLETED";
   const canReview = reviewActions.length > 0 && !item.hasActiveBlocker;
   const canActOnStage = canShowSubmit || canReview;
@@ -379,12 +417,25 @@ function WorkflowActionPanel({
         <div className="mt-4 space-y-3">
           <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600">
             Link or note
+
             <input
+              type="url"
               value={draft.externalLink}
-              onChange={(event) => onDraftChange({ ...draft, externalLink: event.target.value })}
+              onChange={(event) =>
+                onDraftChange({
+                  ...draft,
+                  externalLink: event.target.value,
+                })
+              }
               placeholder={submitPlaceholder(item.stage)}
-              className="mt-2 min-h-11 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 text-base text-white outline-none transition focus:border-indigo-500 lg:rounded-2xl lg:text-sm"
+              className="mt-2 block w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm font-normal normal-case tracking-normal text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
             />
+
+            {draft.externalLink.trim() && !hasValidUrl ? (
+              <p className="mt-1 text-xs font-normal normal-case tracking-normal text-red-500">
+                Enter a valid URL starting with https:// or http://
+              </p>
+            ) : null}
           </label>
           <button
             type="button"
@@ -455,11 +506,20 @@ function WorkflowActionPanel({
 function SummaryCard({ label, value, tone = "default" }: { label: string; value: number; tone?: "default" | "attention" | "danger" }) {
   const valueClass = tone === "danger" ? "text-red-300" : tone === "attention" ? "text-amber-300" : "text-white";
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-2 shadow-lg shadow-black/10 lg:rounded-xl lg:p-1 lg:shadow-xl">
+    <div className="rounded-lg border border-zinc-800 bg-zinc-950/80 p-1 lg:p-2 shadow-lg shadow-black/10 lg:rounded-xl lg:p-1 lg:shadow-xl">
       <div className="text-sm text-zinc-400">{label}</div>
       <div className={`mt-2 text-xl font-semibold lg:mt-2 lg:text-xl ${valueClass}`}>{value}</div>
     </div>
   );
+}
+
+function isValidSubmissionUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
 }
 
 function WorkflowFilters({
@@ -623,10 +683,33 @@ function nextActionText(item: WorkflowBoardItem) {
   return "The current owner should complete their work or raise a blocker if they need help.";
 }
 
-function submitActionFor(stage: string, roleKeys: string[]): { action: WorkflowActionType; label: string } | null {
-  if (stage === "WRITING" && hasRole(roleKeys, "WRITER")) return { action: "SUBMIT_FOR_REVIEW", label: "Submit script for review" };
-  if (stage === "SHOOT" && hasRole(roleKeys, "DOP")) return { action: "SUBMIT_FOR_REVIEW", label: "Submit footage handover" };
-  if (stage === "EDITING" && hasRole(roleKeys, "EDITOR")) return { action: "SUBMIT_FOR_REVIEW", label: "Submit edit for review" };
+function submitActionFor(
+  stage: string,
+  isTaskOwner: boolean,
+): { action: WorkflowActionType; label: string } | null {
+  if (!isTaskOwner) return null;
+
+  if (stage === "WRITING") {
+    return {
+      action: "SUBMIT_FOR_REVIEW",
+      label: "Submit script for review",
+    };
+  }
+
+  if (stage === "SHOOT") {
+    return {
+      action: "SUBMIT_FOR_REVIEW",
+      label: "Submit footage handover",
+    };
+  }
+
+  if (stage === "EDITING") {
+    return {
+      action: "SUBMIT_FOR_REVIEW",
+      label: "Submit edit for review",
+    };
+  }
+
   return null;
 }
 
@@ -637,15 +720,27 @@ function submitPlaceholder(stage: string) {
   return "Add a link or note";
 }
 
-function reviewActionsFor(stage: string, roleKeys: string[]): Array<{ action: WorkflowActionType; label: string; tone?: "success" | "danger" }> {
-  if (stage === "EDITOR_INTAKE" && hasRole(roleKeys, "EDITOR")) {
+function reviewActionsFor(
+  stage: string,
+  roleKeys: string[],
+  isTaskOwnerOrResponsible: boolean = false,
+): Array<{ action: WorkflowActionType; label: string; tone?: "success" | "danger" }> {
+  const isEditor = hasRole(roleKeys, "EDITOR") || isTaskOwnerOrResponsible;
+  const isManager = hasAnyWorkflowRole(roleKeys, ["OWNER", "ADMIN", "MANAGER"]);
+
+  if (stage === "EDITOR_INTAKE" && (isEditor || isManager)) {
     return [
       { action: "ACCEPT_HANDOVER", label: "Accept handover" },
       { action: "REJECT", label: "Reject handover", tone: "danger" },
     ];
   }
 
-  if (["MANAGER_SCRIPT_REVIEW", "MANAGER_EDIT_REVIEW", "CLIENT_APPROVAL"].includes(stage) && hasAnyWorkflowRole(roleKeys, ["OWNER", "ADMIN", "MANAGER"])) {
+  if (
+    ["MANAGER_SCRIPT_REVIEW", "MANAGER_EDIT_REVIEW", "CLIENT_APPROVAL"].includes(
+      stage,
+    ) &&
+    (isManager || isTaskOwnerOrResponsible)
+  ) {
     return [
       { action: "APPROVE", label: "Approve" },
       { action: "REQUEST_CHANGES", label: "Request changes", tone: "danger" },

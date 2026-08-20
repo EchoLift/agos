@@ -31,10 +31,15 @@ export function buildDeepLink(
 
   // If localhost, use path-based routing (http://localhost:3000/agencySlug/route)
   if (base.includes("localhost") || base.includes("127.0.0.1")) {
-    if (agencySlug && !route.startsWith(agencySlug)) {
-      return `${base}${route ? `/${route}` : ""}`;
+    if (agencySlug) {
+      const cleanRoute = route.startsWith(`${agencySlug}/`)
+        ? route.slice(agencySlug.length + 1)
+        : route === agencySlug
+          ? ""
+          : route;
+      return `${base}/${agencySlug}${cleanRoute ? `/${cleanRoute}` : ""}`;
     }
-    return `${base}/${route}`;
+    return `${base}${route ? `/${route}` : ""}`;
   }
 
   // Production:
@@ -52,8 +57,9 @@ export function buildDeepLink(
         : route === agencySlug
           ? ""
           : route;
-      return `${parsedUrl.protocol}/.${rootDomain}${cleanRoute ? `/${cleanRoute}` : ""
-        }`;
+      return `${parsedUrl.protocol}//${agencySlug}.${rootDomain}${
+        cleanRoute ? `/${cleanRoute}` : ""
+      }`;
     } catch {
       return `${base}/${route}`;
     }
@@ -222,6 +228,78 @@ export function renderEmailTemplate(
             </div>
             <div style="margin:28px 0;text-align:center;">
               <a href="${deepLink}" style="background-color:#6366f1;color:#ffffff;padding:12px 28px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block;">Open Deliverable</a>
+            </div>
+          </div>
+          ${footerHtml}
+        </div>
+      `;
+      return { subject, html, text };
+    }
+
+    case "ApprovalRejected": {
+      const subject = `[AGENCIE] Approval Rejected: ${data.workName || data.title}`;
+      const text = `Hi ${recipient},\n\nA submission for ${data.workName || data.title} was rejected in ${agency}.\n\nOpen in AGENCIE to view feedback:\n${deepLink}\n`;
+      const html = `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#18181b;color:#f4f4f5;border-radius:12px;overflow:hidden;padding:24px;">
+          ${headerHtml}
+          <div style="padding:24px;">
+            <h2 style="color:#ef4444;margin-top:0;">Approval Rejected</h2>
+            <p style="color:#a1a1aa;font-size:15px;">Hi ${recipient},</p>
+            <p style="color:#a1a1aa;font-size:15px;">A submission for <strong>${data.workName || data.title}</strong> was rejected in <strong>${agency}</strong> and requires your revision.</p>
+            <div style="background:#27272a;padding:16px;border-radius:8px;margin:20px 0;">
+              <p style="margin:4px 0;color:#ffffff;font-weight:600;">${data.workName || data.title}</p>
+              ${data.body ? `<p style="margin:4px 0;color:#f87171;font-size:14px;">Reason: ${data.body}</p>` : ""}
+            </div>
+            <div style="margin:28px 0;text-align:center;">
+              <a href="${deepLink}" style="background-color:#ef4444;color:#ffffff;padding:12px 28px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block;">View Feedback in AGENCIE</a>
+            </div>
+          </div>
+          ${footerHtml}
+        </div>
+      `;
+      return { subject, html, text };
+    }
+
+    case "ClientApprovalRequired": {
+      const subject = `[AGENCIE] Client Approval Required: ${data.workName || data.title}${data.clientName ? ` (${data.clientName})` : ""}`;
+      const text = `Hi ${recipient},\n\nContent is waiting for your final review and approval in ${agency}:\n${data.workName || data.title}\n\nReview & Approve in AGENCIE:\n${deepLink}\n`;
+      const html = `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#18181b;color:#f4f4f5;border-radius:12px;overflow:hidden;padding:24px;">
+          ${headerHtml}
+          <div style="padding:24px;">
+            <h2 style="color:#6366f1;margin-top:0;">Client Approval Required</h2>
+            <p style="color:#a1a1aa;font-size:15px;">Hi ${recipient},</p>
+            <p style="color:#a1a1aa;font-size:15px;">A deliverable in <strong>${agency}</strong> is complete and ready for your final sign-off.</p>
+            <div style="background:#27272a;padding:16px;border-radius:8px;margin:20px 0;">
+              <p style="margin:4px 0;color:#ffffff;font-weight:600;">${data.workName || data.title}</p>
+              ${data.clientName ? `<p style="margin:4px 0;color:#a1a1aa;font-size:14px;">Client: ${data.clientName}</p>` : ""}
+              ${data.dueDate ? `<p style="margin:4px 0;color:#818cf8;font-size:14px;">Deadline: ${data.dueDate}</p>` : ""}
+            </div>
+            <div style="margin:28px 0;text-align:center;">
+              <a href="${deepLink}" style="background-color:#6366f1;color:#ffffff;padding:12px 28px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block;">Review & Approve</a>
+            </div>
+          </div>
+          ${footerHtml}
+        </div>
+      `;
+      return { subject, html, text };
+    }
+
+    case "ClientFeedbackRequested": {
+      const subject = `[AGENCIE] Client Feedback Requested: ${data.workName || data.title}`;
+      const text = `Hi ${recipient},\n\nFeedback has been requested on content in ${agency}:\n${data.workName || data.title}\n\nOpen in AGENCIE to review:\n${deepLink}\n`;
+      const html = `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#18181b;color:#f4f4f5;border-radius:12px;overflow:hidden;padding:24px;">
+          ${headerHtml}
+          <div style="padding:24px;">
+            <h2 style="color:#f59e0b;margin-top:0;">Feedback Requested</h2>
+            <p style="color:#a1a1aa;font-size:15px;">Hi ${recipient},</p>
+            <p style="color:#a1a1aa;font-size:15px;">Your input has been requested on a deliverable in <strong>${agency}</strong>.</p>
+            <div style="background:#27272a;padding:16px;border-radius:8px;margin:20px 0;">
+              <p style="margin:4px 0;color:#ffffff;font-weight:600;">${data.workName || data.title}</p>
+            </div>
+            <div style="margin:28px 0;text-align:center;">
+              <a href="${deepLink}" style="background-color:#f59e0b;color:#ffffff;padding:12px 28px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block;">Provide Feedback</a>
             </div>
           </div>
           ${footerHtml}

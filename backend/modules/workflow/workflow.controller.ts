@@ -6,7 +6,6 @@ import { AssignContentDto } from "./dto/assign-content.dto";
 import { BlockContentDto } from "./dto/block-content.dto";
 import { CreateContentAssetDto } from "./dto/create-content-asset.dto";
 import { RequestChangesDto } from "./dto/request-changes.dto";
-import { SubmitWorkDto } from "./dto/submit-work.dto";
 import { AdvanceWorkflowStageDto } from "./dto/advance-workflow-stage.dto";
 import { WorkflowActionDto } from "./dto/workflow-action.dto";
 import { WorkflowService } from "./workflow.service";
@@ -41,11 +40,6 @@ export class WorkflowController {
   @Post(":id/assign")
   assign(@Param("id") id: string, @Body() dto: AssignContentDto) {
     return this.workflowService.assign(id, dto);
-  }
-
-  @Post(":id/submit")
-  submit(@Param("id") id: string, @Body() dto: SubmitWorkDto) {
-    return this.workflowService.submit(id, dto);
   }
 
   @Post(":id/actions")

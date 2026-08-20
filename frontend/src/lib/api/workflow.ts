@@ -96,6 +96,7 @@ export interface WorkflowActionInput {
   externalLink?: string;
   comment?: string;
   reason?: string;
+  allowMissingAssignee?: boolean;
 }
 
 export async function getWorkflowBoard(agencyId: string, filters: WorkflowBoardFilters = {}): Promise<WorkflowBoard> {

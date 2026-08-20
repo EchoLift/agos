@@ -13,12 +13,9 @@ import { PrismaService } from "@packages/database/prisma.service";
 import { DomainEvents } from "@packages/events/domain-event";
 import { EventBusService } from "@packages/events/event-bus.service";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
-import {
-  assertClientScope,
-  isClientUser,
-  requireClientScope,
-} from "@packages/security/client-scope";
+import { assertClientScope, isClientUser, requireClientScope } from "@packages/security/client-scope";
 import { GoogleCalendarSyncService } from "@modules/google-calendar/google-calendar-sync.service";
+import { isEmailChannelRequired } from "@modules/notification/notification.policy";
 import { CreateWorkOrderDto } from "./dto/create-work-order.dto";
 import { UpdateWorkOrderDto } from "./dto/update-work-order.dto";
 import {
@@ -32,7 +29,7 @@ export class WorkOrderService {
     private readonly prisma: PrismaService,
     private readonly eventBus: EventBusService,
     private readonly googleCalendarSync: GoogleCalendarSyncService,
-  ) {}
+  ) { }
 
   async create(dto: CreateWorkOrderDto, actor: IdentityContext) {
     const agencyId = this.requireAgency(actor);
@@ -47,8 +44,8 @@ export class WorkOrderService {
         : Promise.resolve(null),
       dto.clientId
         ? this.prisma.client.findFirst({
-            where: { id: dto.clientId, agencyId, deletedAt: null },
-          })
+          where: { id: dto.clientId, agencyId, deletedAt: null },
+        })
         : Promise.resolve(null),
     ]);
 
@@ -99,6 +96,17 @@ export class WorkOrderService {
         },
       );
 
+      await this.createWorkOrderNotification(
+        tx,
+        agencyId,
+        workOrder.assigneeMembershipId,
+        {
+          title: `Gig assigned: ${workOrder.title}`,
+          body: `You have been assigned to "${workOrder.title}". Due ${new Date(dueAt).toLocaleDateString()}.`,
+          eventType: DomainEvents.WorkOrderCreated,
+        },
+      );
+
       return this.serialize(workOrder);
     });
     this.googleCalendarSync.queueWorkOrderSync(created.id);
@@ -115,8 +123,8 @@ export class WorkOrderService {
       ...(clientId
         ? { clientId }
         : this.canManage(actor)
-        ? {}
-        : {
+          ? {}
+          : {
             OR: [
               { assigneeMembershipId: membershipId },
               { reviewerMembershipId: membershipId },
@@ -190,11 +198,11 @@ export class WorkOrderService {
             : {}),
           ...(dto.rewardAmount !== undefined
             ? {
-                rewardAmount:
-                  dto.rewardAmount == null
-                    ? null
-                    : new Prisma.Decimal(dto.rewardAmount),
-              }
+              rewardAmount:
+                dto.rewardAmount == null
+                  ? null
+                  : new Prisma.Decimal(dto.rewardAmount),
+            }
             : {}),
           ...(dto.rewardCurrency !== undefined
             ? { rewardCurrency: dto.rewardCurrency }
@@ -241,6 +249,20 @@ export class WorkOrderService {
       throw new BadRequestException("Add notes or a link before submitting");
     }
 
+    if (dto.externalLink?.trim()) {
+      try {
+        const url = new URL(dto.externalLink.trim());
+
+        if (url.protocol !== "https:" && url.protocol !== "http:") {
+          throw new Error("Unsupported protocol");
+        }
+      } catch {
+        throw new BadRequestException(
+          "Enter a valid URL starting with https:// or http://",
+        );
+      }
+    }
+
     const submittedResult = await this.prisma.$transaction(async (tx) => {
       const lastSubmission = await tx.workOrderSubmission.findFirst({
         where: { workOrderId: id },
@@ -280,6 +302,19 @@ export class WorkOrderService {
           },
         },
       );
+
+      if (workOrder.reviewerMembershipId) {
+        await this.createWorkOrderNotification(
+          tx,
+          agencyId,
+          workOrder.reviewerMembershipId,
+          {
+            title: `Review needed: ${workOrder.title}`,
+            body: dto.body?.trim() || `Gig "${workOrder.title}" was submitted for review.`,
+            eventType: DomainEvents.WorkOrderSubmitted,
+          },
+        );
+      }
 
       return this.serialize(updated);
     });
@@ -371,6 +406,19 @@ export class WorkOrderService {
         },
       );
 
+      if (action === "requestChanges") {
+        await this.createWorkOrderNotification(
+          tx,
+          agencyId,
+          workOrder.assigneeMembershipId,
+          {
+            title: `Changes requested: ${workOrder.title}`,
+            body: dto.comment?.trim() || `Changes were requested on your submission for "${workOrder.title}".`,
+            eventType: DomainEvents.WorkOrderChangesRequested,
+          },
+        );
+      }
+
       return this.serialize(updated);
     });
     this.googleCalendarSync.queueWorkOrderSync(reviewedResult.id);
@@ -423,10 +471,10 @@ export class WorkOrderService {
       clientId: workOrder.clientId,
       client: workOrder.client
         ? {
-            id: workOrder.client.id,
-            name: workOrder.client.displayName ?? workOrder.client.name,
-            industry: workOrder.client.industry,
-          }
+          id: workOrder.client.id,
+          name: workOrder.client.displayName ?? workOrder.client.name,
+          industry: workOrder.client.industry,
+        }
         : null,
       title: workOrder.title,
       description: workOrder.description,
@@ -505,5 +553,79 @@ export class WorkOrderService {
     return [...(actor.roles ?? []), actor.role ?? ""]
       .filter(Boolean)
       .map((role) => role.toUpperCase().replace(/[\s-]+/g, "_"));
+  }
+
+  private async createWorkOrderNotification(
+    tx: Prisma.TransactionClient,
+    agencyId: string,
+    membershipId: string,
+    input: { title: string; body: string; eventType: string },
+  ) {
+    if (!("membership" in tx) || !("notification" in tx)) return null;
+    const membership = await tx.membership.findFirst({
+      where: { id: membershipId, agencyId, status: "ACTIVE", deletedAt: null },
+      select: { userId: true },
+    });
+
+    if (!membership) return null;
+
+    const notification = await tx.notification.create({
+      data: {
+        agencyId,
+        userId: membership.userId,
+        title: input.title,
+        body: input.body,
+        eventType: input.eventType,
+      },
+    });
+
+    await this.queueEmailDeliveryForNotification(
+      tx,
+      agencyId,
+      notification.id,
+      input.eventType,
+    );
+
+    return notification;
+  }
+
+  private async queueEmailDeliveryForNotification(
+    tx: Prisma.TransactionClient,
+    agencyId: string,
+    notificationId: string,
+    eventType: string,
+  ) {
+    if (!isEmailChannelRequired(eventType) || !("notificationDelivery" in tx)) {
+      return null;
+    }
+
+    const delivery = await tx.notificationDelivery.create({
+      data: {
+        agencyId,
+        notificationId,
+        channel: "EMAIL",
+        status: "QUEUED",
+      },
+    });
+
+    const event = {
+      agencyId,
+      actorId: null,
+      aggregateId: delivery.id,
+      aggregateType: "NotificationDelivery",
+      payload: { deliveryId: delivery.id },
+    };
+
+    if (typeof this.eventBus.publishWithinTransaction === "function") {
+      await this.eventBus.publishWithinTransaction(
+        tx,
+        DomainEvents.NotificationQueued,
+        event,
+      );
+    } else {
+      await this.eventBus.publish(DomainEvents.NotificationQueued, event);
+    }
+
+    return delivery;
   }
 }

@@ -12,6 +12,8 @@ import { visibleWorkspaceNavItems } from "@/lib/workspace-access";
 import { getWorkspaceUrl, getRootDomainUrl, getWorkspaceHref, getHelpHref } from "@/lib/workspace-url";
 import { clearAgencyScopedUiState } from "@/lib/workspace-cache";
 import { rememberedEntityKey, useRememberedEntityId } from "@/lib/remembered-tab";
+import { useDialog } from "@/components/ui/DialogProvider";
+import { AgencieLoader } from "@/components/ui/AgencieLoader";
 import GlobalSearch from "@/components/GlobalSearch";
 import MobileWorkspaceNav from "@/components/MobileWorkspaceNav";
 
@@ -21,6 +23,7 @@ export default function WorkspaceHeader({
   agencySlug: string;
 }) {
   const pathname = usePathname();
+  const dialog = useDialog();
   const { agency, agencyDisplayName } = useAgency();
   const displayName = agencyDisplayName || agencySlug;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -43,18 +46,19 @@ export default function WorkspaceHeader({
   const rememberedWorkflowId = useRememberedEntityId(
     rememberedEntityKey("workflow", agency?.id),
   );
+
   const navItems = useMemo(() => {
     const rememberedByKey = {
       clients: rememberedClientId
         ? `/clients/${rememberedClientId}`
-        : null,
+        : '/clients',
       campaigns: rememberedCampaignId
         ? `/campaigns/${rememberedCampaignId}`
-        : null,
-      gigs: rememberedGigId ? `/gigs/${rememberedGigId}` : null,
+        : '/campaigns',
+      gigs: rememberedGigId ? `/gigs/${rememberedGigId}` : '/gigs',
       workflow: rememberedWorkflowId
         ? `/workflow/${rememberedWorkflowId}`
-        : null,
+        : `/workflow`
     };
 
     return baseNavItems.map((item) => {
@@ -75,7 +79,7 @@ export default function WorkspaceHeader({
     rememberedCampaignId,
     rememberedClientId,
     rememberedGigId,
-    rememberedWorkflowId,
+    rememberedWorkflowId
   ]);
   const [switchingAgencyId, setSwitchingAgencyId] = useState<string | null>(
     null,
@@ -128,12 +132,22 @@ export default function WorkspaceHeader({
 
       console.error("Failed to switch workspace", error);
 
-      window.alert("Unable to switch workspace. Please try again.");
+      void dialog.alert({
+        title: "Unable to switch workspace",
+        description: "Please check your network connection and try again.",
+        variant: "error",
+      });
     }
   };
 
-  const confirmLogout = () => {
-    const confirmed = window.confirm("Logout from AGENCIE?");
+  const confirmLogout = async () => {
+    const confirmed = await dialog.confirm({
+      title: "Logout from AGENCIE?",
+      description: "You will be signed out of your current session.",
+      confirmText: "Logout",
+      cancelText: "Cancel",
+      variant: "danger",
+    });
     if (confirmed) {
       logout();
     }
@@ -303,21 +317,11 @@ export default function WorkspaceHeader({
                 </div>
               ) : null}
               {switchingAgencyId ? (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#09090b]/90 backdrop-blur-sm">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="h-10 w-10 animate-spin rounded-full border-4 border-zinc-700 border-t-indigo-400" />
-
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-white">
-                        Switching workspace
-                      </p>
-
-                      <p className="mt-1 text-xs text-zinc-500">
-                        Opening your agency…
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <AgencieLoader
+                  variant="overlay"
+                  label="Switching workspace"
+                  sublabel="Opening your agency…"
+                />
               ) : null}
             </div>
           </div>
@@ -352,8 +356,8 @@ function WorkspaceNavLink({
     <Link
       href={href}
       className={`rounded-md px-3 py-2 transition ${isActive
-          ? "bg-indigo-500/15 text-indigo-200"
-          : "hover:bg-zinc-900 hover:text-white"
+        ? "bg-indigo-500/15 text-indigo-200"
+        : "hover:bg-zinc-900 hover:text-white"
         }`}
     >
       {label}

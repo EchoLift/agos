@@ -66,19 +66,20 @@ export default function GlobalSearch({
   const rememberedWorkflowId = useRememberedEntityId(
     rememberedEntityKey("workflow", agency?.id),
   );
+
   const pageResults = useMemo<SearchResult[]>(
     () => {
       const rememberedByKey = {
         clients: rememberedClientId
           ? `/clients/${rememberedClientId}`
-          : null,
+          : '/clients',
         campaigns: rememberedCampaignId
           ? `/campaigns/${rememberedCampaignId}`
-          : null,
-        gigs: rememberedGigId ? `/gigs/${rememberedGigId}` : null,
+          : '/campaigns',
+        gigs: rememberedGigId ? `/gigs/${rememberedGigId}` : '/gigs',
         workflow: rememberedWorkflowId
           ? `/workflow/${rememberedWorkflowId}`
-          : null,
+          : '/workflow',
       };
 
       return visibleWorkspaceNavItems(agency, agencySlug, userId).map((item) => {

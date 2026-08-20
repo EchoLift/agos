@@ -31,6 +31,7 @@ describe("WorkflowService collaboration flows", () => {
       approval: { findUnique: jest.fn(), create: jest.fn() },
       blocker: { create: jest.fn(), updateMany: jest.fn() },
       workflowTransition: { create: jest.fn(), findFirst: jest.fn() },
+      workflowStep: { findFirst: jest.fn() },
       assignmentHistory: { create: jest.fn() },
       $transaction: jest.fn(async (callback: (tx: any) => Promise<any>) =>
         callback(prisma),
@@ -38,6 +39,9 @@ describe("WorkflowService collaboration flows", () => {
     };
     eventBus = {
       publish: jest.fn<() => Promise<unknown>>().mockResolvedValue({}),
+      publishWithinTransaction: jest
+        .fn<() => Promise<unknown>>()
+        .mockResolvedValue({}),
     } as any;
     service = new WorkflowService(prisma as any, eventBus as any);
   });
@@ -47,32 +51,68 @@ describe("WorkflowService collaboration flows", () => {
       id: "asset-1",
       agencyId: "agency-1",
     });
-    prisma.workflowTask.findUnique.mockResolvedValue({
-      id: "task-1",
+    prisma.workflowInstance.findFirst.mockResolvedValue({
+      id: "instance-1",
       agencyId: "agency-1",
-      workflowInstanceId: "instance-1",
-      ownerMembershipId: "member-1",
-      workflowStepId: "step-1",
-      deadlineAt: new Date(),
-      workflowInstance: { contentAssetId: "asset-1" },
-      workflowStep: { stage: "WRITING" },
+      contentAssetId: "asset-1",
+      currentTaskId: "task-1",
+      currentTask: {
+        id: "task-1",
+        agencyId: "agency-1",
+        workflowInstanceId: "instance-1",
+        ownerMembershipId: "member-1",
+        workflowStepId: "step-1",
+        deadlineAt: new Date(),
+        workflowStep: { stage: "WRITING" },
+        owner: { id: "member-1", user: { name: "Writer" } },
+        workflowInstance: {
+          id: "instance-1",
+          templateId: "template-1",
+          managerMembershipId: "manager-1",
+          contentAsset: {
+            displayCode: "REEL-001",
+            campaign: {
+              teamAssignments: [{ membershipId: "member-1", assignmentRole: "WRITER" }],
+              publishingSchedules: [],
+            },
+            client: null,
+          },
+        },
+      },
     });
+    prisma.workflowInstance.findUnique = jest.fn(async () => ({
+      id: "instance-1",
+      templateId: "template-1",
+    }));
+    prisma.workflowStep.findFirst = jest.fn(async () => ({ id: "step-review" }));
     prisma.submission.findFirst.mockResolvedValue(null);
     prisma.submission.create.mockResolvedValue({
       id: "submission-1",
       version: 1,
+      submissionType: "SCRIPT",
     });
     prisma.workflowTask.update.mockResolvedValue({ id: "task-1" });
+    prisma.workflowTask.create.mockResolvedValue({ id: "task-review" });
+    prisma.membership = {
+      findFirst: jest.fn(async () => ({ userId: "user-manager" })),
+    };
+    prisma.notification = {
+      create: jest.fn(async () => ({ id: "notif-1" })),
+    };
+    prisma.notificationDelivery = {
+      create: jest.fn(async () => ({ id: "del-1" })),
+    };
 
-    const result = await service.submit("asset-1", {
-      actorId: "member-1",
-      workflowTaskId: "task-1",
-      submissionType: "RAW_FOOTAGE" as any,
+    const result = await service.performAction("asset-1", {
+      action: "SUBMIT_FOR_REVIEW" as any,
       body: "draft ready",
-    });
+      externalLink: "https://example.com/script",
+      idempotencyKey: "sub-key-1",
+    }, { agencyId: "agency-1", membershipId: "member-1" } as any);
 
-    expect(result).toEqual(expect.objectContaining({ id: "submission-1" }));
-    expect(eventBus.publish).toHaveBeenCalledWith(
+    expect(result).toEqual(expect.objectContaining({ submission: expect.objectContaining({ id: "submission-1" }) }));
+    expect(eventBus.publishWithinTransaction).toHaveBeenCalledWith(
+      expect.anything(),
       DomainEvents.SubmissionCreated,
       expect.objectContaining({
         payload: expect.objectContaining({ contentAssetId: "asset-1" }),

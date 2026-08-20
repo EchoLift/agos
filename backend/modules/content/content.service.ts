@@ -35,7 +35,7 @@ export class ContentService {
     private readonly eventBus: EventBusService,
     @Optional()
     private readonly googleCalendarSync?: GoogleCalendarSyncService,
-  ) {}
+  ) { }
 
   async create(
     dto: CreateContentAssetDto,
@@ -92,17 +92,17 @@ export class ContentService {
     const selectedAssigneeId = this.nullIfBlank(dto.assigneeId);
     const writerMembershipId = selectedAssigneeId
       ? this.ensureCampaignRoleOverride(
-          campaign.teamAssignments,
-          selectedAssigneeId,
-          CampaignAssignmentRole.WRITER,
-          "Selected owner must be assigned as Writer on this campaign",
-        )
+        campaign.teamAssignments,
+        selectedAssigneeId,
+        CampaignAssignmentRole.WRITER,
+        "Selected owner must be assigned as Writer on this campaign",
+      )
       : this.requiredSingleCampaignAssignee(
-          campaign.teamAssignments,
-          CampaignAssignmentRole.WRITER,
-          "Writer required",
-          "Multiple writers assigned; choose one on the campaign team or assign this content explicitly.",
-        );
+        campaign.teamAssignments,
+        CampaignAssignmentRole.WRITER,
+        "Writer required",
+        "Multiple writers assigned; choose one on the campaign team or assign this content explicitly.",
+      );
     const managerMembershipId =
       this.singleCampaignAssignee(
         campaign.teamAssignments,
@@ -117,8 +117,8 @@ export class ContentService {
     const writingDeadlineAt = dto.deadlineAt
       ? new Date(dto.deadlineAt)
       : this.defaultWritingDeadline(
-          campaign.publishingSchedules[0]?.scheduledAt ?? campaign.endDate,
-        );
+        campaign.publishingSchedules[0]?.scheduledAt ?? campaign.endDate,
+      );
 
     await Promise.all([
       this.ensureAssignableMembership(writerMembershipId, resolvedAgencyId),
@@ -306,33 +306,33 @@ export class ContentService {
       );
       const currentTask = workflowInstance.currentTaskId
         ? await tx.workflowTask.findUnique({
-            where: { id: workflowInstance.currentTaskId },
-          })
+          where: { id: workflowInstance.currentTaskId },
+        })
         : null;
       const nextDeadlineAt =
         deadlineAt ?? currentTask?.deadlineAt ?? workflowInstance.deadlineAt;
 
       const task = currentTask
         ? await tx.workflowTask.update({
-            where: { id: currentTask.id },
-            data: {
-              ...(assigneeId !== undefined
-                ? { ownerMembershipId: assigneeId }
-                : {}),
-              deadlineAt: nextDeadlineAt,
-              version: { increment: 1 },
-            },
-          })
+          where: { id: currentTask.id },
+          data: {
+            ...(assigneeId !== undefined
+              ? { ownerMembershipId: assigneeId }
+              : {}),
+            deadlineAt: nextDeadlineAt,
+            version: { increment: 1 },
+          },
+        })
         : await tx.workflowTask.create({
-            data: {
-              agencyId,
-              workflowInstanceId: workflowInstance.id,
-              displayName: `Planning for ${contentAsset.displayCode}`,
-              ownerMembershipId: assigneeId,
-              status: TaskStatus.TODO,
-              deadlineAt: nextDeadlineAt,
-            },
-          });
+          data: {
+            agencyId,
+            workflowInstanceId: workflowInstance.id,
+            displayName: `Planning for ${contentAsset.displayCode}`,
+            ownerMembershipId: assigneeId,
+            status: TaskStatus.TODO,
+            deadlineAt: nextDeadlineAt,
+          },
+        });
 
       await tx.workflowInstance.update({
         where: { id: workflowInstance.id },
@@ -714,6 +714,9 @@ export class ContentService {
       workflowInstances?: Array<{
         currentStep?: { stage: ContentStage } | null;
         currentTask?: {
+          id: string;
+          ownerMembershipId?: string | null;
+          status: string;
           submissions?: Array<{
             id: string;
             submissionType: string;
@@ -741,55 +744,78 @@ export class ContentService {
   >(asset: T) {
     const workflow = asset.workflowInstances?.[0];
     const latestSubmission = this.latestWorkflowSubmission(workflow);
+
     const stage = this.projectContentStage(
       asset.status,
       workflow?.currentStep?.stage ??
-        workflow?.transitions?.[0]?.toStage ??
-        null,
+      workflow?.transitions?.[0]?.toStage ??
+      null,
     );
+
     const { workflowInstances, client, campaign, ...contentAsset } = asset;
+
     return {
       ...contentAsset,
       stage,
+
+      currentTask: workflow?.currentTask
+        ? {
+          id: workflow.currentTask.id,
+          ownerMembershipId:
+            workflow.currentTask.ownerMembershipId ?? null,
+          status: workflow.currentTask.status ?? null,
+        }
+        : null,
+
       ...(latestSubmission
         ? {
-            latestSubmission: {
-              id: latestSubmission.id,
-              submissionType: latestSubmission.submissionType,
-              version: latestSubmission.version,
-              body: latestSubmission.body,
-              externalLink: latestSubmission.externalLink,
-              status: latestSubmission.status,
-              createdAt: latestSubmission.createdAt,
-            },
-          }
+          latestSubmission: {
+            id: latestSubmission.id,
+            submissionType: latestSubmission.submissionType,
+            version: latestSubmission.version,
+            body: latestSubmission.body,
+            externalLink: latestSubmission.externalLink,
+            status: latestSubmission.status,
+            createdAt: latestSubmission.createdAt,
+          },
+        }
+        : {
+          latestSubmission: null,
+        }),
+
+      ...(client
+        ? {
+          clientSummary: this.clientWorkSummary(client),
+        }
         : {}),
-      ...(client ? { clientSummary: this.clientWorkSummary(client) } : {}),
+
       ...(campaign
         ? {
-            campaignSummary: {
-              id: campaign.id,
-              name: campaign.name,
-              status: campaign.status,
-              campaignType: campaign.campaignType,
-              goal: campaign.goal,
-              keyMessage: campaign.keyMessage,
-              cta: campaign.cta,
-            },
-          }
+          campaignSummary: {
+            id: campaign.id,
+            name: campaign.name,
+            status: campaign.status,
+            campaignType: campaign.campaignType,
+            goal: campaign.goal,
+            keyMessage: campaign.keyMessage,
+            cta: campaign.cta,
+          },
+        }
         : {}),
     };
   }
-
   private latestWorkflowSubmission(workflow?: {
     currentTask?: {
+      id: string;
+      ownerMembershipId?: string | null;
+      status: string;
       submissions?: Array<{
         id: string;
         submissionType: string;
         version: number;
+        status: string;
         body?: string | null;
         externalLink?: string | null;
-        status: string;
         createdAt: Date;
       }>;
     } | null;

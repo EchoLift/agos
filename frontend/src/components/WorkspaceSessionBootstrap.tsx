@@ -6,6 +6,7 @@ import {
   isAuthTemporarilyUnavailableError,
   refreshAccessToken,
 } from "@/lib/auth";
+import { AgencieLoader } from "@/components/ui/AgencieLoader";
 
 type Props = {
   children: React.ReactNode;
@@ -81,27 +82,27 @@ export default function WorkspaceSessionBootstrap({
 
   if (!ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#09090b]">
-        <div className="flex flex-col items-center gap-4">
-          {!temporarilyUnavailable ? (
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-zinc-800 border-t-indigo-400" />
-          ) : null}
-          <p className="text-sm text-zinc-400">
-            {temporarilyUnavailable
-              ? "Reconnecting to AGENCIE…"
-              : "Loading workspace…"}
-          </p>
-          {temporarilyUnavailable ? (
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-indigo-400 hover:text-white"
-            >
-              Retry
-            </button>
-          ) : null}
-        </div>
-      </div>
+      <AgencieLoader
+        variant="fullscreen"
+        label={
+          temporarilyUnavailable
+            ? "Reconnecting to AGENCIE…"
+            : "Loading workspace…"
+        }
+        sublabel={
+          temporarilyUnavailable
+            ? "Your session is being restored. Please hold on."
+            : "Preparing your workspace and active sessions…"
+        }
+        action={
+          temporarilyUnavailable
+            ? {
+                label: "Retry connection",
+                onClick: () => window.location.reload(),
+              }
+            : undefined
+        }
+      />
     );
   }
 

@@ -43,11 +43,13 @@ import { statusPillClasses } from "@/lib/status-style";
 import { invalidateWorkspaceQueries, queryKeys, setListItem } from "@/lib/query";
 import { getWorkspaceHref } from "@/lib/workspace-url";
 import {
+  clearRememberedEntityId,
   rememberedEntityKey,
   rememberedTabKey,
   useRememberLastVisitedEntity,
   useRememberedTab,
 } from "@/lib/remembered-tab";
+import { useDialog } from "@/components/ui/DialogProvider";
 const assignmentRoleOrder: CampaignAssignmentRole[] = [
   "CAMPAIGN_MANAGER",
   "RELATIONSHIP_MANAGER",
@@ -69,6 +71,7 @@ export default function CampaignDetailPage() {
   const searchParams = useSearchParams();
   const params = useParams<{ campaignId: string }>();
   const queryClient = useQueryClient();
+  const dialog = useDialog();
   const { agencyId, agencySlug, agency } = useAgency();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
@@ -175,7 +178,11 @@ export default function CampaignDetailPage() {
   const activate = async () => {
     if (!agencyId || !campaign) return;
 
-    const confirmed = window.confirm(`Mark ${campaign.name} as active?`);
+    const confirmed = await dialog.confirm({
+      title: "Activate Campaign",
+      description: `Mark ${campaign.name} as active?`,
+      confirmText: "Activate",
+    });
     if (!confirmed) return;
 
     setIsActivating(true);
@@ -201,7 +208,13 @@ export default function CampaignDetailPage() {
   };
 
   const runStatusAction = async (label: string, action: () => Promise<Campaign>) => {
-    const confirmed = window.confirm(`${label} ${campaign?.name}?`);
+    const isDestructive = label.toLowerCase().includes("archive") || label.toLowerCase().includes("delete");
+    const confirmed = await dialog.confirm({
+      title: `${label} Campaign`,
+      description: `Are you sure you want to ${label.toLowerCase()} ${campaign?.name}?`,
+      confirmText: label,
+      variant: isDestructive ? "danger" : "default",
+    });
     if (!confirmed) return;
 
     setIsActivating(true);
@@ -290,7 +303,12 @@ export default function CampaignDetailPage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/campaigns"))}
+            onClick={() => {
+              clearRememberedEntityId(
+                rememberedEntityKey("campaign", agencyId),
+              );
+              router.push(getWorkspaceHref(safeAgencySlug, "/campaigns"))
+            }}
             className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white"
           >
             ←
@@ -657,6 +675,7 @@ function CampaignAgenda({
   onChanged: () => Promise<void>;
 }) {
   const router = useRouter();
+  const dialog = useDialog();
   const [platform, setPlatform] = useState("INSTAGRAM");
   const [scheduledAt, setScheduledAt] = useState("");
   const [contentAssetId, setContentAssetId] = useState("");
@@ -691,7 +710,13 @@ function CampaignAgenda({
   };
 
   const reschedule = async (slot: PublishingSchedule) => {
-    const next = window.prompt("New publish time", toDateTimeInput(slot.scheduledAt));
+    const next = await dialog.prompt({
+      title: "Reschedule Publishing Slot",
+      description: "Select new publishing date and time",
+      defaultValue: toDateTimeInput(slot.scheduledAt),
+      inputType: "datetime-local",
+      confirmText: "Reschedule",
+    });
     if (!next || !slot.id || !slot.version) return;
     setIsSaving(true);
     setError(null);
@@ -709,7 +734,13 @@ function CampaignAgenda({
   };
 
   const cancel = async (slot: PublishingSchedule) => {
-    const reason = window.prompt("Cancellation reason");
+    const reason = await dialog.prompt({
+      title: "Cancel Publishing Slot",
+      description: "Enter a reason for cancelling this slot",
+      placeholder: "e.g. Schedule adjustment",
+      confirmText: "Cancel Slot",
+      variant: "danger",
+    });
     if (!reason || !slot.id || !slot.version) return;
     setIsSaving(true);
     setError(null);
@@ -724,7 +755,13 @@ function CampaignAgenda({
   };
 
   const markPublished = async (slot: PublishingSchedule) => {
-    const publishedUrl = window.prompt("Published URL");
+    const publishedUrl = await dialog.prompt({
+      title: "Mark as Published",
+      description: "Enter the live URL for this published content",
+      placeholder: "https://instagram.com/p/...",
+      inputType: "url",
+      confirmText: "Mark Published",
+    });
     if (!publishedUrl || !slot.id || !slot.version) return;
     setIsSaving(true);
     setError(null);
@@ -741,7 +778,13 @@ function CampaignAgenda({
   const generateProduction = async (slot: PublishingSchedule) => {
     if (!slot.id) return;
     const fallbackTitle = `${labelize(inferContentType(slot))} ${new Date(slot.scheduledAt).toLocaleDateString()}`;
-    const title = window.prompt("Content title", fallbackTitle);
+    const title = await dialog.prompt({
+      title: "Create Content Asset",
+      description: "Enter title for the production content item",
+      defaultValue: fallbackTitle,
+      placeholder: "e.g. Behind the scenes reel",
+      confirmText: "Create Content",
+    });
     if (!title) return;
     setIsSaving(true);
     setError(null);
@@ -935,6 +978,7 @@ function CampaignTeamPanel({
   onClose: () => void;
   onChanged: () => Promise<void>;
 }) {
+  const dialog = useDialog();
   const [membershipId, setMembershipId] = useState("");
   const [assignmentRole, setAssignmentRole] = useState<CampaignAssignmentRole>("WRITER");
   const [isSaving, setIsSaving] = useState(false);
@@ -956,7 +1000,15 @@ function CampaignTeamPanel({
   };
 
   const remove = async (assignment: CampaignTeamAssignment) => {
-    const confirmed = window.confirm(`Remove ${assignmentMemberName(assignment)} from ${assignmentRoleLabel(assignment.assignmentRole)}?`);
+    const memberName = assignmentMemberName(assignment);
+    const roleName = assignmentRoleLabel(assignment.assignmentRole);
+    const confirmed = await dialog.confirm({
+      title: "Remove Team Member",
+      description: `Are you sure you want to remove ${memberName} from the ${roleName} role for this campaign?`,
+      confirmText: "Remove Member",
+      cancelText: "Cancel",
+      variant: "danger",
+    });
     if (!confirmed) return;
     setIsSaving(true);
     setError(null);
