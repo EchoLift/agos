@@ -1,4 +1,9 @@
-import { IsEnum, IsOptional, IsString } from "class-validator";
+import {
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
+} from "class-validator";
 
 export enum WorkflowActionType {
   SUBMIT_FOR_REVIEW = "SUBMIT_FOR_REVIEW",
@@ -32,4 +37,8 @@ export class WorkflowActionDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  allowMissingAssignee?: boolean;
 }

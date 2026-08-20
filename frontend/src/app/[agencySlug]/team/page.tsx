@@ -30,6 +30,7 @@ import {
   useTeamQuery,
 } from "@/lib/query";
 import { rememberedTabKey, useRememberedTab } from "@/lib/remembered-tab";
+import { useDialog } from "@/components/ui/DialogProvider";
 
 type TeamTab = "members" | "invitations";
 
@@ -38,6 +39,7 @@ const invitationTabs: readonly TeamTab[] = ["members", "invitations"];
 
 export default function TeamPage() {
   const queryClient = useQueryClient();
+  const dialog = useDialog();
   const searchParams = useSearchParams();
   const [filters, setFilters] = useState({
     search: "",
@@ -294,9 +296,13 @@ export default function TeamPage() {
     const memberName =
       member.name || member.email || member.mobileNumber || "this member";
     const agencyName = agency?.displayName || agency?.name || "this agency";
-    const confirmed = window.confirm(
-      `Remove ${memberName} from ${agencyName}?`,
-    );
+    const confirmed = await dialog.confirm({
+      title: "Remove Team Member",
+      description: `Are you sure you want to remove ${memberName} from ${agencyName}? This will revoke their workspace access.`,
+      confirmText: "Remove Member",
+      cancelText: "Cancel",
+      variant: "danger",
+    });
     if (!confirmed) return;
 
     setBusyMemberId(member.id);
@@ -354,7 +360,14 @@ export default function TeamPage() {
   const handleRevokeInvitation = async (invitation: TeamInvitation) => {
     if (!agencyId) return;
     const label = invitation.email || "this invitation";
-    if (!window.confirm(`Revoke invitation for ${label}?`)) return;
+    const confirmed = await dialog.confirm({
+      title: "Revoke Invitation",
+      description: `Are you sure you want to revoke the invitation for ${label}? The invite link will no longer work.`,
+      confirmText: "Revoke Invitation",
+      cancelText: "Cancel",
+      variant: "danger",
+    });
+    if (!confirmed) return;
 
     setBusyInvitationId(invitation.id);
     setError(null);

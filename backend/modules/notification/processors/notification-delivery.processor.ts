@@ -109,13 +109,20 @@ export class NotificationDeliveryProcessor {
     const frontendUrl =
       this.config.get<string>("FRONTEND_URL") || "https://app.agencie.in";
 
+    const targetRoute = notification.eventType.startsWith("WorkOrder")
+      ? "gigs"
+      : notification.eventType.startsWith("Campaign") ||
+        notification.eventType.startsWith("Publishing")
+      ? "campaigns"
+      : "workflow";
+
     const rendered = renderEmailTemplate(notification.eventType, {
       recipientName: user.name || "Team Member",
       agencyName: agency.displayName || agency.name,
       agencySlug: agency.slug,
       title: notification.title,
       body: notification.body,
-      deepLink: buildDeepLink(frontendUrl, "", agency.slug),
+      deepLink: buildDeepLink(frontendUrl, targetRoute, agency.slug),
       frontendUrl,
     });
 

@@ -10,16 +10,19 @@ import { formatLabel, statusPillClasses } from "@/lib/status-style";
 import { getAgencyRoleKeys } from "@/lib/workspace-access";
 import { invalidateWorkspaceQueries, queryKeys, setListItem, useContentAssetQuery } from "@/lib/query";
 import { getWorkspaceHref } from "@/lib/workspace-url";
-import { rememberedEntityKey, useRememberLastVisitedEntity } from "@/lib/remembered-tab";
+import { clearRememberedEntityId, rememberedEntityKey, useRememberLastVisitedEntity } from "@/lib/remembered-tab";
+import { useDialog } from "@/components/ui/DialogProvider";
 const contentTypes = ["REEL", "CAROUSEL", "STATIC", "STORY", "BLOG", "YOUTUBE", "AD", "OTHER"];
 
 export default function WorkflowDetailPage() {
   const router = useRouter();
+  const dialog = useDialog();
   const params = useParams<{ contentId: string }>();
   const queryClient = useQueryClient();
   const { agencyId, agency } = useAgency();
   const safeAgencySlug = agency?.slug ?? "";
   const roleKeys = useMemo(() => getAgencyRoleKeys(agency), [agency]);
+  const currentMembershipId = agency?.membershipId ?? null;
   const canEditAsset = roleKeys.some((roleKey) => ["OWNER", "ADMIN", "MANAGER"].includes(roleKey));
   const assetQuery = useContentAssetQuery(agencyId, params.contentId);
   const asset = assetQuery.data ?? null;
@@ -28,6 +31,9 @@ export default function WorkflowDetailPage() {
     entityId: asset?.id,
     enabled: Boolean(asset),
   });
+  const isTaskOwner =
+    Boolean(currentMembershipId) &&
+    asset?.currentTask?.ownerMembershipId === currentMembershipId;
   const [draft, setDraft] = useState({ title: "", type: "REEL", brief: "" });
   const [actionDraft, setActionDraft] = useState({ externalLink: "", comment: "" });
   const [isEditing, setIsEditing] = useState(false);
@@ -64,7 +70,10 @@ export default function WorkflowDetailPage() {
     }
   };
 
-  const runWorkflowAction = async (action: WorkflowActionType) => {
+  const runWorkflowAction = async (
+    action: WorkflowActionType,
+    allowMissingAssignee = false,
+  ) => {
     if (!agencyId || !asset) return;
     setIsActionRunning(true);
     setError(null);
@@ -77,11 +86,12 @@ export default function WorkflowDetailPage() {
         action,
         idempotencyKey: `${action}:${asset.id}:${Date.now()}`,
         ...(trimmedLink
-          ? trimmedLink.startsWith("http")
-            ? { externalLink: trimmedLink }
-            : { body: trimmedLink }
+          ? { externalLink: trimmedLink }
           : {}),
         ...(trimmedComment ? { comment: trimmedComment } : {}),
+        ...(allowMissingAssignee
+          ? { allowMissingAssignee: true }
+          : {}),
       });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.campaign(agencyId, asset.campaignId),
@@ -106,7 +116,29 @@ export default function WorkflowDetailPage() {
       }
       setActionDraft({ externalLink: "", comment: "" });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Workflow action failed.");
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Workflow action failed.";
+      const isMissingAssignee =
+        action === "APPROVE" &&
+        /Assign a .* before approving|Assign an .* before/i.test(message);
+      if (isMissingAssignee && !allowMissingAssignee) {
+        const confirmed = await dialog.confirm({
+          title: "Approve without Next Assignee?",
+          description: `${message}. The workflow will pause in the next stage until an assignee is selected.`,
+          confirmText: "Approve anyway",
+          cancelText: "Cancel",
+          variant: "warning",
+        });
+        if (confirmed) {
+          setIsActionRunning(false);
+          await runWorkflowAction(action, true);
+          return;
+        }
+      }
+
+      setError(message);
     } finally {
       setIsActionRunning(false);
     }
@@ -118,7 +150,15 @@ export default function WorkflowDetailPage() {
         <div className="flex min-w-0 items-center gap-2 lg:gap-4">
           <button
             type="button"
-            onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/workflow"))}
+            onClick={() => {
+              clearRememberedEntityId(
+                rememberedEntityKey("workflow", agencyId),
+              );
+
+              router.push(
+                getWorkspaceHref(safeAgencySlug, "/workflow"),
+              );
+            }}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white lg:rounded-full"
           >
             ←
@@ -218,6 +258,7 @@ export default function WorkflowDetailPage() {
                 <WorkflowDetailActions
                   stage={asset.stage || "DRAFT"}
                   roleKeys={roleKeys}
+                  isTaskOwner={isTaskOwner}
                   draft={actionDraft}
                   isRunning={isActionRunning}
                   onDraftChange={setActionDraft}
@@ -323,21 +364,23 @@ function WorkflowDetailActions({
   stage,
   roleKeys,
   draft,
+  isTaskOwner,
   isRunning,
   onDraftChange,
   onAction,
 }: {
   stage: string;
   roleKeys: string[];
+  isTaskOwner: boolean;
   draft: { externalLink: string; comment: string };
   isRunning: boolean;
   onDraftChange: (value: { externalLink: string; comment: string }) => void;
   onAction: (action: WorkflowActionType) => void;
 }) {
-  const submitAction = submitActionFor(stage, roleKeys);
-  const reviewActions = reviewActionsFor(stage, roleKeys);
-  const canSubmit = Boolean(submitAction) && Boolean(draft.externalLink.trim());
-
+  const submitAction = submitActionFor(stage, isTaskOwner);
+  const reviewActions = reviewActionsFor(stage, roleKeys, isTaskOwner);
+  const hasValidUrl = isValidSubmissionUrl(draft.externalLink);
+  const canSubmit = Boolean(submitAction) && hasValidUrl;
   if (!submitAction && reviewActions.length === 0) return null;
 
   return (
@@ -348,11 +391,20 @@ function WorkflowDetailActions({
       {submitAction ? (
         <div className="mt-3 space-y-3">
           <input
+            type="url"
             value={draft.externalLink}
-            onChange={(event) => onDraftChange({ ...draft, externalLink: event.target.value })}
+            onChange={(event) =>
+              onDraftChange({ ...draft, externalLink: event.target.value })
+            }
             placeholder={submitPlaceholder(stage)}
+            aria-invalid={Boolean(draft.externalLink.trim()) && !hasValidUrl}
             className="min-h-11 w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 text-base text-white outline-none transition focus:border-indigo-500 sm:text-sm"
           />
+          {draft.externalLink.trim() && !hasValidUrl ? (
+            <p className="text-xs text-red-400">
+              Enter a valid URL starting with https:// or http://
+            </p>
+          ) : null}
           <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 -mx-3 border-t border-zinc-800 bg-[#0b0b11]/95 p-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
             <button
               type="button"
@@ -392,6 +444,15 @@ function WorkflowDetailActions({
       ) : null}
     </section>
   );
+}
+
+function isValidSubmissionUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
 }
 
 function ClientContext({
@@ -480,29 +541,64 @@ function formatSubmittedAt(value: string) {
   return new Date(value).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-function submitActionFor(stage: string, roleKeys: string[]): { action: WorkflowActionType; label: string } | null {
-  if (stage === "WRITING" && hasRole(roleKeys, "WRITER")) return { action: "SUBMIT_FOR_REVIEW", label: "Submit script" };
-  if (stage === "SHOOT" && hasRole(roleKeys, "DOP")) return { action: "SUBMIT_FOR_REVIEW", label: "Submit footage" };
-  if (stage === "EDITING" && hasRole(roleKeys, "EDITOR")) return { action: "SUBMIT_FOR_REVIEW", label: "Submit edit" };
+function submitActionFor(
+  stage: string,
+  isTaskOwner: boolean,
+): { action: WorkflowActionType; label: string } | null {
+  if (!isTaskOwner) return null;
+
+  if (stage === "WRITING") {
+    return {
+      action: "SUBMIT_FOR_REVIEW",
+      label: "Submit script",
+    };
+  }
+
+  if (stage === "SHOOT") {
+    return {
+      action: "SUBMIT_FOR_REVIEW",
+      label: "Submit footage",
+    };
+  }
+
+  if (stage === "EDITING") {
+    return {
+      action: "SUBMIT_FOR_REVIEW",
+      label: "Submit edit",
+    };
+  }
+
   return null;
 }
 
 function submitPlaceholder(stage: string) {
-  if (stage === "WRITING") return "Script link, notes, or Google Doc";
-  if (stage === "SHOOT") return "Google Drive folder with raw footage";
-  if (stage === "EDITING") return "Draft edit, Frame.io, or Drive link";
+  if (stage === "WRITING") return "Paste script URL (Google Docs, Notion, Drive, etc.)";
+  if (stage === "SHOOT") return "Paste footage URL (Google Docs, Notion, Drive, etc.)";
+  if (stage === "EDITING") return "Paste edit URL (Google Docs, Notion, Drive, etc.)";
   return "Add a link or note";
 }
 
-function reviewActionsFor(stage: string, roleKeys: string[]): Array<{ action: WorkflowActionType; label: string; tone?: "success" | "danger" }> {
-  if (stage === "EDITOR_INTAKE" && hasRole(roleKeys, "EDITOR")) {
+function reviewActionsFor(
+  stage: string,
+  roleKeys: string[],
+  isTaskOwner: boolean = false,
+): Array<{ action: WorkflowActionType; label: string; tone?: "success" | "danger" }> {
+  const isEditor = hasRole(roleKeys, "EDITOR") || isTaskOwner;
+  const isManager = hasAnyWorkflowRole(roleKeys, ["OWNER", "ADMIN", "MANAGER"]);
+
+  if (stage === "EDITOR_INTAKE" && (isEditor || isManager)) {
     return [
       { action: "ACCEPT_HANDOVER", label: "Accept handover" },
       { action: "REJECT", label: "Reject handover", tone: "danger" },
     ];
   }
 
-  if (["MANAGER_SCRIPT_REVIEW", "MANAGER_EDIT_REVIEW", "CLIENT_APPROVAL"].includes(stage) && hasAnyWorkflowRole(roleKeys, ["OWNER", "ADMIN", "MANAGER"])) {
+  if (
+    ["MANAGER_SCRIPT_REVIEW", "MANAGER_EDIT_REVIEW", "CLIENT_APPROVAL"].includes(
+      stage,
+    ) &&
+    (isManager || isTaskOwner)
+  ) {
     return [
       { action: "APPROVE", label: "Approve" },
       { action: "REQUEST_CHANGES", label: "Request changes", tone: "danger" },

@@ -37,6 +37,23 @@ export function readRememberedEntityId(storageKey: string | null | undefined) {
   }
 }
 
+export function clearRememberedEntityId(
+  storageKey: string | null | undefined,
+) {
+  if (!storageKey || typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.removeItem(storageKey);
+    window.dispatchEvent(
+      new CustomEvent(rememberedEntityChangedEvent, {
+        detail: { storageKey, entityId: null },
+      }),
+    );
+  } catch {
+    // Storage can be unavailable; navigation still works without memory.
+  }
+}
+
 export function useRememberedEntityId(storageKey: string | null | undefined) {
   const [entityId, setEntityId] = useState<string | null>(null);
 

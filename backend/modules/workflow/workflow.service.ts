@@ -35,7 +35,6 @@ import { AssignContentDto } from "./dto/assign-content.dto";
 import { BlockContentDto } from "./dto/block-content.dto";
 import { CreateContentAssetDto } from "./dto/create-content-asset.dto";
 import { RequestChangesDto } from "./dto/request-changes.dto";
-import { SubmitWorkDto } from "./dto/submit-work.dto";
 import {
   WorkflowActionDto,
   WorkflowActionType,
@@ -50,7 +49,7 @@ export class WorkflowService {
     private readonly eventBus: EventBusService,
     @Optional()
     private readonly googleCalendarSync?: GoogleCalendarSyncService,
-  ) {}
+  ) { }
 
   async getBoard(
     agencyId: string,
@@ -86,10 +85,10 @@ export class WorkflowService {
     const roleResponsibilities =
       actor && !canViewBroadWorkflow && actor.membershipId
         ? await this.campaignRoleResponsibilities(
-            agencyId,
-            actor.membershipId,
-            query.campaignId,
-          )
+          agencyId,
+          actor.membershipId,
+          query.campaignId,
+        )
         : [];
 
     const assets = await this.prisma.contentAsset.findMany({
@@ -104,50 +103,50 @@ export class WorkflowService {
         ...(query.campaignId ? { campaignId: query.campaignId } : {}),
         ...(!actorClientId && !canViewBroadWorkflow && actor?.membershipId
           ? {
-              OR: [
-                {
-                  workflowInstances: {
-                    some: {
-                      status: WorkflowInstanceStatus.ACTIVE,
-                      currentTask: {
-                        ownerMembershipId: actor.membershipId,
-                      },
+            OR: [
+              {
+                workflowInstances: {
+                  some: {
+                    status: WorkflowInstanceStatus.ACTIVE,
+                    currentTask: {
+                      ownerMembershipId: actor.membershipId,
                     },
                   },
                 },
-                ...roleResponsibilities.map((responsibility) => ({
-                  campaignId: responsibility.campaignId,
-                  workflowInstances: {
-                    some: {
-                      status: WorkflowInstanceStatus.ACTIVE,
-                      currentStep: {
-                        stage: { in: responsibility.stages },
-                      },
+              },
+              ...roleResponsibilities.map((responsibility) => ({
+                campaignId: responsibility.campaignId,
+                workflowInstances: {
+                  some: {
+                    status: WorkflowInstanceStatus.ACTIVE,
+                    currentStep: {
+                      stage: { in: responsibility.stages },
                     },
                   },
-                })),
-              ],
-            }
+                },
+              })),
+            ],
+          }
           : {}),
         ...(query.search
           ? {
-              OR: [
-                { title: { contains: query.search, mode: "insensitive" } },
-                {
-                  displayCode: { contains: query.search, mode: "insensitive" },
+            OR: [
+              { title: { contains: query.search, mode: "insensitive" } },
+              {
+                displayCode: { contains: query.search, mode: "insensitive" },
+              },
+              {
+                client: {
+                  name: { contains: query.search, mode: "insensitive" },
                 },
-                {
-                  client: {
-                    name: { contains: query.search, mode: "insensitive" },
-                  },
+              },
+              {
+                campaign: {
+                  name: { contains: query.search, mode: "insensitive" },
                 },
-                {
-                  campaign: {
-                    name: { contains: query.search, mode: "insensitive" },
-                  },
-                },
-              ],
-            }
+              },
+            ],
+          }
           : {}),
       },
       include: {
@@ -181,8 +180,8 @@ export class WorkflowService {
         const stage = this.projectContentStage(
           asset.status,
           workflow?.currentStep?.stage ??
-            workflow?.transitions[0]?.toStage ??
-            null,
+          workflow?.transitions[0]?.toStage ??
+          null,
         );
         const deadlineAt = task?.deadlineAt ?? workflow?.deadlineAt ?? null;
         const hasActiveBlocker = Boolean(task?.blockers?.length);
@@ -190,11 +189,11 @@ export class WorkflowService {
           stage === ContentStage.PUBLISHED || stage === ContentStage.ARCHIVED
             ? ContentRisk.ON_TRACK
             : this.computeBoardRisk(
-                workflow?.riskStatus ?? ContentRisk.ON_TRACK,
-                deadlineAt,
-                task?.status,
-                now,
-              );
+              workflow?.riskStatus ?? ContentRisk.ON_TRACK,
+              deadlineAt,
+              task?.status,
+              now,
+            );
         const latestSubmission = task?.submissions?.[0] ?? null;
         const latestApproval = task?.approvals?.[0] ?? null;
         const lastActivityAt = this.maxIsoDate([
@@ -504,8 +503,8 @@ export class WorkflowService {
       );
       const previousTask = workflowInstance.currentTaskId
         ? await tx.workflowTask.findUnique({
-            where: { id: workflowInstance.currentTaskId },
-          })
+          where: { id: workflowInstance.currentTaskId },
+        })
         : null;
 
       const task = await tx.workflowTask.create({
@@ -585,73 +584,6 @@ export class WorkflowService {
 
     this.queueWorkflowTaskSync(result.previousTaskId, result.task.id);
     return result.task;
-  }
-
-  async submit(id: string, dto: SubmitWorkDto) {
-    await this.ensureContentAssetExists(id);
-    const task = await this.ensureTaskBelongsToContentAsset(
-      dto.workflowTaskId,
-      id,
-    );
-
-    if (task.ownerMembershipId !== dto.actorId) {
-      throw new BadRequestException(
-        "Only the current task owner can submit this work",
-      );
-    }
-
-    this.ensureSubmissionHasContent(dto);
-
-    const latestSubmission = await this.prisma.submission.findFirst({
-      where: {
-        workflowTaskId: dto.workflowTaskId,
-        submissionType: dto.submissionType,
-      },
-      orderBy: { version: "desc" },
-    });
-
-    const submission = await this.prisma.submission.create({
-      data: {
-        agencyId: task.agencyId,
-        workflowTaskId: dto.workflowTaskId,
-        submittedBy: dto.actorId,
-        submissionType: dto.submissionType,
-        version: (latestSubmission?.version ?? 0) + 1,
-        body: dto.body,
-        externalLink: dto.externalLink,
-        status: SubmissionStatus.SUBMITTED,
-      },
-    });
-
-    await this.prisma.workflowTask.update({
-      where: { id: task.id },
-      data: { status: TaskStatus.WAITING_REVIEW, version: { increment: 1 } },
-    });
-
-    await this.createMembershipNotification(
-      task.agencyId,
-      task.workflowInstance.managerMembershipId,
-      {
-        title: "Submission received",
-        body: `A workflow submission is waiting for review.`,
-        eventType: DomainEvents.SubmissionCreated,
-      },
-    );
-
-    await this.eventBus.publish(DomainEvents.SubmissionCreated, {
-      agencyId: task.agencyId,
-      actorId: dto.actorId,
-      payload: {
-        contentAssetId: id,
-        workflowInstanceId: task.workflowInstanceId,
-        workflowTaskId: task.id,
-        submissionId: submission.id,
-        version: submission.version,
-      },
-    });
-
-    this.queueWorkflowTaskSync(task.id);
-    return submission;
   }
 
   async markSubmissionSeen(
@@ -784,6 +716,18 @@ export class WorkflowService {
         dto,
         actor.membershipId,
       );
+    }
+
+    if (dto.allowMissingAssignee) {
+      const roles = [actor.role, ...(actor.roles ?? [])]
+        .filter(Boolean)
+        .map((role) => role!.toUpperCase());
+
+      if (!roles.includes("OWNER")) {
+        throw new ForbiddenException(
+          "Only the Owner can approve without a downstream assignee",
+        );
+      }
     }
 
     if (
@@ -1252,7 +1196,7 @@ export class WorkflowService {
       );
     }
 
-    this.ensureSubmissionHasContent(dto);
+    this.ensureValidSubmissionUrl(dto.externalLink);
 
     const reviewStage = this.reviewStageFor(stage);
     if (!reviewStage) {
@@ -1308,7 +1252,7 @@ export class WorkflowService {
           submissionType,
           version: (latestSubmission?.version ?? 0) + 1,
           body: dto.body,
-          externalLink: dto.externalLink,
+          externalLink: dto.externalLink?.trim(),
           status: SubmissionStatus.SUBMITTED,
         },
       });
@@ -1328,7 +1272,7 @@ export class WorkflowService {
           workflowInstanceId: task.workflowInstanceId,
           workflowStepId: reviewStepId,
           displayName: `${this.stageLabel(reviewStage)} for ${task.workflowInstance.contentAsset.displayCode}`,
-          ownerMembershipId: reviewOwnerId,
+          ownerMembershipId: reviewOwnerId ?? null,
           status: TaskStatus.WAITING_REVIEW,
           deadlineAt: task.deadlineAt,
         },
@@ -1344,18 +1288,22 @@ export class WorkflowService {
         },
       });
 
-      await tx.assignmentHistory.create({
-        data: {
-          agencyId: task.agencyId,
-          workflowInstanceId: task.workflowInstanceId,
-          workflowTaskId: reviewTask.id,
-          fromMembershipId: actorMembershipId,
-          toMembershipId: reviewOwnerId,
-          workflowStepId: reviewStepId,
-          changedByMembershipId: actorMembershipId,
-          reason: "Submitted for review",
-        },
-      });
+      // Assignment history and assignee notification only fire when there is
+      // an actual reviewer — schema requires non-null toMembershipId.
+      if (reviewOwnerId) {
+        await tx.assignmentHistory.create({
+          data: {
+            agencyId: task.agencyId,
+            workflowInstanceId: task.workflowInstanceId,
+            workflowTaskId: reviewTask.id,
+            fromMembershipId: actorMembershipId,
+            toMembershipId: reviewOwnerId,
+            workflowStepId: reviewStepId,
+            changedByMembershipId: actorMembershipId,
+            reason: "Submitted for review",
+          },
+        });
+      }
 
       await tx.workflowTransition.create({
         data: {
@@ -1370,12 +1318,14 @@ export class WorkflowService {
         },
       });
 
-      await this.createTaskNotification(tx, task.agencyId, reviewOwnerId, {
-        title: `Review needed: ${task.workflowInstance.contentAsset.displayCode}`,
-        body:
-          dto.comment || `${this.stageLabel(stage)} was submitted for review.`,
-        eventType: DomainEvents.SubmissionCreated,
-      });
+      if (reviewOwnerId) {
+        await this.createTaskNotification(tx, task.agencyId, reviewOwnerId, {
+          title: `Review needed: ${task.workflowInstance.contentAsset.displayCode}`,
+          body:
+            dto.comment || `${this.stageLabel(stage)} was submitted for review.`,
+          eventType: DomainEvents.SubmissionCreated,
+        });
+      }
 
       await this.publishWithinTransaction(tx, DomainEvents.SubmissionCreated, {
         agencyId: task.agencyId,
@@ -1393,20 +1343,23 @@ export class WorkflowService {
         },
       });
 
-      await this.publishWithinTransaction(tx, DomainEvents.ContentAssigned, {
-        agencyId: task.agencyId,
-        actorId: actorMembershipId,
-        aggregateId: task.workflowInstanceId,
-        aggregateType: "WorkflowTask",
-        payload: {
-          contentAssetId,
-          workflowInstanceId: task.workflowInstanceId,
-          workflowTaskId: reviewTask.id,
-          assigneeId: reviewOwnerId,
-          stage: reviewStage,
-          deadlineAt: task.deadlineAt.toISOString(),
-        },
-      });
+      // ContentAssigned must only fire when an actual assignee was resolved.
+      if (reviewOwnerId) {
+        await this.publishWithinTransaction(tx, DomainEvents.ContentAssigned, {
+          agencyId: task.agencyId,
+          actorId: actorMembershipId,
+          aggregateId: task.workflowInstanceId,
+          aggregateType: "WorkflowTask",
+          payload: {
+            contentAssetId,
+            workflowInstanceId: task.workflowInstanceId,
+            workflowTaskId: reviewTask.id,
+            assigneeId: reviewOwnerId,
+            stage: reviewStage,
+            deadlineAt: task.deadlineAt.toISOString(),
+          },
+        });
+      }
 
       await this.publishWithinTransaction(
         tx,
@@ -1425,6 +1378,21 @@ export class WorkflowService {
           },
         },
       );
+
+      // If the review task is unassigned, surface the staffing gap to the
+      // workflow manager so it becomes their problem, not the submitter's.
+      if (!reviewOwnerId && task.workflowInstance.managerMembershipId) {
+        await this.createTaskNotification(
+          tx,
+          task.agencyId,
+          task.workflowInstance.managerMembershipId,
+          {
+            title: `Reviewer needed: ${this.stageLabel(reviewStage)}`,
+            body: `${task.workflowInstance.contentAsset.displayCode} is ready for ${this.stageLabel(reviewStage)} but has no assigned reviewer.`,
+            eventType: DomainEvents.WorkflowStageChanged,
+          },
+        );
+      }
 
       return { submission, reviewTask };
     });
@@ -1507,7 +1475,12 @@ export class WorkflowService {
     });
     if (existing) return existing;
 
-    const next = await this.nextStageAfterApproval(task, stage, contentAssetId);
+    const next = await this.nextStageAfterApproval(
+      task,
+      stage,
+      contentAssetId,
+      dto.allowMissingAssignee ?? false,
+    );
 
     const result = await this.prisma.$transaction(async (tx) => {
       let nextTaskId: string | null = null;
@@ -1560,7 +1533,7 @@ export class WorkflowService {
             version: { increment: 1 },
           },
         });
-      } else if (next.stage && next.ownerId && next.deadlineAt) {
+      } else if (next.stage && next.deadlineAt) {
         const nextStepId = await this.workflowStepIdForStage(
           task.agencyId,
           task.workflowInstanceId,
@@ -1572,7 +1545,7 @@ export class WorkflowService {
             workflowInstanceId: task.workflowInstanceId,
             workflowStepId: nextStepId,
             displayName: `${this.stageLabel(next.stage)} for ${task.workflowInstance.contentAsset.displayCode}`,
-            ownerMembershipId: next.ownerId,
+            ownerMembershipId: next.ownerId ?? null,
             status: TaskStatus.TODO,
             deadlineAt: next.deadlineAt,
           },
@@ -1590,42 +1563,51 @@ export class WorkflowService {
           },
         });
 
-        await tx.assignmentHistory.create({
-          data: {
+        if (next.ownerId) {
+          await tx.assignmentHistory.create({
+            data: {
+              agencyId: task.agencyId,
+              workflowInstanceId: task.workflowInstanceId,
+              workflowTaskId: nextTask.id,
+              fromMembershipId: task.ownerMembershipId,
+              toMembershipId: next.ownerId,
+              workflowStepId: nextStepId,
+              changedByMembershipId: actorMembershipId,
+              reason:
+                dto.action === WorkflowActionType.ACCEPT_HANDOVER
+                  ? "Handover accepted"
+                  : "Approved",
+            },
+          });
+
+          await this.createTaskNotification(
+            tx,
+            task.agencyId,
+            next.ownerId,
+            {
+              title: `New task: ${this.stageLabel(next.stage)}`,
+              body:
+                dto.comment ||
+                `Content moved to ${this.stageLabel(next.stage)}.`,
+              eventType: DomainEvents.ContentAssigned,
+            },
+          );
+
+
+          await this.publishWithinTransaction(tx, DomainEvents.ContentAssigned, {
             agencyId: task.agencyId,
-            workflowInstanceId: task.workflowInstanceId,
-            workflowTaskId: nextTask.id,
-            fromMembershipId: task.ownerMembershipId,
-            toMembershipId: next.ownerId,
-            workflowStepId: nextStepId,
-            changedByMembershipId: actorMembershipId,
-            reason:
-              dto.action === WorkflowActionType.ACCEPT_HANDOVER
-                ? "Handover accepted"
-                : "Approved",
-          },
-        });
-
-        await this.createTaskNotification(tx, task.agencyId, next.ownerId, {
-          title: `New task: ${this.stageLabel(next.stage)}`,
-          body:
-            dto.comment || `Content moved to ${this.stageLabel(next.stage)}.`,
-          eventType: DomainEvents.ContentAssigned,
-        });
-
-        await this.publishWithinTransaction(tx, DomainEvents.ContentAssigned, {
-          agencyId: task.agencyId,
-          actorId: actorMembershipId,
-          aggregateId: task.workflowInstanceId,
-          aggregateType: "WorkflowTask",
-          payload: {
-            contentAssetId,
-            workflowInstanceId: task.workflowInstanceId,
-            assigneeId: next.ownerId,
-            stage: next.stage,
-            deadlineAt: next.deadlineAt.toISOString(),
-          },
-        });
+            actorId: actorMembershipId,
+            aggregateId: task.workflowInstanceId,
+            aggregateType: "WorkflowTask",
+            payload: {
+              contentAssetId,
+              workflowInstanceId: task.workflowInstanceId,
+              assigneeId: next.ownerId ?? null,
+              stage: next.stage,
+              deadlineAt: next.deadlineAt.toISOString(),
+            },
+          });
+        }
       }
 
       await tx.workflowTransition.create({
@@ -1633,6 +1615,7 @@ export class WorkflowService {
           agencyId: task.agencyId,
           workflowInstanceId: task.workflowInstanceId,
           fromStepId: task.workflowStepId,
+          toStepId: nextTaskId ? (await this.workflowStepIdForStage(task.agencyId, task.workflowInstanceId, next.stage!)) : undefined,
           toStage: next.stage ?? ContentStage.SCHEDULED,
           changedById: actorMembershipId,
           reason:
@@ -1740,7 +1723,11 @@ export class WorkflowService {
     if (existing) return existing;
 
     const previous = await this.previousStageForReturn(task, stage);
-    if (!previous.stage || !previous.ownerId) {
+    // A return is only invalid if we cannot identify a stage to return to.
+    // previous.ownerId may be null when no previous submitter exists and no
+    // sole campaign-role member is found; in that case the task is created
+    // unassigned rather than blocking the reviewer.
+    if (!previous.stage) {
       throw new BadRequestException(
         `${this.stageLabel(stage)} cannot be returned`,
       );
@@ -1803,18 +1790,22 @@ export class WorkflowService {
         },
       });
 
-      await tx.assignmentHistory.create({
-        data: {
-          agencyId: task.agencyId,
-          workflowInstanceId: task.workflowInstanceId,
-          workflowTaskId: returnTask.id,
-          fromMembershipId: task.ownerMembershipId,
-          toMembershipId: previous.ownerId,
-          workflowStepId: previousStepId,
-          changedByMembershipId: actorMembershipId,
-          reason: dto.comment || dto.reason || "Changes requested",
-        },
-      });
+      // Schema requires non-null toMembershipId — skip when returning to
+      // an unassigned task (no prior submitter and no sole campaign member).
+      if (previous.ownerId) {
+        await tx.assignmentHistory.create({
+          data: {
+            agencyId: task.agencyId,
+            workflowInstanceId: task.workflowInstanceId,
+            workflowTaskId: returnTask.id,
+            fromMembershipId: task.ownerMembershipId,
+            toMembershipId: previous.ownerId,
+            workflowStepId: previousStepId,
+            changedByMembershipId: actorMembershipId,
+            reason: dto.comment || dto.reason || "Changes requested",
+          },
+        });
+      }
 
       await tx.workflowTransition.create({
         data: {
@@ -1829,15 +1820,29 @@ export class WorkflowService {
         },
       });
 
-      await this.createTaskNotification(tx, task.agencyId, previous.ownerId, {
-        title:
-          dto.action === WorkflowActionType.REJECT
-            ? "Work rejected"
-            : "Changes requested",
-        body:
-          dto.comment || dto.reason || "Please review the requested changes.",
-        eventType,
-      });
+      if (previous.ownerId) {
+        await this.createTaskNotification(tx, task.agencyId, previous.ownerId, {
+          title:
+            dto.action === WorkflowActionType.REJECT
+              ? "Work rejected"
+              : "Changes requested",
+          body:
+            dto.comment || dto.reason || "Please review the requested changes.",
+          eventType,
+        });
+      } else if (task.workflowInstance.managerMembershipId) {
+        // No known previous worker — notify manager to assign before work can continue.
+        await this.createTaskNotification(
+          tx,
+          task.agencyId,
+          task.workflowInstance.managerMembershipId,
+          {
+            title: `Assignment needed: ${this.stageLabel(previous.stage)}`,
+            body: `${task.workflowInstance.contentAsset.displayCode} was returned to ${this.stageLabel(previous.stage)} but has no assignee.`,
+            eventType: DomainEvents.WorkflowStageChanged,
+          },
+        );
+      }
 
       await this.publishWithinTransaction(tx, eventType, {
         agencyId: task.agencyId,
@@ -1980,6 +1985,24 @@ export class WorkflowService {
     }
   }
 
+  private ensureValidSubmissionUrl(value?: string | null) {
+    if (!value?.trim()) {
+      throw new BadRequestException(
+        "A submission URL is required",
+      );
+    }
+    try {
+      const url = new URL(value.trim());
+      if (url.protocol !== "https:" && url.protocol !== "http:") {
+        throw new Error("Unsupported protocol");
+      }
+    } catch {
+      throw new BadRequestException(
+        "Enter a valid URL starting with https:// or http://",
+      );
+    }
+  }
+
   private reviewOwnerForStage(
     stage: ContentStage,
     workflowInstance: {
@@ -1995,10 +2018,9 @@ export class WorkflowService {
     },
   ) {
     if (stage === ContentStage.SHOOT) {
-      return this.requiredCampaignAssignee(
+      return this.campaignAssigneeOrNull(
         workflowInstance.contentAsset.campaign.teamAssignments,
         CampaignAssignmentRole.EDITOR,
-        "Assign an editor before DOP footage can be handed over",
       );
     }
 
@@ -2024,6 +2046,7 @@ export class WorkflowService {
     },
     stage: ContentStage,
     contentAssetId: string,
+    allowMissingAssignee: boolean = false,
   ) {
     const publishingAt =
       task.workflowInstance.contentAsset.campaign.publishingSchedules[0]
@@ -2031,13 +2054,14 @@ export class WorkflowService {
     const teamAssignments =
       task.workflowInstance.contentAsset.campaign.teamAssignments;
 
+    // All downstream transitions use campaignAssigneeOrNull so the current
+    // worker is never blocked because the next stage is unstaffed.
     if (stage === ContentStage.MANAGER_SCRIPT_REVIEW) {
       return {
         stage: ContentStage.SHOOT,
-        ownerId: this.requiredCampaignAssignee(
+        ownerId: this.campaignAssigneeOrNull(
           teamAssignments,
           CampaignAssignmentRole.DOP,
-          "Assign a DOP before approving script work",
         ),
         deadlineAt: this.relativeDeadline(publishingAt, -2, 18),
       };
@@ -2046,10 +2070,9 @@ export class WorkflowService {
     if (stage === ContentStage.EDITOR_INTAKE) {
       return {
         stage: ContentStage.EDITING,
-        ownerId: this.requiredCampaignAssignee(
+        ownerId: this.campaignAssigneeOrNull(
           teamAssignments,
           CampaignAssignmentRole.EDITOR,
-          "Assign an editor before accepting footage",
         ),
         deadlineAt: this.relativeDeadline(publishingAt, -1, 18),
       };
@@ -2065,10 +2088,9 @@ export class WorkflowService {
     if (stage === ContentStage.SHOOT) {
       return {
         stage: ContentStage.EDITOR_INTAKE,
-        ownerId: this.requiredCampaignAssignee(
+        ownerId: this.campaignAssigneeOrNull(
           teamAssignments,
           CampaignAssignmentRole.EDITOR,
-          "Assign an editor before approving shoot work",
         ),
         deadlineAt: this.relativeDeadline(publishingAt, -1, 12),
       };
@@ -2079,14 +2101,11 @@ export class WorkflowService {
       contentAssetId,
     );
     if (autoAdvance?.completeWorkflow) return { completeWorkflow: true };
-    if (
-      autoAdvance?.nextStage &&
-      autoAdvance.nextOwnerId &&
-      autoAdvance.nextDeadlineAt
-    ) {
+    // Allow advance even when nextOwnerId is null — task is created unassigned.
+    if (autoAdvance?.nextStage && autoAdvance.nextDeadlineAt) {
       return {
         stage: autoAdvance.nextStage,
-        ownerId: autoAdvance.nextOwnerId,
+        ownerId: autoAdvance.nextOwnerId ?? null,
         deadlineAt: new Date(autoAdvance.nextDeadlineAt),
       };
     }
@@ -2124,15 +2143,16 @@ export class WorkflowService {
     if (stage === ContentStage.MANAGER_SCRIPT_REVIEW) {
       return {
         stage: ContentStage.WRITING,
+        // Prefer the actual previous submitter to preserve continuity;
+        // fall back to the sole campaign Writer if no submission history exists.
         ownerId:
           (await this.latestSubmitterFor(
             task.workflowInstanceId,
             SubmissionType.SCRIPT,
           )) ??
-          this.requiredCampaignAssignee(
+          this.campaignAssigneeOrNull(
             teamAssignments,
             CampaignAssignmentRole.WRITER,
-            "Assign a writer before requesting script changes",
           ),
         deadlineAt: this.relativeDeadline(publishingAt, -4, 18),
       };
@@ -2146,10 +2166,9 @@ export class WorkflowService {
             task.workflowInstanceId,
             SubmissionType.RAW_FOOTAGE,
           )) ??
-          this.requiredCampaignAssignee(
+          this.campaignAssigneeOrNull(
             teamAssignments,
             CampaignAssignmentRole.DOP,
-            "Assign a DOP before rejecting footage handover",
           ),
         deadlineAt: this.relativeDeadline(publishingAt, -2, 18),
       };
@@ -2163,10 +2182,9 @@ export class WorkflowService {
             task.workflowInstanceId,
             SubmissionType.FINAL_CUT,
           )) ??
-          this.requiredCampaignAssignee(
+          this.campaignAssigneeOrNull(
             teamAssignments,
             CampaignAssignmentRole.EDITOR,
-            "Assign an editor before requesting edit changes",
           ),
         deadlineAt: this.relativeDeadline(publishingAt, -1, 18),
       };
@@ -2288,48 +2306,33 @@ export class WorkflowService {
     if (currentStage === ContentStage.WRITING) {
       return {
         nextStage: ContentStage.SHOOT,
-        nextOwnerId: this.requiredCampaignAssignee(
+        nextOwnerId: this.campaignAssigneeOrNull(
           context.campaign.teamAssignments,
           CampaignAssignmentRole.DOP,
-          "Assign a DOP before approving script work",
         ),
-        nextDeadlineAt: this.relativeDeadline(
-          publishingAt,
-          -2,
-          18,
-        ).toISOString(),
+        nextDeadlineAt: this.relativeDeadline(publishingAt, -2, 18).toISOString(),
       };
     }
 
     if (currentStage === ContentStage.SHOOT) {
       return {
         nextStage: ContentStage.EDITOR_INTAKE,
-        nextOwnerId: this.requiredCampaignAssignee(
+        nextOwnerId: this.campaignAssigneeOrNull(
           context.campaign.teamAssignments,
           CampaignAssignmentRole.EDITOR,
-          "Assign an editor before approving shoot work",
         ),
-        nextDeadlineAt: this.relativeDeadline(
-          publishingAt,
-          -1,
-          12,
-        ).toISOString(),
+        nextDeadlineAt: this.relativeDeadline(publishingAt, -1, 12).toISOString(),
       };
     }
 
     if (currentStage === ContentStage.EDITOR_INTAKE) {
       return {
         nextStage: ContentStage.EDITING,
-        nextOwnerId: this.requiredCampaignAssignee(
+        nextOwnerId: this.campaignAssigneeOrNull(
           context.campaign.teamAssignments,
           CampaignAssignmentRole.EDITOR,
-          "Assign an editor before accepting footage",
         ),
-        nextDeadlineAt: this.relativeDeadline(
-          publishingAt,
-          -1,
-          18,
-        ).toISOString(),
+        nextDeadlineAt: this.relativeDeadline(publishingAt, -1, 18).toISOString(),
       };
     }
 
@@ -2436,6 +2439,25 @@ export class WorkflowService {
         `Multiple ${assignmentRole.replaceAll("_", " ").toLowerCase()} assignees exist on this campaign; choose one before activating this work`,
       );
     }
+    return matching[0].membershipId;
+  }
+
+  private campaignAssigneeOrNull(
+    assignments: Array<{
+      membershipId: string;
+      assignmentRole: CampaignAssignmentRole;
+    }>,
+    assignmentRole: CampaignAssignmentRole,
+  ) {
+    const matching = assignments.filter(
+      (item) => item.assignmentRole === assignmentRole,
+    );
+
+    // 0 members → no assignee yet.
+    // >1 members → requires explicit content-level assignment; return null
+    // so the task is created unassigned rather than randomly picking one.
+    if (matching.length !== 1) return null;
+
     return matching[0].membershipId;
   }
 

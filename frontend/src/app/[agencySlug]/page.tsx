@@ -160,7 +160,7 @@ export default function WorkspaceDashboard() {
     if (href === "workflow" && rememberedWorkflowId) {
       return getWorkspaceHref(safeAgencySlug, `/workflow/${rememberedWorkflowId}`);
     }
-
+    
     return getWorkspaceHref(safeAgencySlug, `/${href}`);
   };
 

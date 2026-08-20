@@ -14,7 +14,7 @@ import { formatLabel, statusPillClasses } from "@/lib/status-style";
 import { getAgencyRoleKeys } from "@/lib/workspace-access";
 import { invalidateWorkspaceQueries, queryKeys, setListItem, useGigQuery } from "@/lib/query";
 import { getWorkspaceHref } from "@/lib/workspace-url";
-import { rememberedEntityKey, useRememberLastVisitedEntity } from "@/lib/remembered-tab";
+import { clearRememberedEntityId, rememberedEntityKey, useRememberLastVisitedEntity } from "@/lib/remembered-tab";
 
 export default function GigDetailPage() {
   const router = useRouter();
@@ -46,6 +46,21 @@ export default function GigDetailPage() {
     workOrder.assignee?.id === agency?.membershipId &&
     ["ASSIGNED", "IN_PROGRESS", "CHANGES_REQUESTED"].includes(workOrder.status),
   );
+
+  const externalLink = submissionDraft.externalLink.trim();
+
+  const hasValidSubmissionUrl = (() => {
+    // URL is optional if body/notes are allowed as the submission
+    if (!externalLink) return true;
+
+    try {
+      const url = new URL(externalLink);
+      return url.protocol === "https:" || url.protocol === "http:";
+    } catch {
+      return false;
+    }
+  })();
+
   const canReview = Boolean(
     workOrder &&
     workOrder.status === "SUBMITTED" &&
@@ -53,8 +68,14 @@ export default function GigDetailPage() {
   );
   const hasSubmissionInput = Boolean(submissionDraft.body.trim() || submissionDraft.externalLink.trim());
 
+  const canSubmitWork =
+    canSubmit &&
+    hasSubmissionInput &&
+    hasValidSubmissionUrl;
+
+
   const submit = async () => {
-    if (!agencyId || !workOrder || !hasSubmissionInput) return;
+    if (!agencyId || !workOrder || !canSubmitWork) return;
     setIsRunning(true);
     setError(null);
     try {
@@ -111,7 +132,12 @@ export default function GigDetailPage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => router.push(getWorkspaceHref(safeAgencySlug, "/gigs"))}
+            onClick={() => {
+              clearRememberedEntityId(
+                rememberedEntityKey("gig", agencyId),
+              );
+              router.push(getWorkspaceHref(safeAgencySlug, "/gigs"))
+            }}
             className="flex h-11 w-11 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white lg:rounded-full"
           >
             ←
@@ -157,10 +183,24 @@ export default function GigDetailPage() {
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">Submit work</h2>
                 <div className="mt-3 grid gap-3">
                   <input
+                    type="url"
                     value={submissionDraft.externalLink}
-                    onChange={(event) => setSubmissionDraft((current) => ({ ...current, externalLink: event.target.value }))}
-                    placeholder="Google Doc, Drive, Frame.io, or reference link"
-                    className="min-h-11 rounded-md border border-zinc-800 bg-zinc-950 px-3 text-base text-white outline-none transition focus:border-indigo-500 lg:rounded-2xl lg:text-sm"
+                    onChange={(event) =>
+                      setSubmissionDraft((current) => ({
+                        ...current,
+                        externalLink: event.target.value,
+                      }))
+                    }
+                    placeholder="https://..."
+                    aria-invalid={
+                      Boolean(submissionDraft.externalLink.trim()) &&
+                      !hasValidSubmissionUrl
+                    }
+                    {...externalLink && !hasValidSubmissionUrl && (
+                      <p className="text-xs text-red-600">
+                        Enter a valid URL starting with https:// or http://
+                      </p>
+                    )}
                   />
                   <textarea
                     value={submissionDraft.body}
@@ -172,7 +212,7 @@ export default function GigDetailPage() {
                   <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 flex justify-end bg-[#0b0b11] py-1 lg:static lg:py-0">
                     <button
                       type="button"
-                      disabled={isRunning || !hasSubmissionInput}
+                      disabled={isRunning || !canSubmitWork}
                       onClick={submit}
                       className="min-h-11 w-full rounded-md bg-indigo-500 px-5 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto lg:rounded-full"
                     >
