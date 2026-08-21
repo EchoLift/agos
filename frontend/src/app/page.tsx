@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Particles from "@/components/Particles";
 import RootRedirect from "@/components/RootRedirect";
+import MobileNav from "@/components/MobileNav";
 
 const problemItems = ["WhatsApp", "Excel", "Notion", "Google Drive", "Phone calls"];
 
@@ -166,34 +167,43 @@ export default function Home() {
         pixelRatio={1}
         className="fixed inset-0 z-0"
       />
-      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-8">
+      <header className="sticky top-0 z-[100] mx-auto flex max-w-7xl items-center justify-between border-b border-border bg-background/95 px-4 py-4 backdrop-blur lg:px-4">
         <div className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-lg font-bold tracking-tight text-transparent">
           AGENCIE
         </div>
+
+        {/* Desktop nav */}
         <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
           <a href="#problem" className="transition hover:text-foreground">
             Problem
           </a>
+
           <a href="#how-it-works" className="transition hover:text-foreground">
             How it works
           </a>
+
           <a href="#features" className="transition hover:text-foreground">
             Features
           </a>
+
           <Link href="/help" className="transition hover:text-foreground">
             Docs
           </Link>
+
           <a href="#pricing" className="transition hover:text-foreground">
             Early Access
           </a>
         </nav>
+
+        {/* Mobile hamburger */}
+        <MobileNav />
       </header>
 
       <main>
         {/* ── Hero ── */}
-        <section className="relative mx-auto grid max-w-7xl gap-12 overflow-hidden rounded-[3rem] border border-border bg-card px-6 py-16 shadow-2xl shadow-black/20 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-24">
+        <section className="relative mx-auto grid max-w-7xl gap-12 overflow-hidden rounded-[0rem] border border-border bg-card px-1 py-1 shadow-2xl shadow-black/20 lg:grid-cols-[1.1fr_0.9fr] lg:px-8 lg:py-12">
           <div className="absolute inset-0 z-10 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.12),transparent_50%)]" />
-          <div className="relative z-20 max-w-2xl">
+          <div className="relative z-20 max-w-2xl p-4">
             <p className="mb-4 inline-flex rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-sm font-medium uppercase tracking-widest text-indigo-300">
               Creative Agency Operations Platform
             </p>
@@ -203,16 +213,16 @@ export default function Home() {
                 AGENCIE
               </span>
               <span className="block text-2xl font-semibold tracking-tight text-foreground sm:text-3xl mt-2">
-                  Run every client, campaign, and creative workflow from one place.
-                </span>
+                Run every client, campaign, and creative workflow from one place.
+              </span>
             </h1>
-              <p className="mt-5 text-base font-medium leading-relaxed text-foreground/90">
-                Replace scattered WhatsApp follow-ups, spreadsheets, and status calls with clear ownership, deadlines, approvals, and production workflows.
-              </p>
+            <p className="mt-5 text-base font-medium leading-relaxed text-foreground/90">
+              Replace scattered WhatsApp follow-ups, spreadsheets, and status calls with clear ownership, deadlines, approvals, and production workflows.
+            </p>
 
-              <p className="mt-3 text-base leading-7 text-muted-foreground">
-                From campaign planning to scripts, shoots, edits, reviews and publishing, AGENCIE keeps everyone clear on what they own and what happens next.
-              </p>
+            <p className="mt-3 text-base leading-7 text-muted-foreground">
+              From campaign planning to scripts, shoots, edits, reviews and publishing, AGENCIE keeps everyone clear on what they own and what happens next.
+            </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
                 href="/login"
@@ -237,8 +247,8 @@ export default function Home() {
             </div>
           </div>
 
-            <div className="relative z-20 overflow-hidden rounded-3xl border border-border bg-background/80 p-4 shadow-black/20">
-            <div className="rounded-2xl border border-border bg-card p-5 backdrop-blur">
+          <div className="relative z-20 overflow-hidden rounded-none border border-none bg-background/0 p-1 shadow-none">
+            <div className="rounded-none border border-none bg-card p-0 backdrop-blur">
               <div className="mb-5 flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Operations overview</p>
@@ -271,32 +281,32 @@ export default function Home() {
         </section>
 
         {/* ── What AGENCIE does ── */}
-          {/* ── Trust & Security ── */}
-          <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
-            <div className="rounded-3xl border border-border bg-card p-8 lg:p-12">
-              <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">Built for agency boundaries</p>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl border border-border bg-background p-4">
-                  <p className="font-semibold text-foreground">Multi-agency isolation</p>
-                  <p className="mt-2 text-sm text-muted-foreground">Each agency operates in an isolated workspace so client data stays private.</p>
-                </div>
-                <div className="rounded-2xl border border-border bg-background p-4">
-                  <p className="font-semibold text-foreground">Role-based access</p>
-                  <p className="mt-2 text-sm text-muted-foreground">Owners, managers, production roles and clients see capabilities appropriate to them.</p>
-                </div>
-                <div className="rounded-2xl border border-border bg-background p-4">
-                  <p className="font-semibold text-foreground">Client-scoped access</p>
-                  <p className="mt-2 text-sm text-muted-foreground">Invite clients with limited scopes for review and approval without exposing internal operations.</p>
-                </div>
-                <div className="rounded-2xl border border-border bg-background p-4">
-                  <p className="font-semibold text-foreground">Google authentication</p>
-                  <p className="mt-2 text-sm text-muted-foreground">Secure sign-in and optional Calendar sync for convenience.</p>
-                </div>
+        {/* ── Trust & Security ── */}
+        <section className="mx-auto max-w-7xl mt-2 px-1 py-1 lg:px-2">
+          <div className="rounded-none border-t bg-card p-1 lg:p-2">
+            <p className="text-lg font-medium uppercase tracking-[0.2em] text-muted-foreground">Built for agency boundaries</p>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-background p-4">
+                <p className="font-semibold text-foreground">Multi-agency isolation</p>
+                <p className="mt-2 text-sm text-muted-foreground">Each agency operates in an isolated workspace so client data stays private.</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-background p-4">
+                <p className="font-semibold text-foreground">Role-based access</p>
+                <p className="mt-2 text-sm text-muted-foreground">Owners, managers, production roles and clients see capabilities appropriate to them.</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-background p-4">
+                <p className="font-semibold text-foreground">Client-scoped access</p>
+                <p className="mt-2 text-sm text-muted-foreground">Invite clients with limited scopes for review and approval without exposing internal operations.</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-background p-4">
+                <p className="font-semibold text-foreground">Google authentication</p>
+                <p className="mt-2 text-sm text-muted-foreground">Secure sign-in and optional Calendar sync for convenience.</p>
               </div>
             </div>
-          </section>
-        <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
-          <div className="rounded-3xl border border-border bg-card p-8 lg:p-12">
+          </div>
+        </section>
+        <section className="mx-auto max-w-7xl px-1 py-1 lg:px-4">
+          <div className="rounded-3xl border border-border bg-card p-4 lg:p-12">
             <div className="max-w-2xl">
               <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
                 Everything stays connected
@@ -315,7 +325,7 @@ export default function Home() {
                     {step}
                   </div>
                   {index < workflowSteps.length - 1 && (
-                    <span className="text-zinc-500">↓</span>
+                    <span className="text-zinc-300">➜</span>
                   )}
                 </div>
               ))}
@@ -324,16 +334,16 @@ export default function Home() {
         </section>
 
         {/* ── Problem ── */}
-        <section id="problem" className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
-          <div className="grid gap-8 rounded-3xl border border-border bg-card p-8 lg:grid-cols-2 lg:p-12">
+        <section id="problem" className="mx-auto max-w-7xl px-1 py-1 lg:px-2">
+          <div className="grid gap-4 rounded-2xl border border-border bg-card p-2 lg:grid-cols-2 lg:p-6">
             <div>
               <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
                 The problem
               </p>
-              <h2 className="mt-3 text-3xl font-semibold text-foreground">
+              <h2 className="mt-1 text-3xl font-semibold text-foreground">
                 Chaos is expensive when it lives in too many places.
               </h2>
-              <ul className="mt-8 space-y-3 text-lg text-muted-foreground">
+              <ul className="mt-2 space-y-3 text-lg text-muted-foreground">
                 {problemItems.map((item) => (
                   <li key={item} className="flex items-center gap-3">
                     <span className="text-red-400">✕</span>
@@ -341,17 +351,17 @@ export default function Home() {
                   </li>
                 ))}
               </ul>
-              <p className="mt-6 text-sm leading-7 text-muted-foreground">
+              <p className="mt-2 text-sm leading-7 text-muted-foreground">
                 AGENCIE replaces fragmented agency coordination with a structured
                 workflow where client work, ownership, deadlines, production
                 status, reviews, and approvals stay connected.
               </p>
             </div>
-            <div className="rounded-2xl border border-border bg-background p-6">
-              <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                The result
+            <div className="rounded-none border-t bg-background p-0">
+              <p className="text-lg font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                The result:
               </p>
-              <ul className="mt-6 space-y-4 text-lg text-foreground">
+              <ul className="mt-2 space-y-2 text-lg text-foreground">
                 {outcomes.map((item) => (
                   <li key={item} className="rounded-xl border border-border bg-card px-4 py-3">
                     {item}
@@ -363,10 +373,10 @@ export default function Home() {
         </section>
 
         {/* ── How AGENCIE works ── */}
-        <section id="how-it-works" className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
-          <div className="rounded-3xl border border-border bg-card p-8 lg:p-12">
+        <section id="how-it-works" className="mx-auto max-w-7xl px-1 py-1 lg:px-1">
+          <div className="rounded-none border-t bg-card p-1 lg:p-2">
             <div className="max-w-2xl">
-              <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+              <p className="text-lg font-medium uppercase tracking-[0.2em] text-muted-foreground">
                 How AGENCIE works
               </p>
               <h2 className="mt-3 text-3xl font-semibold text-foreground">
@@ -393,10 +403,10 @@ export default function Home() {
         </section>
 
         {/* ── Two ways to run work (Campaigns vs Gigs) ── */}
-        <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
-          <div className="rounded-3xl border border-border bg-card p-8 lg:p-12">
+        <section className="mx-auto max-w-7xl px-1 py-1 lg:px-2">
+          <div className="rounded-none border-t bg-card p-2 lg:p-6">
             <div className="max-w-2xl">
-              <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+              <p className="text-lg font-medium uppercase tracking-[0.2em] text-muted-foreground">
                 How you can run work
               </p>
               <h2 className="mt-3 text-3xl font-semibold text-foreground">Two ways to run work: Campaigns or Gigs</h2>
@@ -420,10 +430,10 @@ export default function Home() {
         </section>
 
         {/* ── Workflow demo ── */}
-        <section id="workflow" className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
+        <section id="workflow" className="mx-auto max-w-7xl px-1 py-1 lg:px-4">
           <div className="grid gap-8 lg:grid-cols-[1fr_0.95fr]">
-            <div className="rounded-3xl border border-border bg-card p-8">
-              <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="rounded-none border-t bg-card p-4">
+              <p className="text-lg font-medium uppercase tracking-[0.2em] text-muted-foreground">
                 Workflow
               </p>
               <h2 className="mt-3 text-3xl font-semibold text-foreground">
@@ -443,11 +453,10 @@ export default function Home() {
                       <p className="text-sm text-muted-foreground">{row.status}</p>
                     </div>
                     <div
-                      className={`rounded-full px-3 py-1 text-sm ${
-                        row.done
+                      className={`rounded-full px-3 py-1 text-sm ${row.done
                           ? "bg-emerald-500/15 text-emerald-300"
                           : "bg-muted text-muted-foreground"
-                      }`}
+                        }`}
                     >
                       {row.done ? "✓" : "⏳"}
                     </div>
@@ -455,8 +464,8 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <div className="rounded-3xl border border-border bg-card p-8">
-              <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="rounded-none border-t bg-card p-1">
+              <p className="text-lg font-medium uppercase tracking-[0.2em] text-muted-foreground">
                 Why it matters
               </p>
               <h3 className="mt-3 text-2xl font-semibold text-foreground">
@@ -478,15 +487,15 @@ export default function Home() {
         </section>
 
         {/* ── Features ── */}
-        <section id="features" className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
-          <div className="mb-6">
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+        <section id="features" className="mx-auto border-t max-w-7xl px-1 py-1 lg:px-2">
+          <div className="mb-2">
+            <p className="text-lg font-medium uppercase tracking-[0.2em] text-muted-foreground">
               Features
             </p>
           </div>
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {features.map((feature) => (
-              <div key={feature.title} className="rounded-3xl border border-border bg-card p-6">
+              <div key={feature.title} className="rounded-2xl border border-border bg-card p-2">
                 <h3 className="text-xl font-semibold text-foreground">{feature.title}</h3>
                 <p className="mt-3 text-sm leading-7 text-muted-foreground">
                   {feature.description}
@@ -496,9 +505,9 @@ export default function Home() {
           </div>
         </section>
         {/* ── Documentation ── */}
-        <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
-          <div className="overflow-hidden rounded-3xl border border-indigo-500/20 bg-card p-8 lg:p-12">
-            <div className="grid gap-10 lg:grid-cols-[1fr_0.9fr] lg:items-center">
+        <section className="mx-auto max-w-7xl px-1 py-1 lg:px-2">
+          <div className="overflow-hidden rounded-3xl border border-indigo-500/20 bg-card p-2 lg:p-6">
+            <div className="grid gap-4 lg:grid-cols-[1fr_0.9fr] lg:items-center">
               <div className="max-w-2xl">
                 <p className="text-sm font-medium uppercase tracking-[0.2em] text-indigo-300">
                   Documentation
@@ -527,7 +536,7 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 {[
                   "Getting Started",
                   "Clients",
@@ -551,8 +560,8 @@ export default function Home() {
         </section>
 
         {/* ── Google Calendar integration ── */}
-        <section id="google-calendar" className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
-          <div className="rounded-3xl border border-border bg-card p-8 lg:p-12">
+        <section id="google-calendar" className="mx-auto max-w-7xl px-1 py-1 lg:px-2">
+          <div className="rounded-none border-t bg-card p-2 lg:p-2">
             <div className="grid gap-10 lg:grid-cols-[1fr_auto]">
               <div className="max-w-2xl">
                 <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-medium uppercase tracking-widest text-indigo-300">
@@ -608,8 +617,8 @@ export default function Home() {
         </section>
 
         {/* ── Operations overview ── */}
-        <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
-          <div className="grid gap-8 rounded-3xl border border-border bg-card p-8 lg:grid-cols-[0.9fr_1.1fr] lg:p-12">
+        <section className="mx-auto max-w-7xl px-1 py-1 lg:px-2">
+          <div className="grid gap-2 rounded-none border-t bg-card p-2 lg:grid-cols-[0.9fr_1.1fr] lg:p-6">
             <div>
               <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
                 Operations overview preview
@@ -621,17 +630,17 @@ export default function Home() {
                 A concise operational view for owners, managers, and production leads showing pending approvals, blockers, and urgent deadlines.
               </p>
             </div>
-            <div className="rounded-2xl border border-border bg-background p-6">
+            <div className="rounded-none border border-none bg-none p-0">
               <div className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-2xl border border-border bg-card p-4">
+                <div className="rounded-2xl border border-border bg-background p-4">
                   <p className="text-sm text-muted-foreground">Waiting approval</p>
                   <p className="mt-2 text-2xl font-semibold text-foreground">12</p>
                 </div>
-                <div className="rounded-2xl border border-border bg-card p-4">
+                <div className="rounded-2xl border border-border bg-background p-4">
                   <p className="text-sm text-muted-foreground">Blocked</p>
                   <p className="mt-2 text-2xl font-semibold text-orange-400">3</p>
                 </div>
-                <div className="rounded-2xl border border-border bg-card p-4">
+                <div className="rounded-2xl border border-border bg-background p-4">
                   <p className="text-sm text-muted-foreground">Due today</p>
                   <p className="mt-2 text-2xl font-semibold text-foreground">5</p>
                 </div>
@@ -645,16 +654,16 @@ export default function Home() {
         </section>
 
         {/* ── Audience ── */}
-        <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
-          <div className="rounded-3xl border border-border bg-card p-8 lg:p-12">
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">
+        <section className="mx-auto max-w-7xl px-1 py-1 lg:px-2">
+          <div className="rounded-none border-t bg-card p-2 lg:p-2">
+            <p className="text-lg font-medium uppercase tracking-[0.2em] text-muted-foreground">
               Built for creative agencies
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-2 flex flex-wrap gap-2">
               {audienceTags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground"
+                  className="rounded-full border border-border bg-background px-1 py-2 text-sm text-foreground"
                 >
                   {tag}
                 </span>
@@ -664,8 +673,8 @@ export default function Home() {
         </section>
 
         {/* ── Early Access ── */}
-        <section id="pricing" className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
-          <div className="rounded-3xl border border-indigo-500/20 bg-indigo-500/10 p-8 lg:p-12">
+        <section id="pricing" className="mx-auto max-w-7xl px-1 py-1 lg:px-2">
+          <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/10 p-2 lg:p-12">
             <div className="max-w-2xl">
               <p className="text-sm font-medium uppercase tracking-[0.2em] text-indigo-300">
                 Early Access
@@ -695,12 +704,12 @@ export default function Home() {
         </section>
 
         {/* ── FAQ ── */}
-        <section id="faq" className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
-          <div className="rounded-3xl border border-border bg-card p-8 lg:p-12">
+        <section id="faq" className="mx-auto max-w-7xl px-1 py-1 lg:px-2">
+          <div className="rounded-none border-t bg-card p-2 lg:p-2">
             <h2 className="text-3xl font-semibold text-foreground">
               Frequently asked questions
             </h2>
-            <div className="mt-8 space-y-4">
+            <div className="mt-4 space-y-4">
               {faqItems.map((item) => (
                 <div
                   key={item.question}
@@ -718,8 +727,8 @@ export default function Home() {
       </main>
 
       {/* ── Footer ── */}
-      <footer className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
-        <div className="rounded-3xl border border-border bg-card p-8 lg:p-10">
+      <footer className="mx-auto max-w-7xl px-1 py-1 lg:px-2">
+        <div className="rounded-2xl border border-border bg-card p-2 lg:p-2">
           <div className="grid gap-10 sm:grid-cols-[1fr_auto_auto]">
             <div>
               <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-lg font-bold tracking-tight text-transparent">
