@@ -15,6 +15,7 @@ import { getAgencyRoleKeys } from "@/lib/workspace-access";
 import { invalidateWorkspaceQueries, queryKeys, setListItem, useGigQuery } from "@/lib/query";
 import { getWorkspaceHref } from "@/lib/workspace-url";
 import { clearRememberedEntityId, rememberedEntityKey, useRememberLastVisitedEntity } from "@/lib/remembered-tab";
+import { isValidSubmissionUrl } from "@/lib/submission-url";
 
 export default function GigDetailPage() {
   const router = useRouter();
@@ -48,18 +49,7 @@ export default function GigDetailPage() {
   );
 
   const externalLink = submissionDraft.externalLink.trim();
-
-  const hasValidSubmissionUrl = (() => {
-    // URL is optional if body/notes are allowed as the submission
-    if (!externalLink) return true;
-
-    try {
-      const url = new URL(externalLink);
-      return url.protocol === "https:" || url.protocol === "http:";
-    } catch {
-      return false;
-    }
-  })();
+  const hasValidSubmissionUrl = isValidSubmissionUrl(externalLink);
 
   const canReview = Boolean(
     workOrder &&
@@ -196,12 +186,14 @@ export default function GigDetailPage() {
                       Boolean(submissionDraft.externalLink.trim()) &&
                       !hasValidSubmissionUrl
                     }
-                    {...externalLink && !hasValidSubmissionUrl && (
-                      <p className="text-xs text-red-600">
-                        Enter a valid URL starting with https:// or http://
-                      </p>
-                    )}
+                    className="rounded-md border border-zinc-800 bg-zinc-950 px-3 py-3 text-base text-white outline-none transition focus:border-indigo-500 lg:rounded-2xl lg:text-sm"
                   />
+
+                  {externalLink && !hasValidSubmissionUrl && (
+                    <p className="text-xs text-red-600">
+                      Enter a valid URL starting with https:// or http://
+                    </p>
+                  )}
                   <textarea
                     value={submissionDraft.body}
                     onChange={(event) => setSubmissionDraft((current) => ({ ...current, body: event.target.value }))}

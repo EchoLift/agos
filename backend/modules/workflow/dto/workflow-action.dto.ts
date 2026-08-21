@@ -3,6 +3,9 @@ import {
   IsEnum,
   IsOptional,
   IsString,
+  isURL,
+  IsUrl,
+  MaxLength,
 } from "class-validator";
 
 export enum WorkflowActionType {
@@ -28,6 +31,11 @@ export class WorkflowActionDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
+  @IsUrl({
+    protocols: ["http", "https"],
+    require_protocol: true,
+  })
   externalLink?: string;
 
   @IsOptional()
