@@ -525,7 +525,6 @@ export class GoogleCalendarSyncService {
 
   private workflowTaskInclude() {
     return {
-      agency: true,
       owner: { include: { user: true } },
       workflowStep: true,
       workflowInstance: {
@@ -533,6 +532,7 @@ export class GoogleCalendarSyncService {
           currentStep: true,
           contentAsset: {
             include: {
+              agency: true,
               campaign: true,
               client: true,
             },
@@ -593,6 +593,7 @@ export class GoogleCalendarSyncService {
     completed = false,
   ) {
     const contentAsset = workflowTask.workflowInstance.contentAsset;
+    const agency = contentAsset.agency;
     const stage =
       workflowTask.workflowStep?.stage ??
       workflowTask.workflowInstance.currentStep?.stage ??
@@ -600,9 +601,9 @@ export class GoogleCalendarSyncService {
     const titlePrefix = completed ? "[Completed] [AGENCIE]" : "[AGENCIE]";
     const contentTitle = contentAsset.title || contentAsset.displayCode;
     const summary = `${titlePrefix} ${this.labelize(stage)} - ${contentTitle}`;
-    const link = `https://${workflowTask.agency.slug}.${this.rootDomain()}/workflow/${contentAsset.id}`;
+    const link = `https://${agency.slug}.${this.rootDomain()}/workflow/${contentAsset.id}`;
     const description = [
-      `Agency: ${workflowTask.agency.displayName || workflowTask.agency.name}`,
+      `Agency: ${agency.displayName || agency.name}`,
       contentAsset.client
         ? `Client: ${contentAsset.client.displayName ?? contentAsset.client.name}`
         : null,

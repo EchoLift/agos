@@ -58,12 +58,6 @@ describe("GoogleCalendarSyncService", () => {
     status: TaskStatus.TODO,
     deadlineAt: new Date("2026-08-21T12:00:00.000Z"),
     updatedAt: new Date("2026-08-15T09:00:00.000Z"),
-    agency: {
-      id: "agency-1",
-      slug: "socia-expert",
-      name: "Socia Expert",
-      displayName: "Socia Expert",
-    },
     owner: {
       id: "membership-1",
       userId: "user-1",
@@ -83,6 +77,12 @@ describe("GoogleCalendarSyncService", () => {
         displayCode: "IND-1",
         title: "Independence Day Reel",
         status: ContentAssetStatus.ACTIVE,
+        agency: {
+          id: "agency-1",
+          slug: "socia-expert",
+          name: "Socia Expert",
+          displayName: "Socia Expert",
+        },
         campaign: { id: "campaign-1", name: "August Campaign" },
         client: { id: "client-1", name: "Taaza", displayName: "Taaza" },
       },
