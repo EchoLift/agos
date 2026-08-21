@@ -331,6 +331,32 @@ export function renderEmailTemplate(
       return { subject, html, text };
     }
 
+    case "ClientReportReady": {
+      const reportPeriod = data.additionalContext || "this month";
+      const subject = `Your ${reportPeriod} reports are ready`;
+      const text = `Hi ${recipient},\n\n${agency} has uploaded your reports for ${reportPeriod}.\n\nView your analytics and reports in your client portal:\n${deepLink}\n\nAGENCIE Team`;
+      const html = `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#18181b;color:#f4f4f5;border-radius:12px;overflow:hidden;padding:24px;">
+          ${headerHtml}
+          <div style="padding:24px;">
+            <h2 style="color:#ffffff;margin-top:0;">Your ${reportPeriod} reports are ready</h2>
+            <p style="color:#a1a1aa;font-size:15px;">Hi ${recipient},</p>
+            <p style="color:#a1a1aa;font-size:15px;"><strong>${agency}</strong> has uploaded your analytics reports for <strong>${reportPeriod}</strong>. View them in your client portal at any time.</p>
+            <div style="background:#27272a;padding:16px;border-radius:8px;margin:20px 0;">
+              <p style="margin:4px 0;color:#818cf8;font-size:14px;font-weight:600;">Reporting period</p>
+              <p style="margin:4px 0;color:#ffffff;font-weight:600;font-size:16px;">${reportPeriod}</p>
+            </div>
+            <div style="margin:28px 0;text-align:center;">
+              <a href="${deepLink}" style="background-color:#6366f1;color:#ffffff;padding:12px 28px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block;">View Reports</a>
+            </div>
+            <p style="color:#52525b;font-size:12px;text-align:center;">You are receiving this notification because your agency configured a monthly report delivery schedule.</p>
+          </div>
+          ${footerHtml}
+        </div>
+      `;
+      return { subject, html, text };
+    }
+
     default: {
       const subject = `[AGENCIE] Notification: ${data.title}`;
       const text = `Hi ${recipient},\n\n${data.body || data.title} in ${agency}.\n\nOpen in AGENCIE:\n${deepLink}\n`;

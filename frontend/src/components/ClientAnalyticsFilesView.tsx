@@ -10,6 +10,7 @@ import {
   getGroupedAnalyticsFiles,
   uploadAnalyticsFiles,
 } from "@/lib/api/client-analytics";
+import { ReportNotificationStatusWidget } from "@/components/ReportNotificationScheduleModal";
 
 interface ClientAnalyticsFilesViewProps {
   agencyId: string | null;
@@ -40,14 +41,32 @@ const MONTH_NAMES = [
 // ── SVG icon components ──────────────────────────────────────────────────────
 
 const IconImage = ({ className = "h-4 w-4" }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
     <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
     <circle cx="9" cy="9" r="2" />
     <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
   </svg>
 );
 const IconPdf = ({ className = "h-4 w-4" }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
     <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
     <polyline points="14 2 14 8 20 8" />
     <path d="M10 12v-1h4v1" />
@@ -56,7 +75,16 @@ const IconPdf = ({ className = "h-4 w-4" }: { className?: string }) => (
   </svg>
 );
 const IconSpreadsheet = ({ className = "h-4 w-4" }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
     <rect width="18" height="18" x="3" y="3" rx="2" />
     <path d="M3 9h18" />
     <path d="M3 15h18" />
@@ -65,7 +93,16 @@ const IconSpreadsheet = ({ className = "h-4 w-4" }: { className?: string }) => (
   </svg>
 );
 const IconDocument = ({ className = "h-4 w-4" }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
     <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
     <polyline points="14 2 14 8 20 8" />
     <line x1="16" y1="13" x2="8" y2="13" />
@@ -74,56 +111,135 @@ const IconDocument = ({ className = "h-4 w-4" }: { className?: string }) => (
   </svg>
 );
 const IconVideo = ({ className = "h-4 w-4" }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
     <path d="m22 8-6 4 6 4V8z" />
     <rect width="14" height="12" x="2" y="6" rx="2" ry="2" />
   </svg>
 );
 const IconBox = ({ className = "h-4 w-4" }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
     <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
     <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
     <line x1="12" y1="22.08" x2="12" y2="12" />
   </svg>
 );
 const IconAnalytics = ({ className = "h-5 w-5" }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
     <line x1="18" y1="20" x2="18" y2="10" />
     <line x1="12" y1="20" x2="12" y2="4" />
     <line x1="6" y1="20" x2="6" y2="14" />
   </svg>
 );
 const IconFolder = ({ className = "h-7 w-7" }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
   </svg>
 );
 const IconUpload = ({ className = "h-4 w-4" }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     <polyline points="17 8 12 3 7 8" />
     <line x1="12" y1="3" x2="12" y2="15" />
   </svg>
 );
 const IconChevronLeft = ({ className = "h-4 w-4" }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
     <polyline points="15 18 9 12 15 6" />
   </svg>
 );
-const IconChevronRight = ({ className = "h-4 w-4" }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+const IconChevronRight = ({
+  className = "h-4 w-4",
+}: {
+  className?: string;
+}) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
     <polyline points="9 18 15 12 9 6" />
   </svg>
 );
 const IconX = ({ className = "h-3.5 w-3.5" }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
     <line x1="18" y1="6" x2="6" y2="18" />
     <line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
 
 type CategoryIconProps = { className?: string };
-const CATEGORY_ICON: Record<AnalyticsCategory, (p: CategoryIconProps) => ReactElement> = {
+const CATEGORY_ICON: Record<
+  AnalyticsCategory,
+  (p: CategoryIconProps) => ReactElement
+> = {
   IMAGE: IconImage,
   PDF: IconPdf,
   SPREADSHEET: IconSpreadsheet,
@@ -458,7 +574,9 @@ export function ClientAnalyticsFilesView({
               </p>
             </div>
             <h2 className="mt-1 text-2xl font-semibold text-white">
-              {title || data?.period.label || `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`}
+              {title ||
+                data?.period.label ||
+                `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`}
             </h2>
             <p className="text-xs text-zinc-400">
               {description ||
@@ -517,6 +635,14 @@ export function ClientAnalyticsFilesView({
           )}
         </div>
       </div>
+
+      {canUpload && agencyId && (
+        <ReportNotificationStatusWidget
+          agencyId={agencyId}
+          clientId={clientId}
+          canConfigure={canUpload}
+        />
+      )}
 
       {/* Content State */}
       {isLoading ? (
@@ -629,8 +755,7 @@ export function ClientAnalyticsFilesView({
           {/* Grouped Category Sections */}
           <div className="space-y-2">
             {displayedGroups.map((group) => {
-              const meta =
-                CATEGORY_META[group.category] || CATEGORY_META.OTHER;
+              const meta = CATEGORY_META[group.category] || CATEGORY_META.OTHER;
               return (
                 <section
                   key={group.category}
@@ -639,7 +764,10 @@ export function ClientAnalyticsFilesView({
                   <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2">
                     <div className="flex items-center gap-3">
                       <span className={meta.iconColor}>
-                        {(() => { const Icon = CATEGORY_ICON[group.category]; return <Icon className="h-5 w-5" />; })()}
+                        {(() => {
+                          const Icon = CATEGORY_ICON[group.category];
+                          return <Icon className="h-5 w-5" />;
+                        })()}
                       </span>
                       <h3 className="text-base font-semibold text-white">
                         {group.label}
@@ -663,7 +791,10 @@ export function ClientAnalyticsFilesView({
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0 flex-1">
                               <span className={meta.iconColor + " shrink-0"}>
-                                {(() => { const Icon = CATEGORY_ICON[group.category]; return <Icon className="h-4 w-4" />; })()}
+                                {(() => {
+                                  const Icon = CATEGORY_ICON[group.category];
+                                  return <Icon className="h-4 w-4" />;
+                                })()}
                               </span>
                               <div className="min-w-0">
                                 <p
@@ -733,7 +864,9 @@ export function ClientAnalyticsFilesView({
                               className="text-xs text-zinc-500 transition hover:text-rose-400 disabled:opacity-50"
                               title="Delete file"
                             >
-                              {deletingId === file.id ? "Deleting..." : "Delete"}
+                              {deletingId === file.id
+                                ? "Deleting..."
+                                : "Delete"}
                             </button>
                           )}
                         </div>
@@ -821,79 +954,97 @@ export function ClientAnalyticsFilesView({
                   disabled={isUploading}
                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 />
-                <span className="text-zinc-400"><IconUpload className="h-8 w-8" /></span>
+                <span className="text-zinc-400">
+                  <IconUpload className="h-8 w-8" />
+                </span>
                 <p className="mt-2 text-sm font-medium text-zinc-300">
                   Drag & drop analytics files here, or{" "}
                   <span className="text-indigo-400 underline">browse</span>
                 </p>
                 <p className="mt-1 text-[11px] text-zinc-500">
-                  Images, PDFs, Spreadsheets (CSV/XLSX), Docs, Videos • Up to
-                  20 files (max 25MB each)
+                  Images, PDFs, Spreadsheets (CSV/XLSX), Docs, Videos • Up to 20
+                  files (max 25MB each)
                 </p>
               </div>
 
               {/* Selected Files Preview List */}
-              {uploadFilesList.length > 0 && (() => {
-                const totalBytes = uploadFilesList.reduce((s, f) => s + f.size, 0);
-                const totalOver = totalBytes > MAX_TOTAL_BYTES;
-                return (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs text-zinc-400">
-                      <span>
-                        Selected Files ({uploadFilesList.length}/{MAX_FILES})
-                        {" — "}
-                        <span className={totalOver ? "text-rose-400 font-semibold" : "text-zinc-400"}>
-                          {formatBytes(totalBytes)} / 100 MB total
-                        </span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => { setUploadFilesList([]); setUploadFeedback(null); }}
-                        className="text-rose-400 hover:underline"
-                      >
-                        Clear all
-                      </button>
-                    </div>
-                    <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
-                      {uploadFilesList.map((file, idx) => {
-                        const over = file.size > MAX_FILE_BYTES;
-                        return (
-                          <div
-                            key={`${file.name}-${idx}`}
-                            className={`flex items-center justify-between rounded-xl border px-3 py-2 text-xs ${
-                              over
-                                ? "border-rose-500/40 bg-rose-950/40"
-                                : "border-zinc-800/80 bg-zinc-900/60"
-                            }`}
+              {uploadFilesList.length > 0 &&
+                (() => {
+                  const totalBytes = uploadFilesList.reduce(
+                    (s, f) => s + f.size,
+                    0,
+                  );
+                  const totalOver = totalBytes > MAX_TOTAL_BYTES;
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs text-zinc-400">
+                        <span>
+                          Selected Files ({uploadFilesList.length}/{MAX_FILES})
+                          {" — "}
+                          <span
+                            className={
+                              totalOver
+                                ? "text-rose-400 font-semibold"
+                                : "text-zinc-400"
+                            }
                           >
-                            <div className="flex items-center gap-2 min-w-0 flex-1 truncate">
-                              <span className={`truncate ${over ? "text-rose-300" : "text-zinc-300"}`}>
-                                {file.name}
-                              </span>
-                              <span className={`shrink-0 ${over ? "text-rose-400 font-semibold" : "text-zinc-500"}`}>
-                                ({formatBytes(file.size)})
-                              </span>
-                              {over && (
-                                <span className="shrink-0 rounded-full bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-bold text-rose-400">
-                                  &gt;25 MB
-                                </span>
-                              )}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeFileFromUpload(idx)}
-                              className="ml-2 shrink-0 text-zinc-500 hover:text-rose-400"
+                            {formatBytes(totalBytes)} / 100 MB total
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadFilesList([]);
+                            setUploadFeedback(null);
+                          }}
+                          className="text-rose-400 hover:underline"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                        {uploadFilesList.map((file, idx) => {
+                          const over = file.size > MAX_FILE_BYTES;
+                          return (
+                            <div
+                              key={`${file.name}-${idx}`}
+                              className={`flex items-center justify-between rounded-xl border px-3 py-2 text-xs ${
+                                over
+                                  ? "border-rose-500/40 bg-rose-950/40"
+                                  : "border-zinc-800/80 bg-zinc-900/60"
+                              }`}
                             >
-                              <IconX />
-                            </button>
-                          </div>
-                        );
-                      })}
+                              <div className="flex items-center gap-2 min-w-0 flex-1 truncate">
+                                <span
+                                  className={`truncate ${over ? "text-rose-300" : "text-zinc-300"}`}
+                                >
+                                  {file.name}
+                                </span>
+                                <span
+                                  className={`shrink-0 ${over ? "text-rose-400 font-semibold" : "text-zinc-500"}`}
+                                >
+                                  ({formatBytes(file.size)})
+                                </span>
+                                {over && (
+                                  <span className="shrink-0 rounded-full bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-bold text-rose-400">
+                                    &gt;25 MB
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeFileFromUpload(idx)}
+                                className="ml-2 shrink-0 text-zinc-500 hover:text-rose-400"
+                              >
+                                <IconX />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                );
-              })()}
-
+                  );
+                })()}
 
               {/* Feedback / Error Alerts */}
               {uploadFeedback?.successMessage && (
@@ -962,4 +1113,3 @@ function formatBytes(bytes: number, decimals = 1) {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
-

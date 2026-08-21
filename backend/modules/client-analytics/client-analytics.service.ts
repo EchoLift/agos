@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -10,10 +11,19 @@ import { EventBusService } from "@packages/events/event-bus.service";
 import { DomainEvents } from "@packages/events/domain-event";
 import { assertClientScope } from "@packages/security/client-scope";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
-import { AnalyticsFileCategory, ClientAnalyticsAsset } from "@prisma/client";
+import {
+  AnalyticsFileCategory,
+  ClientAnalyticsAsset,
+  ReportNotificationScheduleType,
+} from "@prisma/client";
 import { R2StorageService } from "./r2-storage.service";
 import { UploadAnalyticsFilesDto } from "./dto/upload-analytics-files.dto";
 import { QueryAnalyticsFilesDto } from "./dto/query-analytics-files.dto";
+import { ReportScheduleCalculatorService } from "./services/report-schedule-calculator.service";
+import {
+  UpsertReportNotificationScheduleDto,
+  ReportNotificationScheduleResponse,
+} from "./dto/report-notification-schedule.dto";
 import {
   CategoryCountDto,
   CategoryGroupDto,
@@ -69,6 +79,7 @@ export class ClientAnalyticsService {
     private readonly prisma: PrismaService,
     private readonly r2Storage: R2StorageService,
     private readonly eventBus: EventBusService,
+    private readonly scheduleCalculator: ReportScheduleCalculatorService,
   ) {}
 
   classifyAnalyticsFile(
@@ -80,7 +91,18 @@ export class ClientAnalyticsService {
 
     if (
       mime.startsWith("image/") ||
-      ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "tiff", "avif"].includes(ext)
+      [
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "webp",
+        "svg",
+        "bmp",
+        "ico",
+        "tiff",
+        "avif",
+      ].includes(ext)
     ) {
       return AnalyticsFileCategory.IMAGE;
     }
@@ -169,7 +191,7 @@ export class ClientAnalyticsService {
 
     const now = new Date();
     const year = dto.year ?? now.getUTCFullYear();
-    const month = dto.month ?? (now.getUTCMonth() + 1);
+    const month = dto.month ?? now.getUTCMonth() + 1;
 
     const period = this.getPeriodDto(year, month);
     const uploadedAssets: ClientAnalyticsAsset[] = [];
@@ -307,7 +329,7 @@ export class ClientAnalyticsService {
 
     const now = new Date();
     const year = dto.year ?? now.getUTCFullYear();
-    const month = dto.month ?? (now.getUTCMonth() + 1);
+    const month = dto.month ?? now.getUTCMonth() + 1;
     const period = this.getPeriodDto(year, month);
 
     const assets = await this.prisma.clientAnalyticsAsset.findMany({
@@ -467,5 +489,174 @@ export class ClientAnalyticsService {
       id: fileId,
       deletedAt: now.toISOString(),
     };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Report Notification Schedule CRUD
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async getReportNotificationSchedule(
+    clientId: string,
+    actor?: IdentityContext,
+  ): Promise<ReportNotificationScheduleResponse> {
+    const agencyId = actor?.agencyId;
+    if (!agencyId) {
+      throw new BadRequestException("Agency context required.");
+    }
+
+    assertClientScope(actor, clientId);
+
+    const schedule =
+      await this.prisma.clientReportNotificationSchedule.findUnique({
+        where: { agencyId_clientId: { agencyId, clientId } },
+        include: {
+          executions: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+      });
+
+    if (!schedule) {
+      return {
+        configured: false,
+        id: null,
+        agencyId,
+        clientId,
+        scheduleType: null,
+        daysBeforeMonthEnd: null,
+        sendTime: null,
+        timezone: "Asia/Kolkata",
+        enabled: false,
+        nextRunAt: null,
+        lastRunAt: null,
+        lastExecution: null,
+      };
+    }
+
+    const lastExecution = schedule.executions[0] ?? null;
+
+    return {
+      configured: true,
+      id: schedule.id,
+      agencyId: schedule.agencyId,
+      clientId: schedule.clientId,
+      scheduleType: schedule.scheduleType,
+      daysBeforeMonthEnd: schedule.daysBeforeMonthEnd,
+      sendTime: schedule.sendTime,
+      timezone: schedule.timezone,
+      enabled: schedule.enabled,
+      nextRunAt: schedule.nextRunAt,
+      lastRunAt: schedule.lastRunAt,
+      lastExecution: lastExecution
+        ? {
+            id: lastExecution.id,
+            status: lastExecution.status,
+            reportYear: lastExecution.reportYear,
+            reportMonth: lastExecution.reportMonth,
+            reportPeriodLabel: `${["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][lastExecution.reportMonth - 1]} ${lastExecution.reportYear}`,
+            scheduledAt: lastExecution.scheduledAt,
+            sentAt: lastExecution.sentAt,
+            attemptCount: lastExecution.attemptCount,
+            lastAttemptAt: lastExecution.lastAttemptAt,
+            recipientCount: lastExecution.recipientCount,
+            errorDetails: lastExecution.errorDetails,
+          }
+        : null,
+    };
+  }
+
+  async upsertReportNotificationSchedule(
+    clientId: string,
+    dto: UpsertReportNotificationScheduleDto,
+    actor?: IdentityContext,
+  ): Promise<ReportNotificationScheduleResponse> {
+    const agencyId = actor?.agencyId;
+    const userId = actor?.userId;
+    if (!agencyId || !userId) {
+      throw new BadRequestException("Agency and user context required.");
+    }
+
+    // Client-scoped members may NOT configure agency notification schedules.
+    if (actor?.clientId) {
+      throw new ForbiddenException(
+        "Client-scoped users cannot modify report notification schedules.",
+      );
+    }
+
+    assertClientScope(actor, clientId);
+
+    this.scheduleCalculator.validateScheduleInput(
+      dto.scheduleType,
+      dto.daysBeforeMonthEnd ?? null,
+      dto.sendTime,
+      dto.timezone ?? null,
+    );
+
+    const timezone = this.scheduleCalculator.normalizeTimezone(dto.timezone);
+    const enabled = dto.enabled !== false;
+
+    const nextRunAt = enabled
+      ? this.scheduleCalculator.calculateNextRunAt({
+          scheduleType: dto.scheduleType,
+          daysBeforeMonthEnd: dto.daysBeforeMonthEnd,
+          sendTime: dto.sendTime,
+          timezone,
+        })
+      : null;
+
+    await this.prisma.clientReportNotificationSchedule.upsert({
+      where: { agencyId_clientId: { agencyId, clientId } },
+      create: {
+        agencyId,
+        clientId,
+        scheduleType: dto.scheduleType,
+        daysBeforeMonthEnd:
+          dto.scheduleType ===
+          ReportNotificationScheduleType.DAYS_BEFORE_MONTH_END
+            ? (dto.daysBeforeMonthEnd ?? null)
+            : null,
+        sendTime: dto.sendTime,
+        timezone,
+        enabled,
+        nextRunAt,
+        createdById: userId,
+      },
+      update: {
+        scheduleType: dto.scheduleType,
+        daysBeforeMonthEnd:
+          dto.scheduleType ===
+          ReportNotificationScheduleType.DAYS_BEFORE_MONTH_END
+            ? (dto.daysBeforeMonthEnd ?? null)
+            : null,
+        sendTime: dto.sendTime,
+        timezone,
+        enabled,
+        nextRunAt,
+        version: { increment: 1 },
+      },
+    });
+
+    return this.getReportNotificationSchedule(clientId, actor);
+  }
+
+  async previewReportNotificationSchedule(
+    scheduleType: ReportNotificationScheduleType,
+    daysBeforeMonthEnd: number | null | undefined,
+    sendTime: string,
+    timezone: string | null | undefined,
+  ) {
+    this.scheduleCalculator.validateScheduleInput(
+      scheduleType,
+      daysBeforeMonthEnd ?? null,
+      sendTime,
+      timezone ?? null,
+    );
+    return this.scheduleCalculator.generatePreview({
+      scheduleType,
+      daysBeforeMonthEnd: daysBeforeMonthEnd ?? undefined,
+      sendTime,
+      timezone: timezone ?? undefined,
+    });
   }
 }

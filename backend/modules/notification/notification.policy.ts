@@ -73,6 +73,7 @@ const DEFAULT_EVENT_INTENTS = new Map<string, NotificationDeliveryIntent>([
     "ClientRevisionClarificationRequired",
     NotificationDeliveryIntent.ClientActionRequired,
   ],
+  ["ClientReportReady", NotificationDeliveryIntent.ClientActionRequired],
 ]);
 
 const AWARENESS_ONLY_EVENTS = new Set<string>([

@@ -39,7 +39,9 @@ export class NotificationDeliveryProcessor {
     }
 
     if (delivery.status === "SENT" || delivery.status === "CANCELLED") {
-      this.logger.log(`Delivery ${deliveryId} is already ${delivery.status}. Skipping.`);
+      this.logger.log(
+        `Delivery ${deliveryId} is already ${delivery.status}. Skipping.`,
+      );
       return true;
     }
 
@@ -59,7 +61,9 @@ export class NotificationDeliveryProcessor {
     });
 
     if (!agency || agency.deletedAt) {
-      this.logger.warn(`Agency ${agencyId} invalid or deleted for delivery ${deliveryId}`);
+      this.logger.warn(
+        `Agency ${agencyId} invalid or deleted for delivery ${deliveryId}`,
+      );
       await this.markCancelled(deliveryId, "Agency deleted or not found");
       return false;
     }
@@ -71,7 +75,9 @@ export class NotificationDeliveryProcessor {
     });
 
     if (!user || !user.authUser) {
-      this.logger.warn(`User / AuthUser not found for userId: ${notification.userId}`);
+      this.logger.warn(
+        `User / AuthUser not found for userId: ${notification.userId}`,
+      );
       await this.markFailed(deliveryId, "Target user identity not found", 1);
       return false;
     }
@@ -101,20 +107,33 @@ export class NotificationDeliveryProcessor {
     try {
       recipientEmail = this.crypto.decrypt(user.authUser.emailEncrypted);
     } catch (err: any) {
-      this.logger.error(`Failed to decrypt email for authUser ${user.authUser.id}`, err);
-      await this.markFailed(deliveryId, "Email decryption failed", delivery.retryCount + 1);
+      this.logger.error(
+        `Failed to decrypt email for authUser ${user.authUser.id}`,
+        err,
+      );
+      await this.markFailed(
+        deliveryId,
+        "Email decryption failed",
+        delivery.retryCount + 1,
+      );
       return false;
     }
 
     const frontendUrl =
       this.config.get<string>("FRONTEND_URL") || "https://app.agencie.in";
+    const metadata =
+      notification.metadataJson &&
+      typeof notification.metadataJson === "object" &&
+      !Array.isArray(notification.metadataJson)
+        ? (notification.metadataJson as Record<string, unknown>)
+        : {};
 
     const targetRoute = notification.eventType.startsWith("WorkOrder")
       ? "gigs"
       : notification.eventType.startsWith("Campaign") ||
-        notification.eventType.startsWith("Publishing")
-      ? "campaigns"
-      : "workflow";
+          notification.eventType.startsWith("Publishing")
+        ? "campaigns"
+        : "workflow";
 
     const rendered = renderEmailTemplate(notification.eventType, {
       recipientName: user.name || "Team Member",
@@ -122,7 +141,20 @@ export class NotificationDeliveryProcessor {
       agencySlug: agency.slug,
       title: notification.title,
       body: notification.body,
-      deepLink: buildDeepLink(frontendUrl, targetRoute, agency.slug),
+      deepLink:
+        typeof metadata.deepLink === "string"
+          ? metadata.deepLink
+          : buildDeepLink(
+              frontendUrl,
+              notification.eventType === "ClientReportReady"
+                ? "/files"
+                : targetRoute,
+              agency.slug,
+            ),
+      additionalContext:
+        typeof metadata.reportPeriodLabel === "string"
+          ? metadata.reportPeriodLabel
+          : undefined,
       frontendUrl,
     });
 
@@ -163,7 +195,12 @@ export class NotificationDeliveryProcessor {
    * Resolves recipient email authoritatively from the Invitation (via emailHash → AuthUser).
    */
   private async processInvitationEmailSend(
-    delivery: { id: string; invitationId: string | null; retryCount: number; agencyId: string },
+    delivery: {
+      id: string;
+      invitationId: string | null;
+      retryCount: number;
+      agencyId: string;
+    },
     deliveryId: string,
   ): Promise<boolean> {
     const invitation = await this.prisma.invitation.findUnique({
@@ -172,7 +209,9 @@ export class NotificationDeliveryProcessor {
     });
 
     if (!invitation) {
-      this.logger.warn(`Invitation ${delivery.invitationId} not found for delivery ${deliveryId}`);
+      this.logger.warn(
+        `Invitation ${delivery.invitationId} not found for delivery ${deliveryId}`,
+      );
       await this.markCancelled(deliveryId, "Invitation not found");
       return false;
     }
@@ -181,12 +220,17 @@ export class NotificationDeliveryProcessor {
       this.logger.log(
         `Invitation ${invitation.id} status is ${invitation.status}; cancelling delivery ${deliveryId}`,
       );
-      await this.markCancelled(deliveryId, `Invitation status is ${invitation.status}`);
+      await this.markCancelled(
+        deliveryId,
+        `Invitation status is ${invitation.status}`,
+      );
       return true;
     }
 
     if (invitation.expiresAt < new Date()) {
-      this.logger.warn(`Invitation ${invitation.id} is expired; cancelling delivery ${deliveryId}`);
+      this.logger.warn(
+        `Invitation ${invitation.id} is expired; cancelling delivery ${deliveryId}`,
+      );
       await this.markCancelled(deliveryId, "Invitation expired");
       return false;
     }
@@ -198,7 +242,9 @@ export class NotificationDeliveryProcessor {
       try {
         recipientEmail = this.crypto.decrypt(invitation.emailEncrypted);
       } catch (err) {
-        this.logger.error(`Failed to decrypt emailEncrypted for invitation ${invitation.id}`);
+        this.logger.error(
+          `Failed to decrypt emailEncrypted for invitation ${invitation.id}`,
+        );
       }
     }
 
@@ -289,7 +335,9 @@ export class NotificationDeliveryProcessor {
    * THROWS on DB or publish failure so that RabbitMQ does NOT ACK the MemberInvited message.
    */
   async processInvitationDelivery(invitationId: string): Promise<void> {
-    this.logger.log(`Queuing invitation email delivery for invitationId: ${invitationId}`);
+    this.logger.log(
+      `Queuing invitation email delivery for invitationId: ${invitationId}`,
+    );
 
     // --- 1. Validate invitation ---
     const invitation = await this.prisma.invitation.findUnique({
@@ -299,7 +347,9 @@ export class NotificationDeliveryProcessor {
 
     if (!invitation) {
       // Invitation not found — treat as permanent skip (do not retry)
-      this.logger.warn(`Invitation ${invitationId} not found; skipping email delivery`);
+      this.logger.warn(
+        `Invitation ${invitationId} not found; skipping email delivery`,
+      );
       return;
     }
 
@@ -311,7 +361,9 @@ export class NotificationDeliveryProcessor {
     }
 
     if (invitation.expiresAt < new Date()) {
-      this.logger.warn(`Invitation ${invitationId} is expired; skipping email delivery`);
+      this.logger.warn(
+        `Invitation ${invitationId} is expired; skipping email delivery`,
+      );
       return;
     }
 
@@ -328,29 +380,31 @@ export class NotificationDeliveryProcessor {
 
     // --- 3. Create Notification + NotificationDelivery in a transaction ---
     // Notification.userId is nullable for invitation-sourced notifications (invitee may not be registered).
-    const { notification, delivery } = await this.prisma.$transaction(async (tx) => {
-      const notification = await tx.notification.create({
-        data: {
-          agencyId: invitation.agencyId,
-          userId: null,               // Invited user may not have a registered account yet
-          title: `You're invited to join ${invitation.agency.name}`,
-          body: `Accept your invitation to become a member of ${invitation.agency.name} on AGENCIE.`,
-          eventType: DomainEvents.MemberInvited,
-        },
-      });
+    const { notification, delivery } = await this.prisma.$transaction(
+      async (tx) => {
+        const notification = await tx.notification.create({
+          data: {
+            agencyId: invitation.agencyId,
+            userId: null, // Invited user may not have a registered account yet
+            title: `You're invited to join ${invitation.agency.name}`,
+            body: `Accept your invitation to become a member of ${invitation.agency.name} on AGENCIE.`,
+            eventType: DomainEvents.MemberInvited,
+          },
+        });
 
-      const delivery = await tx.notificationDelivery.create({
-        data: {
-          agencyId: invitation.agencyId,
-          notificationId: notification.id,
-          invitationId: invitation.id,
-          channel: "EMAIL",
-          status: "QUEUED",
-        },
-      });
+        const delivery = await tx.notificationDelivery.create({
+          data: {
+            agencyId: invitation.agencyId,
+            notificationId: notification.id,
+            invitationId: invitation.id,
+            channel: "EMAIL",
+            status: "QUEUED",
+          },
+        });
 
-      return { notification, delivery };
-    });
+        return { notification, delivery };
+      },
+    );
 
     this.logger.log(
       `Created NotificationDelivery ${delivery.id} for invitation ${invitationId}; publishing NotificationQueued`,

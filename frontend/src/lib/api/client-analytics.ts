@@ -1,12 +1,7 @@
 import { apiClient } from "../api-client";
 
 export type AnalyticsCategory =
-  | "IMAGE"
-  | "VIDEO"
-  | "PDF"
-  | "SPREADSHEET"
-  | "DOCUMENT"
-  | "OTHER";
+  "IMAGE" | "VIDEO" | "PDF" | "SPREADSHEET" | "DOCUMENT" | "OTHER";
 
 export interface AnalyticsPeriod {
   year: number;
@@ -139,3 +134,107 @@ export async function deleteAnalyticsFile(
   );
 }
 
+// ─── Report Notification Schedule ──────────────────────────────────────────
+
+export type ReportNotificationScheduleType =
+  | "FIRST_DAY"
+  | "FIRST_WORKING_DAY"
+  | "LAST_DAY"
+  | "LAST_WORKING_DAY"
+  | "DAYS_BEFORE_MONTH_END";
+
+export type ReportNotificationExecutionStatus =
+  "PENDING" | "SENT" | "SKIPPED_NO_REPORTS" | "FAILED";
+
+export interface ReportScheduleLastExecution {
+  id: string;
+  status: ReportNotificationExecutionStatus;
+  reportYear: number;
+  reportMonth: number;
+  reportPeriodLabel: string;
+  scheduledAt: string;
+  sentAt: string | null;
+  attemptCount: number;
+  lastAttemptAt: string | null;
+  recipientCount: number;
+  errorDetails: string | null;
+}
+
+export interface ReportNotificationScheduleData {
+  configured: boolean;
+  id: string | null;
+  agencyId: string;
+  clientId: string;
+  scheduleType: ReportNotificationScheduleType | null;
+  daysBeforeMonthEnd: number | null;
+  sendTime: string | null;
+  timezone: string;
+  enabled: boolean;
+  nextRunAt: string | null;
+  lastRunAt: string | null;
+  lastExecution: ReportScheduleLastExecution | null;
+}
+
+export interface UpsertReportSchedulePayload {
+  scheduleType: ReportNotificationScheduleType;
+  daysBeforeMonthEnd?: number;
+  sendTime: string;
+  timezone?: string;
+  enabled?: boolean;
+}
+
+export interface ReportSchedulePreview {
+  scheduleType: ReportNotificationScheduleType;
+  daysBeforeMonthEnd: number | null;
+  sendTime: string;
+  timezone: string;
+  nextRunAt: string;
+  reportYear: number;
+  reportMonth: number;
+  reportPeriodLabel: string;
+}
+
+export async function getReportNotificationSchedule(
+  agencyId: string | null | undefined,
+  clientId: string,
+): Promise<ReportNotificationScheduleData> {
+  return apiClient<ReportNotificationScheduleData>(
+    `/clients/${clientId}/analytics/files/notification-schedule`,
+    {
+      method: "GET",
+      agencyId: agencyId || undefined,
+    },
+  );
+}
+
+export async function upsertReportNotificationSchedule(
+  agencyId: string | null | undefined,
+  clientId: string,
+  payload: UpsertReportSchedulePayload,
+): Promise<ReportNotificationScheduleData> {
+  return apiClient<ReportNotificationScheduleData>(
+    `/clients/${clientId}/analytics/files/notification-schedule`,
+    {
+      method: "PUT",
+      agencyId: agencyId || undefined,
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+}
+
+export async function previewReportNotificationSchedule(
+  agencyId: string | null | undefined,
+  clientId: string,
+  payload: Omit<UpsertReportSchedulePayload, "enabled">,
+): Promise<ReportSchedulePreview> {
+  return apiClient<ReportSchedulePreview>(
+    `/clients/${clientId}/analytics/files/notification-schedule/preview`,
+    {
+      method: "POST",
+      agencyId: agencyId || undefined,
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+}

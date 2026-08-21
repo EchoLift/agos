@@ -94,6 +94,55 @@ describe("NotificationService", () => {
     expect(result.deliveryId).toBe("deliv_1");
   });
 
+  it("persists metadata for queued operational notifications", async () => {
+    const mockNotification = {
+      id: "notif_report",
+      agencyId: "agency_1",
+      userId: "user_1",
+      title: "Reports ready",
+      body: "August reports are ready",
+      eventType: "ClientReportReady",
+      metadataJson: {
+        deepLink: "https://social-expert.agencie.in/files",
+        reportPeriodLabel: "August 2026",
+      },
+    };
+    const mockDelivery = {
+      id: "deliv_report",
+      agencyId: "agency_1",
+      notificationId: "notif_report",
+      channel: "EMAIL",
+      status: "QUEUED",
+    };
+
+    prisma.notification.create.mockResolvedValue(mockNotification);
+    prisma.notificationDelivery.create.mockResolvedValue(mockDelivery);
+
+    await service.notify({
+      agencyId: "agency_1",
+      userId: "user_1",
+      title: "Reports ready",
+      body: "August reports are ready",
+      eventType: "ClientReportReady",
+      deliveryIntent: NotificationDeliveryIntent.ClientActionRequired,
+      recipientType: "CLIENT",
+      metadata: {
+        deepLink: "https://social-expert.agencie.in/files",
+        reportPeriodLabel: "August 2026",
+      },
+    });
+
+    expect(prisma.notification.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: "ClientReportReady",
+        metadataJson: {
+          deepLink: "https://social-expert.agencie.in/files",
+          reportPeriodLabel: "August 2026",
+        },
+      }),
+    });
+  });
+
   it("should create in-app notification ONLY (no email delivery) for low-priority event", async () => {
     const mockNotification = {
       id: "notif_2",

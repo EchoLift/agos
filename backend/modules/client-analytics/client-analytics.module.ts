@@ -4,11 +4,12 @@ import { EventBusModule } from "@packages/events/event-bus.module";
 import { ClientAnalyticsService } from "./client-analytics.service";
 import { ClientAnalyticsController } from "./client-analytics.controller";
 import { R2StorageService } from "./r2-storage.service";
+import { ReportScheduleCalculatorService } from "./services/report-schedule-calculator.service";
 
 @Module({
   imports: [DatabaseModule, EventBusModule],
   controllers: [ClientAnalyticsController],
-  providers: [ClientAnalyticsService, R2StorageService],
-  exports: [ClientAnalyticsService, R2StorageService],
+  providers: [ClientAnalyticsService, R2StorageService, ReportScheduleCalculatorService],
+  exports: [ClientAnalyticsService, R2StorageService, ReportScheduleCalculatorService],
 })
 export class ClientAnalyticsModule {}
