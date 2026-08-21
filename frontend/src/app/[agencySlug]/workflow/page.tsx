@@ -4,8 +4,10 @@ import { Dispatch, ReactNode, SetStateAction, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { AlertCircle } from "lucide-react";
 import { useAgency } from "@/components/AgencyProvider";
 import { performWorkflowAction, WorkflowActionType, WorkflowBoardItem } from "@/lib/api/workflow";
+import { parseApiError, ParsedApiError } from "@/lib/api-error";
 import { formatLabel, statusPillClass, statusPillClasses } from "@/lib/status-style";
 import { getAgencyRoleKeys } from "@/lib/workspace-access";
 import { invalidateWorkspaceQueries, queryKeys, useWorkflowQuery } from "@/lib/query";
@@ -33,6 +35,7 @@ export default function WorkflowPage() {
   const [filters, setFilters] = useState({ clientId: "", campaignId: "", ownerId: "", risk: "", search: "" });
   const [actionDraft, setActionDraft] = useState({ externalLink: "", comment: "", reason: "" });
   const [isActionRunning, setIsActionRunning] = useState(false);
+  const [actionError, setActionError] = useState<ParsedApiError | null>(null);
   const [error, setError] = useState<string | null>(null);
   const boardQuery = useWorkflowQuery(agencyId, filters);
   const board = boardQuery.data ?? null;
@@ -45,6 +48,8 @@ export default function WorkflowPage() {
   const selectItem = (item: WorkflowBoardItem | null) => {
     setSelectedItem(item);
     setActionDraft({ externalLink: "", comment: "", reason: "" });
+    setActionError(null);
+    setError(null);
   };
 
   const runWorkflowAction = async (
@@ -53,16 +58,20 @@ export default function WorkflowPage() {
   ) => {
     if (!agencyId || !selectedItem) return;
     setIsActionRunning(true);
+    setActionError(null);
     setError(null);
 
     const trimmedLink = actionDraft.externalLink.trim();
     const trimmedComment = actionDraft.comment.trim();
     const trimmedReason = actionDraft.reason.trim();
+    const targetId = selectedItem.workflowTaskId ?? selectedItem.contentAssetId;
+    const now = new Date().getTime();
+    const idempotencyKey = `${action}:${targetId}:${now}`;
 
     try {
       await performWorkflowAction(agencyId, selectedItem.contentAssetId, {
         action,
-        idempotencyKey: `${action}:${selectedItem.workflowTaskId ?? selectedItem.contentAssetId}:${Date.now()}`,
+        idempotencyKey,
         ...(trimmedLink
           ? { externalLink: trimmedLink }
           : {}),
@@ -100,17 +109,14 @@ export default function WorkflowPage() {
       const nextSelected = refreshed.data?.columns.flatMap((column) => column.items).find((item) => item.contentAssetId === selectedItem.contentAssetId) ?? null;
       selectItem(nextSelected);
     } catch (err: unknown) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Workflow action failed.";
+      const parsed = parseApiError(err);
       const isMissingAssignee =
         action === "APPROVE" &&
-        /Assign a .* before approving|Assign an .* before/i.test(message);
+        /Assign a .* before approving|Assign an .* before/i.test(parsed.message);
       if (isMissingAssignee && !allowMissingAssignee) {
         const confirmed = await dialog.confirm({
           title: "Approve without Next Assignee?",
-          description: `${message}. The workflow will pause in the next stage until an assignee is selected.`,
+          description: `${parsed.message}. The workflow will pause in the next stage until an assignee is selected.`,
           confirmText: "Approve anyway",
           cancelText: "Cancel",
           variant: "warning",
@@ -122,7 +128,41 @@ export default function WorkflowPage() {
         }
       }
 
-      setError(message);
+      if (parsed.isCampaignReviewAccessRequired) {
+        const managerName = parsed.currentCampaignManager?.name;
+        const suggestion =
+          parsed.suggestion ||
+          (managerName
+            ? `Ask to be added as a campaign manager or reviewer, or contact ${managerName}.`
+            : "Ask to be added as a campaign manager or reviewer, or contact the current campaign manager.");
+
+        await dialog.alert({
+          title: "Approval access required",
+          variant: "error",
+          description: (
+            <div className="space-y-2 text-sm text-zinc-300">
+              <p>You don&apos;t have approval access for this campaign.</p>
+              {managerName ? (
+                <p className="font-medium text-white">
+                  Current campaign manager: <span className="text-indigo-400">{managerName}</span>
+                </p>
+              ) : null}
+              <p className="text-xs text-zinc-400">{suggestion}</p>
+            </div>
+          ),
+          confirmText: "Understood",
+        });
+      } else if (parsed.isForbidden) {
+        await dialog.alert({
+          title: "Permission denied",
+          variant: "error",
+          description: parsed.message || "You don't have permission to perform this action.",
+          confirmText: "Understood",
+        });
+      }
+
+      setActionError(parsed);
+      setError(parsed.message);
     } finally {
       setIsActionRunning(false);
     }
@@ -208,8 +248,8 @@ export default function WorkflowPage() {
           <div className="p-4 text-sm text-zinc-500">Loading workflow board...</div>
         ) : firstLoadError ? (
           <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{firstLoadError}</div>
-        ) : error ? (
-          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>
+        ) : actionError || error ? (
+          <WorkflowActionErrorBanner error={actionError || error} />
         ) : !hasItems ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="rounded-full bg-zinc-900/80 px-4 py-3 text-sm font-semibold text-zinc-400">No items</div>
@@ -263,7 +303,7 @@ export default function WorkflowPage() {
           </div>
         )}
 
-        {!isLoading && !error && hasItems && mobileColumn ? (
+        {!isLoading && !error && !actionError && hasItems && mobileColumn ? (
           <div className="lg:hidden">
             <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2">
               {board?.columns.map((column) => (
@@ -271,62 +311,76 @@ export default function WorkflowPage() {
                   key={column.stage}
                   type="button"
                   onClick={() => setMobileStage(column.stage)}
-                  className={`min-h-11 shrink-0 rounded-md border px-3 text-sm font-medium ${mobileColumn.stage === column.stage ? "border-indigo-500 bg-indigo-500/15 text-indigo-200" : "border-zinc-800 bg-zinc-900 text-zinc-400"}`}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
+                    effectiveMobileStage === column.stage
+                      ? "bg-indigo-500 text-white"
+                      : "bg-zinc-900 text-zinc-400 hover:text-white"
+                  }`}
                 >
-                  {column.label} <span className="ml-1 text-xs opacity-70">{column.count}</span>
+                  {column.label} ({column.count})
                 </button>
               ))}
             </div>
-            <div className="space-y-2 pt-1">
-              {mobileColumn.items.length === 0 ? (
-                <div className="rounded-md border border-dashed border-zinc-800 p-5 text-center text-sm text-zinc-500">Nothing in {mobileColumn.label}</div>
-              ) : mobileColumn.items.map((item) => (
-                <button
-                  key={item.contentAssetId}
-                  type="button"
-                  onClick={() => selectItem(item)}
-                  className="min-h-24 w-full rounded-md border border-zinc-800 bg-zinc-950 p-3 text-left"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold text-indigo-300">{item.displayCode}</div>
-                      <div className="mt-1 truncate text-sm font-semibold text-white">{item.title}</div>
-                    </div>
-                    <RiskBadge risk={item.riskStatus} />
+
+            <section className="mt-3 rounded-2xl border border-zinc-800 bg-[#0b0b11] p-3">
+              <div className="space-y-3">
+                {mobileColumn.items.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-zinc-800 px-3 py-6 text-center text-xs text-zinc-600">
+                    Nothing in {mobileColumn.label}
                   </div>
-                  <div className="mt-2 truncate text-xs text-zinc-500">{item.clientName} · {item.campaignName}</div>
-                  <div className="mt-2 flex items-center justify-between gap-2 text-xs text-zinc-400">
-                    <span className="truncate">{item.owner?.name || "Unassigned"}</span>
-                    <span className="shrink-0">{formatDateTime(item.deadlineAt)}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
+                ) : (
+                  mobileColumn.items.map((item) => (
+                    <button
+                      key={item.contentAssetId}
+                      type="button"
+                      onClick={() => selectItem(item)}
+                      className="w-full rounded-2xl border border-zinc-800 bg-zinc-950 p-4 text-left transition hover:bg-zinc-900/30"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold text-indigo-300">{item.displayCode}</div>
+                          <div className="mt-1 truncate text-sm font-semibold text-white">{item.title}</div>
+                        </div>
+                        <RiskBadge risk={item.riskStatus} />
+                      </div>
+                      <div className="mt-3 space-y-1.5 text-xs text-zinc-500">
+                        <div className="truncate">{item.clientName} · {item.campaignName}</div>
+                        <div>Owner: <span className="text-zinc-300">{item.owner?.name || "Unassigned"}</span></div>
+                        <div>Due: <span className="text-zinc-300">{formatDateTime(item.deadlineAt)}</span></div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </section>
           </div>
         ) : null}
       </div>
 
       {selectedItem ? (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/60">
-          <button type="button" className="hidden flex-1 cursor-default lg:block" aria-label="Close workflow detail" onClick={() => selectItem(null)} />
-          <aside className="h-full w-full overflow-y-auto bg-zinc-950 p-3 pb-[calc(5rem+env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 sm:p-4 lg:max-w-xl lg:border-l lg:p-6">
-            <div className="flex items-start justify-between gap-4">
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs">
+          <aside className="h-full w-full max-w-xl overflow-y-auto border-l border-zinc-800 bg-[#09090d] p-4 lg:p-6">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-indigo-300">{selectedItem.displayCode}</p>
-                <h2 className="mt-2 text-2xl font-semibold text-white">{selectedItem.title}</h2>
-                <p className="mt-2 text-sm text-zinc-400">{selectedItem.clientName} · {selectedItem.campaignName}</p>
+                <div className="text-xs font-semibold uppercase tracking-wider text-indigo-300">{selectedItem.displayCode}</div>
+                <h2 className="mt-1 text-lg font-semibold text-white">{selectedItem.title}</h2>
+                <p className="mt-1 text-xs text-zinc-500">{selectedItem.clientName} · {selectedItem.campaignName}</p>
               </div>
-              <button type="button" onClick={() => selectItem(null)} className="min-h-11 rounded-md border border-zinc-800 px-3 text-sm text-zinc-400 transition hover:bg-zinc-900 hover:text-white lg:rounded-full">Close</button>
+              <button
+                type="button"
+                onClick={() => selectItem(null)}
+                className="rounded-full border border-zinc-800 p-2 text-zinc-400 transition hover:bg-zinc-900 hover:text-white"
+              >
+                Close
+              </button>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2 lg:mt-6 lg:gap-3">
-              <Detail label="Current Stage" value={formatLabel(selectedItem.stage)} />
-              <Detail label="Risk" value={formatLabel(selectedItem.riskStatus)} />
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <Detail label="Stage" value={formatLabel(selectedItem.stage)} />
+              <Detail label="Task status" value={selectedItem.taskStatus ? formatLabel(selectedItem.taskStatus) : "None"} />
               <Detail label="Owner" value={selectedItem.owner?.name || "Unassigned"} />
               <Detail label="Manager" value={selectedItem.manager?.name || "Unassigned"} />
               <Detail label="Deadline" value={formatDateTime(selectedItem.deadlineAt)} />
-              <Detail label="Last Activity" value={formatDateTime(selectedItem.lastActivityAt)} />
-              <Detail label="Task Status" value={selectedItem.taskStatus ? formatLabel(selectedItem.taskStatus) : "Not started"} />
               <Detail label="Submission" value={selectedItem.submissionStatus ? formatLabel(selectedItem.submissionStatus) : "No submission"} />
             </div>
 
@@ -345,6 +399,7 @@ export default function WorkflowPage() {
               item={selectedItem}
               roleKeys={roleKeys}
               draft={actionDraft}
+              actionError={actionError}
               currentMembershipId={currentMembershipId}
               isRunning={isActionRunning}
               onDraftChange={setActionDraft}
@@ -367,11 +422,65 @@ export default function WorkflowPage() {
   );
 }
 
+export function WorkflowActionErrorBanner({ error }: { error: ParsedApiError | string | null }) {
+  if (!error) return null;
+  const parsed = typeof error === "string" ? parseApiError(error) : error;
+
+  if (parsed.isCampaignReviewAccessRequired) {
+    const managerName = parsed.currentCampaignManager?.name;
+    const suggestion =
+      parsed.suggestion ||
+      (managerName
+        ? `Ask to be added as a campaign manager or reviewer, or contact ${managerName}.`
+        : "Ask to be added as a campaign manager or reviewer, or contact the current campaign manager.");
+
+    return (
+      <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div className="flex items-start gap-2.5">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+          <div className="space-y-1.5">
+            <h4 className="font-semibold text-red-300">Approval access required</h4>
+            <p className="text-zinc-300">You don&apos;t have approval access for this campaign.</p>
+            {managerName ? (
+              <p className="text-xs font-medium text-white">
+                Current campaign manager: <span className="text-indigo-300">{managerName}</span>
+              </p>
+            ) : null}
+            <p className="text-xs text-zinc-400">{suggestion}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (parsed.isForbidden) {
+    return (
+      <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div className="flex items-start gap-2.5">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
+          <div className="space-y-1">
+            <h4 className="font-semibold text-red-300">Permission denied</h4>
+            <p className="text-zinc-300">{parsed.message || "You don't have permission to perform this action."}</p>
+            {parsed.suggestion ? <p className="text-xs text-zinc-400">{parsed.suggestion}</p> : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+      {parsed.message}
+    </div>
+  );
+}
+
 function WorkflowActionPanel({
   item,
   roleKeys,
   currentMembershipId,
   draft,
+  actionError,
   isRunning,
   onDraftChange,
   onAction,
@@ -380,6 +489,7 @@ function WorkflowActionPanel({
   roleKeys: string[];
   currentMembershipId: string | null;
   draft: { externalLink: string; comment: string; reason: string };
+  actionError?: ParsedApiError | null;
   isRunning: boolean;
   onDraftChange: (value: { externalLink: string; comment: string; reason: string }) => void;
   onAction: (action: WorkflowActionType) => void;
@@ -405,6 +515,11 @@ function WorkflowActionPanel({
 
   return (
     <section className="mt-4 rounded-md border border-zinc-800 bg-[#0b0b11] p-3 lg:mt-6 lg:rounded-2xl lg:p-4">
+      {actionError ? (
+        <div className="mb-4">
+          <WorkflowActionErrorBanner error={actionError} />
+        </div>
+      ) : null}
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">Move this work</h3>

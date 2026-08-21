@@ -1,4 +1,7 @@
 import { getAccessToken, getApiBaseUrl, clearAccessToken, refreshAccessToken, redirectToLogin } from "./auth";
+import { ApiError } from "./api-error";
+
+export { ApiError } from "./api-error";
 
 interface FetchOptions extends RequestInit {
   agencyId?: string;
@@ -14,7 +17,11 @@ export async function apiClient<T = unknown>(endpoint: string, options: FetchOpt
     token = await refreshAccessToken();
     if (!token) {
       redirectToLogin();
-      throw new Error("Authentication required");
+      throw new ApiError({
+        status: 401,
+        statusCode: 401,
+        message: "Authentication required",
+      });
     }
   }
 
@@ -47,15 +54,49 @@ export async function apiClient<T = unknown>(endpoint: string, options: FetchOpt
       redirectToLogin();
     }
     
+    let errorData: Record<string, unknown> | null = null;
     let errorMessage = "An error occurred while fetching data.";
     try {
-      const errorData = await response.json();
-      errorMessage = errorData.message || errorMessage;
+      errorData = (await response.json()) as Record<string, unknown>;
+      if (Array.isArray(errorData?.message)) {
+        errorMessage = errorData.message.join(", ");
+      } else if (typeof errorData?.message === "string") {
+        errorMessage = errorData.message;
+      }
     } catch {
-      errorMessage = (await response.text()) || errorMessage;
+      try {
+        errorMessage = (await response.text()) || errorMessage;
+      } catch {
+        // Keep default message
+      }
     }
     
-    throw new Error(errorMessage);
+    throw new ApiError({
+      status: response.status,
+      statusCode: response.status,
+      code: typeof errorData?.code === "string" ? errorData.code : null,
+      message: errorMessage,
+      suggestion:
+        typeof errorData?.suggestion === "string"
+          ? errorData.suggestion
+          : undefined,
+      currentCampaignManager: (() => {
+        const ccm = errorData?.currentCampaignManager;
+        if (!ccm || typeof ccm !== "object") return null;
+        const manager = ccm as Record<string, unknown>;
+        return {
+          membershipId:
+            typeof manager.membershipId === "string"
+              ? manager.membershipId
+              : null,
+          name:
+            typeof manager.name === "string"
+              ? manager.name
+              : "the campaign manager",
+        };
+      })(),
+      raw: errorData,
+    });
   }
 
   // Handle empty responses
