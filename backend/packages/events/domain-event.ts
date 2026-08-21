@@ -79,6 +79,9 @@ export const DomainEvents = {
   WorkOrderApproved: "WorkOrderApproved",
   WorkOrderChangesRequested: "WorkOrderChangesRequested",
   WorkOrderCancelled: "WorkOrderCancelled",
+  ClientAnalyticsAssetUploaded: "ClientAnalyticsAssetUploaded",
+  ClientAnalyticsAssetDeleted: "ClientAnalyticsAssetDeleted",
 } as const;
 
 export type DomainEventName = (typeof DomainEvents)[keyof typeof DomainEvents];
+

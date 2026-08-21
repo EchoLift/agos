@@ -5,6 +5,7 @@ export type WorkspaceNavKey =
   | "dashboard"
   | "clients"
   | "campaigns"
+  | "files"
   | "gigs"
   | "workflow"
   | "calendar"
@@ -35,6 +36,12 @@ export const workspaceNavItems: WorkspaceNavItem[] = [
     label: "Campaigns",
     shortLabel: "CP",
     href: "/campaigns",
+  },
+  {
+    key: "files",
+    label: "Files",
+    shortLabel: "FL",
+    href: "/files",
   },
   {
     key: "gigs",
@@ -149,7 +156,7 @@ const roleAccess: Record<string, WorkspaceNavKey[]> = {
   ],
   FINANCE: ["dashboard", "clients","team"],
   HR: ["dashboard", "team"],
-  CLIENT: ["dashboard", "campaigns", "calendar"],
+  CLIENT: ["dashboard", "campaigns", "files", "calendar"],
   MEMBER: [
     "dashboard",
     "campaigns",
@@ -297,6 +304,10 @@ export function canAccessWorkspacePath(
 
   if (relativePath.startsWith("/clients")) {
     return allowed.has("clients");
+  }
+
+  if (relativePath.startsWith("/files")) {
+    return allowed.has("files");
   }
 
   if (relativePath.startsWith("/campaigns")) {

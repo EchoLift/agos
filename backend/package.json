@@ -26,6 +26,8 @@
     "seed:demo:reset": "ts-node -r tsconfig-paths/register scripts/demo-seed/index.ts --reset"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1115.0",
+    "@aws-sdk/s3-request-presigner": "^3.1115.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.0",
@@ -37,6 +39,7 @@
     "@nestjs/websockets": "^11.0.0",
     "@prisma/client": "^6.0.0",
     "@types/cron": "^2.0.1",
+    "@types/multer": "^2.2.0",
     "amqplib": "^0.10.5",
     "argon2": "^0.41.1",
     "class-transformer": "^0.5.1",

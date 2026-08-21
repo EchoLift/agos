@@ -12,6 +12,8 @@ import { invalidateWorkspaceQueries, queryKeys, setListItem, useClientQuery } fr
 import { getWorkspaceHref } from "@/lib/workspace-url";
 import { clearRememberedEntityId, rememberedEntityKey, useRememberLastVisitedEntity } from "@/lib/remembered-tab";
 
+import { ClientAnalyticsFilesView } from "@/components/ClientAnalyticsFilesView";
+
 export default function ClientDetailPage() {
   const router = useRouter();
   const params = useParams<{ clientId: string }>();
@@ -24,6 +26,7 @@ export default function ClientDetailPage() {
     entityId: playbook?.client.id,
     enabled: Boolean(playbook),
   });
+  const [activeTab, setActiveTab] = useState<"playbook" | "analytics">("playbook");
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,19 +79,53 @@ export default function ClientDetailPage() {
             router.push(getWorkspaceHref(safeAgencySlug, "/clients"));
           }} className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white">←</button>
           <div>
-            <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">Client Playbook</p>
+            <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">Client Detail</p>
             <h1 className="mt-1 text-3xl font-semibold text-white">{playbook?.client.name || (isLoading ? "Loading..." : "Client")}</h1>
             <p className="mt-2 text-sm text-zinc-400">
               {playbook ? `${playbook.sections.length} visible sections for your role.` : "Loading role-aware client context."}
             </p>
           </div>
         </div>
-        {playbook?.canEdit ? (
+        {activeTab === "playbook" && playbook?.canEdit ? (
           <button type="button" onClick={() => setIsEditing((value) => !value)} className="rounded-full border border-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-900">
-            {isEditing ? "Cancel" : "Edit"}
+            {isEditing ? "Cancel" : "Edit Playbook"}
           </button>
         ) : null}
       </div>
+
+      {/* Tabs */}
+      {playbook && (
+        <div className="flex border-b border-zinc-800">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("playbook");
+              setIsEditing(false);
+            }}
+            className={`border-b-2 px-6 py-3 text-sm font-semibold transition ${
+              activeTab === "playbook"
+                ? "border-indigo-500 text-white"
+                : "border-transparent text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            Playbook
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("analytics");
+              setIsEditing(false);
+            }}
+            className={`border-b-2 px-6 py-3 text-sm font-semibold transition ${
+              activeTab === "analytics"
+                ? "border-indigo-500 text-white"
+                : "border-transparent text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            Analytics Files
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 text-sm text-zinc-500">Loading client...</div>
@@ -97,7 +134,13 @@ export default function ClientDetailPage() {
       ) : error ? (
         <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>
       ) : playbook ? (
-        isEditing ? (
+        activeTab === "analytics" ? (
+          <ClientAnalyticsFilesView
+            agencyId={agencyId || ""}
+            clientId={playbook.client.id}
+            clientName={playbook.client.name}
+          />
+        ) : isEditing ? (
           <form className="space-y-6" onSubmit={handleSubmit(save)}>
             <ClientPlaybookForm register={register} setValue={setValue} watch={watch} />
             <ClientFormActions>
@@ -135,6 +178,7 @@ export default function ClientDetailPage() {
     </div>
   );
 }
+
 
 function Detail({ label, value }: { label: string; value?: string | null }) {
   return (
