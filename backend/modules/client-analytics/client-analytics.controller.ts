@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Put,
   Query,
   UploadedFiles,
   UseInterceptors,
@@ -27,6 +28,10 @@ import {
 } from "./client-analytics.service";
 import { UploadAnalyticsFilesDto } from "./dto/upload-analytics-files.dto";
 import { QueryAnalyticsFilesDto } from "./dto/query-analytics-files.dto";
+import {
+  PreviewReportNotificationScheduleDto,
+  UpsertReportNotificationScheduleDto,
+} from "./dto/report-notification-schedule.dto";
 
 @ApiTags("Client Analytics")
 @ApiBearerAuth()
@@ -121,5 +126,52 @@ export class ClientAnalyticsController {
     @CurrentUser() user: IdentityContext,
   ) {
     return this.analyticsService.deleteFile(clientId, fileId, user);
+  }
+
+  // ─── Report Notification Schedule ──────────────────────────────────────────
+
+  @Get("notification-schedule")
+  @ApiOperation({
+    summary: "Get report notification schedule for a client",
+    description: "Returns the recurring monthly report notification configuration, next run time, and last execution status.",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Schedule configuration or unconfigured state." })
+  async getReportNotificationSchedule(
+    @Param("clientId") clientId: string,
+    @CurrentUser() user: IdentityContext,
+  ) {
+    return this.analyticsService.getReportNotificationSchedule(clientId, user);
+  }
+
+  @Put("notification-schedule")
+  @ApiOperation({
+    summary: "Create or update report notification schedule for a client",
+    description: "Upserts the monthly report notification schedule. Only non-client-scoped agency users may configure this. Calculates nextRunAt from the provided schedule template and timezone.",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Updated schedule configuration." })
+  async upsertReportNotificationSchedule(
+    @Param("clientId") clientId: string,
+    @Body() dto: UpsertReportNotificationScheduleDto,
+    @CurrentUser() user: IdentityContext,
+  ) {
+    return this.analyticsService.upsertReportNotificationSchedule(clientId, dto, user);
+  }
+
+  @Post("notification-schedule/preview")
+  @ApiOperation({
+    summary: "Preview next run date and reporting period for a schedule configuration",
+    description: "Returns the backend-computed nextRunAt and resolved reporting period label for a proposed schedule configuration without saving it.",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Preview result with nextRunAt and reportPeriodLabel." })
+  async previewReportNotificationSchedule(
+    @Param("clientId") _clientId: string,
+    @Body() dto: PreviewReportNotificationScheduleDto,
+  ) {
+    return this.analyticsService.previewReportNotificationSchedule(
+      dto.scheduleType,
+      dto.daysBeforeMonthEnd ?? null,
+      dto.sendTime,
+      dto.timezone ?? null,
+    );
   }
 }

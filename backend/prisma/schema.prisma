@@ -63,55 +63,57 @@ model Session {
 }
 
 model Agency {
-  id                   String                @id @default(uuid())
-  name                 String
-  displayName          String                @default("")
-  slug                 String                @unique
-  status               AgencyStatus          @default(ACTIVE)
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  deletedAt            DateTime?
-  version              Int                   @default(1)
-  auditEvents          AuditEvent[]
-  campaigns            Campaign[]
-  clients              Client[]
-  clientContacts       ClientContact[]
-  contentAssets        ContentAsset[]
-  invitations          Invitation[]
-  memberships          Membership[]
-  roles                Role[]
-  googleCalendarEvents GoogleCalendarEvent[]
-  workOrders           WorkOrder[]
-  clientAnalyticsAssets ClientAnalyticsAsset[]
+  id                          String                             @id @default(uuid())
+  name                        String
+  displayName                 String                             @default("")
+  slug                        String                             @unique
+  status                      AgencyStatus                       @default(ACTIVE)
+  createdAt                   DateTime                           @default(now())
+  updatedAt                   DateTime                           @updatedAt
+  deletedAt                   DateTime?
+  version                     Int                                @default(1)
+  auditEvents                 AuditEvent[]
+  campaigns                   Campaign[]
+  clients                     Client[]
+  clientContacts              ClientContact[]
+  contentAssets               ContentAsset[]
+  invitations                 Invitation[]
+  memberships                 Membership[]
+  roles                       Role[]
+  googleCalendarEvents        GoogleCalendarEvent[]
+  workOrders                  WorkOrder[]
+  clientAnalyticsAssets       ClientAnalyticsAsset[]
+  reportNotificationSchedules ClientReportNotificationSchedule[]
 
   @@map("agencies")
 }
 
 model User {
-  id                       String                    @id @default(uuid())
-  authUserId               String                    @unique
-  name                     String?
-  avatarUrl                String?
-  mobileNumberEncrypted    String?
-  mobileNumberHash         String?
-  timezone                 String?
-  language                 String?
-  jobTitle                 String?
-  bio                      String?
-  presenceStatus           PresenceStatus?
-  workLocation             WorkLocation?
-  statusMessage            String?
-  statusExpiresAt          DateTime?
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
-  deletedAt                DateTime?
-  version                  Int                       @default(1)
-  memberships              Membership[]
-  clientContacts           ClientContact[]
-  googleCalendarConnection GoogleCalendarConnection?
-  googleCalendarEvents     GoogleCalendarEvent[]
-  uploadedClientAnalyticsAssets ClientAnalyticsAsset[]
-  authUser                 AuthUser                  @relation(fields: [authUserId], references: [id])
+  id                                 String                             @id @default(uuid())
+  authUserId                         String                             @unique
+  name                               String?
+  avatarUrl                          String?
+  mobileNumberEncrypted              String?
+  mobileNumberHash                   String?
+  timezone                           String?
+  language                           String?
+  jobTitle                           String?
+  bio                                String?
+  presenceStatus                     PresenceStatus?
+  workLocation                       WorkLocation?
+  statusMessage                      String?
+  statusExpiresAt                    DateTime?
+  createdAt                          DateTime                           @default(now())
+  updatedAt                          DateTime                           @updatedAt
+  deletedAt                          DateTime?
+  version                            Int                                @default(1)
+  memberships                        Membership[]
+  clientContacts                     ClientContact[]
+  googleCalendarConnection           GoogleCalendarConnection?
+  googleCalendarEvents               GoogleCalendarEvent[]
+  uploadedClientAnalyticsAssets      ClientAnalyticsAsset[]
+  createdReportNotificationSchedules ClientReportNotificationSchedule[]
+  authUser                           AuthUser                           @relation(fields: [authUserId], references: [id])
 
   @@map("users")
 }
@@ -259,7 +261,7 @@ model SystemRolePermission {
 }
 
 model Client {
-  id                          String          @id @default(uuid())
+  id                          String                             @id @default(uuid())
   agencyId                    String
   assignedManagerMembershipId String?
   name                        String
@@ -321,20 +323,21 @@ model Client {
   internalNotes               String?
   startDate                   DateTime?
   timezone                    String?
-  status                      ClientStatus    @default(ACTIVE)
-  createdAt                   DateTime        @default(now())
-  updatedAt                   DateTime        @updatedAt
+  status                      ClientStatus                       @default(ACTIVE)
+  createdAt                   DateTime                           @default(now())
+  updatedAt                   DateTime                           @updatedAt
   deletedAt                   DateTime?
-  version                     Int             @default(1)
+  version                     Int                                @default(1)
   campaigns                   Campaign[]
-  agency                      Agency          @relation(fields: [agencyId], references: [id])
-  assignedManager             Membership?     @relation("ClientManager", fields: [assignedManagerMembershipId], references: [id])
-  clientMemberships           Membership[]    @relation("ClientMemberships")
-  invitations                 Invitation[]    @relation("ClientInvitations")
+  agency                      Agency                             @relation(fields: [agencyId], references: [id])
+  assignedManager             Membership?                        @relation("ClientManager", fields: [assignedManagerMembershipId], references: [id])
+  clientMemberships           Membership[]                       @relation("ClientMemberships")
+  invitations                 Invitation[]                       @relation("ClientInvitations")
   contentAssets               ContentAsset[]
   clientContacts              ClientContact[]
   workOrders                  WorkOrder[]
   clientAnalyticsAssets       ClientAnalyticsAsset[]
+  reportNotificationSchedules ClientReportNotificationSchedule[]
 
   @@index([agencyId])
   @@index([agencyId, assignedManagerMembershipId])
@@ -835,16 +838,17 @@ model GoogleCalendarEvent {
 }
 
 model Notification {
-  id         String                 @id @default(uuid())
-  agencyId   String
-  userId     String? // Nullable: invitation notifications have no registered userId yet
-  title      String
-  body       String
-  eventType  String
-  status     NotificationStatus     @default(UNREAD)
-  readAt     DateTime?
-  createdAt  DateTime               @default(now())
-  deliveries NotificationDelivery[]
+  id           String                 @id @default(uuid())
+  agencyId     String
+  userId       String? // Nullable: invitation notifications have no registered userId yet
+  title        String
+  body         String
+  eventType    String
+  metadataJson Json?
+  status       NotificationStatus     @default(UNREAD)
+  readAt       DateTime?
+  createdAt    DateTime               @default(now())
+  deliveries   NotificationDelivery[]
 
   @@index([agencyId, userId, readAt])
   @@map("notifications")
@@ -1251,9 +1255,9 @@ model ClientAnalyticsAsset {
   deletedAt        DateTime?
   version          Int                   @default(1)
 
-  agency           Agency                @relation(fields: [agencyId], references: [id], onDelete: Cascade)
-  client           Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  uploadedByUser   User                  @relation(fields: [uploadedByUserId], references: [id])
+  agency         Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client         Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  uploadedByUser User   @relation(fields: [uploadedByUserId], references: [id])
 
   @@index([agencyId, clientId, year, month, deletedAt])
   @@index([agencyId, clientId, category, deletedAt])
@@ -1261,3 +1265,68 @@ model ClientAnalyticsAsset {
   @@map("client_analytics_assets")
 }
 
+enum ReportNotificationScheduleType {
+  FIRST_DAY
+  FIRST_WORKING_DAY
+  LAST_DAY
+  LAST_WORKING_DAY
+  DAYS_BEFORE_MONTH_END
+}
+
+enum ReportNotificationExecutionStatus {
+  PENDING
+  SENT
+  SKIPPED_NO_REPORTS
+  FAILED
+}
+
+model ClientReportNotificationSchedule {
+  id                 String                         @id @default(uuid())
+  agencyId           String
+  clientId           String
+  scheduleType       ReportNotificationScheduleType
+  daysBeforeMonthEnd Int?
+  sendTime           String
+  timezone           String                         @default("Asia/Kolkata")
+  enabled            Boolean                        @default(true)
+  nextRunAt          DateTime?
+  lastRunAt          DateTime?
+  createdById        String?
+  createdAt          DateTime                       @default(now())
+  updatedAt          DateTime                       @updatedAt
+  deletedAt          DateTime?
+  version            Int                            @default(1)
+
+  agency     Agency                              @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client     Client                              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  createdBy  User?                               @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  executions ClientReportNotificationExecution[]
+
+  @@unique([agencyId, clientId])
+  @@index([enabled, nextRunAt])
+  @@map("client_report_notification_schedules")
+}
+
+model ClientReportNotificationExecution {
+  id             String                            @id @default(uuid())
+  scheduleId     String
+  agencyId       String
+  clientId       String
+  reportYear     Int
+  reportMonth    Int
+  scheduledAt    DateTime
+  sentAt         DateTime?
+  status         ReportNotificationExecutionStatus @default(PENDING)
+  attemptCount   Int                               @default(0)
+  lastAttemptAt  DateTime?
+  recipientCount Int                               @default(0)
+  errorDetails   String?
+  createdAt      DateTime                          @default(now())
+  updatedAt      DateTime                          @updatedAt
+
+  schedule ClientReportNotificationSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleId, reportYear, reportMonth])
+  @@index([agencyId, clientId, reportYear, reportMonth])
+  @@map("client_report_notification_executions")
+}

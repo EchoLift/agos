@@ -61,6 +61,7 @@ export class NotificationService {
         title: input.title,
         body: input.body,
         eventType: input.eventType,
+        ...(input.metadata ? { metadataJson: input.metadata } : {}),
       },
     });
 
