@@ -42,6 +42,41 @@ import {
 import { WorkflowBoardQueryDto } from "./dto/workflow-board-query.dto";
 import { canTransition } from "./workflow-transition-rules";
 
+type WorkflowActionTask = Prisma.WorkflowTaskGetPayload<{
+  include: {
+    workflowStep: true;
+    owner: true;
+    workflowInstance: {
+      include: {
+        manager: {
+          include: {
+            user: true;
+          };
+        };
+        contentAsset: {
+          include: {
+            client: true;
+            campaign: {
+              include: {
+                teamAssignments: {
+                  include: {
+                    membership: {
+                      include: {
+                        user: true;
+                      };
+                    };
+                  };
+                };
+                publishingSchedules: true;
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+}>;
+
 @Injectable()
 export class WorkflowService {
   constructor(
@@ -1168,24 +1203,7 @@ export class WorkflowService {
 
   private async submitForReviewAction(
     contentAssetId: string,
-    task: Prisma.WorkflowTaskGetPayload<{
-      include: {
-        workflowInstance: {
-          include: {
-            contentAsset: {
-              include: {
-                campaign: {
-                  include: { teamAssignments: true; publishingSchedules: true };
-                };
-                client: true;
-              };
-            };
-          };
-        };
-        workflowStep: true;
-        owner: true;
-      };
-    }>,
+    task: WorkflowActionTask,
     stage: ContentStage,
     dto: WorkflowActionDto,
     actorMembershipId: string,
@@ -1403,24 +1421,7 @@ export class WorkflowService {
 
   private canSubmitCurrentStage(
     actorMembershipId: string,
-    task: Prisma.WorkflowTaskGetPayload<{
-      include: {
-        workflowInstance: {
-          include: {
-            contentAsset: {
-              include: {
-                campaign: {
-                  include: { teamAssignments: true; publishingSchedules: true };
-                };
-                client: true;
-              };
-            };
-          };
-        };
-        workflowStep: true;
-        owner: true;
-      };
-    }>,
+    task: WorkflowActionTask,
     stage: ContentStage,
   ) {
     if (task.ownerMembershipId === actorMembershipId) {
@@ -1434,26 +1435,50 @@ export class WorkflowService {
     );
   }
 
+  private throwCampaignReviewAccessForbidden(
+    workflowInstance: WorkflowActionTask["workflowInstance"],
+  ): never {
+    const campaignManagerAssignment =
+      workflowInstance.contentAsset?.campaign?.teamAssignments?.find(
+        (assignment) =>
+          assignment.assignmentRole === CampaignAssignmentRole.CAMPAIGN_MANAGER,
+      );
+
+    let membershipId: string | null = null;
+    let managerName: string | null = null;
+
+    if (campaignManagerAssignment) {
+      membershipId = campaignManagerAssignment.membershipId ?? null;
+      managerName = campaignManagerAssignment.membership?.user?.name ?? null;
+    } else if (workflowInstance.manager) {
+      membershipId =
+        workflowInstance.manager.id ??
+        workflowInstance.managerMembershipId ??
+        null;
+      managerName = workflowInstance.manager.user?.name ?? null;
+    } else if (workflowInstance.managerMembershipId) {
+      membershipId = workflowInstance.managerMembershipId;
+      managerName = null;
+    }
+
+    const formattedManagerName = managerName ?? "the campaign manager";
+
+    throw new ForbiddenException({
+      code: "CAMPAIGN_REVIEW_ACCESS_REQUIRED",
+      message: "You don't have approval access for this campaign.",
+      currentCampaignManager: {
+        membershipId,
+        name: formattedManagerName,
+      },
+      suggestion: managerName
+        ? `Ask to be added as a campaign manager or reviewer, or contact ${managerName}.`
+        : "Ask to be added as a campaign manager or reviewer, or contact the current campaign manager.",
+    });
+  }
+
   private async approveAction(
     contentAssetId: string,
-    task: Prisma.WorkflowTaskGetPayload<{
-      include: {
-        workflowInstance: {
-          include: {
-            contentAsset: {
-              include: {
-                campaign: {
-                  include: { teamAssignments: true; publishingSchedules: true };
-                };
-                client: true;
-              };
-            };
-          };
-        };
-        workflowStep: true;
-        owner: true;
-      };
-    }>,
+    task: WorkflowActionTask,
     stage: ContentStage,
     dto: WorkflowActionDto,
     actorMembershipId: string,
@@ -1462,9 +1487,8 @@ export class WorkflowService {
       task.ownerMembershipId !== actorMembershipId &&
       !this.canReviewWorkflow(actorMembershipId, task.workflowInstance)
     ) {
-      throw new ForbiddenException("You cannot approve this workflow task");
+      this.throwCampaignReviewAccessForbidden(task.workflowInstance);
     }
-
     const existing = await this.prisma.approval.findUnique({
       where: {
         agencyId_idempotencyKey: {
@@ -1683,24 +1707,7 @@ export class WorkflowService {
 
   private async returnAction(
     contentAssetId: string,
-    task: Prisma.WorkflowTaskGetPayload<{
-      include: {
-        workflowInstance: {
-          include: {
-            contentAsset: {
-              include: {
-                campaign: {
-                  include: { teamAssignments: true; publishingSchedules: true };
-                };
-                client: true;
-              };
-            };
-          };
-        };
-        workflowStep: true;
-        owner: true;
-      };
-    }>,
+    task: WorkflowActionTask,
     stage: ContentStage,
     dto: WorkflowActionDto,
     actorMembershipId: string,
@@ -1709,7 +1716,7 @@ export class WorkflowService {
       task.ownerMembershipId !== actorMembershipId &&
       !this.canReviewWorkflow(actorMembershipId, task.workflowInstance)
     ) {
-      throw new ForbiddenException("You cannot return this workflow task");
+      this.throwCampaignReviewAccessForbidden(task.workflowInstance);
     }
 
     const existing = await this.prisma.approval.findUnique({
@@ -1918,12 +1925,25 @@ export class WorkflowService {
             owner: true,
             workflowInstance: {
               include: {
+                manager: {
+                  include: {
+                    user: true,
+                  },
+                },
                 contentAsset: {
                   include: {
                     client: true,
                     campaign: {
                       include: {
-                        teamAssignments: true,
+                        teamAssignments: {
+                          include: {
+                            membership: {
+                              include: {
+                                user: true,
+                              },
+                            },
+                          },
+                        },
                         publishingSchedules: {
                           where: { contentAssetId },
                           orderBy: { scheduledAt: "asc" },
@@ -2012,6 +2032,11 @@ export class WorkflowService {
           teamAssignments: Array<{
             membershipId: string;
             assignmentRole: CampaignAssignmentRole;
+            membership: {
+              user: {
+                name: string | null;
+              };
+            };
           }>;
         };
       };

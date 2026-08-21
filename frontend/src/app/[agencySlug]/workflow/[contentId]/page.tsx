@@ -6,12 +6,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAgency } from "@/components/AgencyProvider";
 import { ContentAsset, updateContentAsset } from "@/lib/api/content";
 import { performWorkflowAction, WorkflowActionType } from "@/lib/api/workflow";
+import { parseApiError, ParsedApiError } from "@/lib/api-error";
 import { formatLabel, statusPillClasses } from "@/lib/status-style";
 import { getAgencyRoleKeys } from "@/lib/workspace-access";
 import { invalidateWorkspaceQueries, queryKeys, setListItem, useContentAssetQuery } from "@/lib/query";
 import { getWorkspaceHref } from "@/lib/workspace-url";
 import { clearRememberedEntityId, rememberedEntityKey, useRememberLastVisitedEntity } from "@/lib/remembered-tab";
 import { useDialog } from "@/components/ui/DialogProvider";
+import { WorkflowActionErrorBanner } from "../page";
 const contentTypes = ["REEL", "CAROUSEL", "STATIC", "STORY", "BLOG", "YOUTUBE", "AD", "OTHER"];
 
 export default function WorkflowDetailPage() {
@@ -39,6 +41,7 @@ export default function WorkflowDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isActionRunning, setIsActionRunning] = useState(false);
+  const [actionError, setActionError] = useState<ParsedApiError | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isLoading = assetQuery.isLoading && !asset;
   const firstLoadError = !asset && assetQuery.error
@@ -76,15 +79,18 @@ export default function WorkflowDetailPage() {
   ) => {
     if (!agencyId || !asset) return;
     setIsActionRunning(true);
+    setActionError(null);
     setError(null);
 
     const trimmedLink = actionDraft.externalLink.trim();
     const trimmedComment = actionDraft.comment.trim();
+    const now = new Date().getTime();
+    const idempotencyKey = `${action}:${asset.id}:${now}`;
 
     try {
       await performWorkflowAction(agencyId, asset.id, {
         action,
-        idempotencyKey: `${action}:${asset.id}:${Date.now()}`,
+        idempotencyKey,
         ...(trimmedLink
           ? { externalLink: trimmedLink }
           : {}),
@@ -116,17 +122,14 @@ export default function WorkflowDetailPage() {
       }
       setActionDraft({ externalLink: "", comment: "" });
     } catch (err: unknown) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Workflow action failed.";
+      const parsed = parseApiError(err);
       const isMissingAssignee =
         action === "APPROVE" &&
-        /Assign a .* before approving|Assign an .* before/i.test(message);
+        /Assign a .* before approving|Assign an .* before/i.test(parsed.message);
       if (isMissingAssignee && !allowMissingAssignee) {
         const confirmed = await dialog.confirm({
           title: "Approve without Next Assignee?",
-          description: `${message}. The workflow will pause in the next stage until an assignee is selected.`,
+          description: `${parsed.message}. The workflow will pause in the next stage until an assignee is selected.`,
           confirmText: "Approve anyway",
           cancelText: "Cancel",
           variant: "warning",
@@ -138,7 +141,41 @@ export default function WorkflowDetailPage() {
         }
       }
 
-      setError(message);
+      if (parsed.isCampaignReviewAccessRequired) {
+        const managerName = parsed.currentCampaignManager?.name;
+        const suggestion =
+          parsed.suggestion ||
+          (managerName
+            ? `Ask to be added as a campaign manager or reviewer, or contact ${managerName}.`
+            : "Ask to be added as a campaign manager or reviewer, or contact the current campaign manager.");
+
+        await dialog.alert({
+          title: "Approval access required",
+          variant: "error",
+          description: (
+            <div className="space-y-2 text-sm text-zinc-300">
+              <p>You don&apos;t have approval access for this campaign.</p>
+              {managerName ? (
+                <p className="font-medium text-white">
+                  Current campaign manager: <span className="text-indigo-400">{managerName}</span>
+                </p>
+              ) : null}
+              <p className="text-xs text-zinc-400">{suggestion}</p>
+            </div>
+          ),
+          confirmText: "Understood",
+        });
+      } else if (parsed.isForbidden) {
+        await dialog.alert({
+          title: "Permission denied",
+          variant: "error",
+          description: parsed.message || "You don't have permission to perform this action.",
+          confirmText: "Understood",
+        });
+      }
+
+      setActionError(parsed);
+      setError(parsed.message);
     } finally {
       setIsActionRunning(false);
     }
@@ -184,8 +221,8 @@ export default function WorkflowDetailPage() {
           <div className="text-sm text-zinc-500">Loading workflow...</div>
         ) : firstLoadError ? (
           <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{firstLoadError}</div>
-        ) : error ? (
-          <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>
+        ) : actionError || error ? (
+          <WorkflowActionErrorBanner error={actionError || error} />
         ) : asset ? (
           <div className="space-y-3 lg:space-y-5">
             <div className="flex flex-wrap items-center gap-3">
@@ -260,6 +297,7 @@ export default function WorkflowDetailPage() {
                   roleKeys={roleKeys}
                   isTaskOwner={isTaskOwner}
                   draft={actionDraft}
+                  actionError={actionError}
                   isRunning={isActionRunning}
                   onDraftChange={setActionDraft}
                   onAction={runWorkflowAction}
@@ -364,6 +402,7 @@ function WorkflowDetailActions({
   stage,
   roleKeys,
   draft,
+  actionError,
   isTaskOwner,
   isRunning,
   onDraftChange,
@@ -373,6 +412,7 @@ function WorkflowDetailActions({
   roleKeys: string[];
   isTaskOwner: boolean;
   draft: { externalLink: string; comment: string };
+  actionError?: ParsedApiError | null;
   isRunning: boolean;
   onDraftChange: (value: { externalLink: string; comment: string }) => void;
   onAction: (action: WorkflowActionType) => void;
@@ -385,6 +425,11 @@ function WorkflowDetailActions({
 
   return (
     <section className="rounded-md border border-zinc-800 bg-[#0b0b11] p-3 lg:rounded-lg lg:p-4">
+      {actionError ? (
+        <div className="mb-4">
+          <WorkflowActionErrorBanner error={actionError} />
+        </div>
+      ) : null}
       <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">Task flow</h2>
       <p className="mt-1 text-xs leading-5 text-zinc-500">Move the current stage forward with a recorded submission, handover, approval, or change request.</p>
 
