@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
   BriefcaseBusiness,
   CalendarDays,
+  Files,
   FolderKanban,
   LayoutDashboard,
   MoreHorizontal,
@@ -192,6 +193,7 @@ function MobileNavLink({
 const mobileNavIcons: Partial<Record<WorkspaceNavItem["key"], LucideIcon>> = {
   dashboard: LayoutDashboard,
   campaigns: FolderKanban,
+  files: Files,
   gigs: BriefcaseBusiness,
   workflow: Workflow,
   calendar: CalendarDays,

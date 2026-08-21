@@ -27,16 +27,19 @@ export async function apiClient<T = unknown>(endpoint: string, options: FetchOpt
 
   const url = endpoint.startsWith("http") ? endpoint : `${getApiBaseUrl()}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
+  const isFormData = typeof FormData !== "undefined" && customConfig.body instanceof FormData;
+
   const createConfig = (currentToken: string | null): RequestInit => ({
     ...customConfig,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(requireAuth && currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
       ...(agencyId ? { "X-Agency-Id": agencyId } : {}),
       ...headers,
     },
     credentials: "include",
   });
+
 
   let response = await fetch(url, createConfig(token));
 

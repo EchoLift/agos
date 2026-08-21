@@ -82,6 +82,7 @@ model Agency {
   roles                Role[]
   googleCalendarEvents GoogleCalendarEvent[]
   workOrders           WorkOrder[]
+  clientAnalyticsAssets ClientAnalyticsAsset[]
 
   @@map("agencies")
 }
@@ -109,6 +110,7 @@ model User {
   clientContacts           ClientContact[]
   googleCalendarConnection GoogleCalendarConnection?
   googleCalendarEvents     GoogleCalendarEvent[]
+  uploadedClientAnalyticsAssets ClientAnalyticsAsset[]
   authUser                 AuthUser                  @relation(fields: [authUserId], references: [id])
 
   @@map("users")
@@ -332,6 +334,7 @@ model Client {
   contentAssets               ContentAsset[]
   clientContacts              ClientContact[]
   workOrders                  WorkOrder[]
+  clientAnalyticsAssets       ClientAnalyticsAsset[]
 
   @@index([agencyId])
   @@index([agencyId, assignedManagerMembershipId])
@@ -1219,3 +1222,42 @@ enum AuthProvider {
   GITHUB
   MICROSOFT
 }
+
+enum AnalyticsFileCategory {
+  IMAGE
+  VIDEO
+  PDF
+  SPREADSHEET
+  DOCUMENT
+  OTHER
+}
+
+model ClientAnalyticsAsset {
+  id               String                @id @default(uuid())
+  agencyId         String
+  clientId         String
+  uploadedByUserId String
+  originalFileName String
+  objectKey        String                @unique
+  mimeType         String
+  extension        String?
+  sizeBytes        BigInt
+  category         AnalyticsFileCategory
+  year             Int
+  month            Int
+  checksum         String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  deletedAt        DateTime?
+  version          Int                   @default(1)
+
+  agency           Agency                @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  client           Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  uploadedByUser   User                  @relation(fields: [uploadedByUserId], references: [id])
+
+  @@index([agencyId, clientId, year, month, deletedAt])
+  @@index([agencyId, clientId, category, deletedAt])
+  @@index([clientId, createdAt])
+  @@map("client_analytics_assets")
+}
+

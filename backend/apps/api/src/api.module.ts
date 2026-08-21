@@ -6,6 +6,7 @@ import { ActivationModule } from "@modules/activation/activation.module";
 import { CalendarModule } from "@modules/calendar/calendar.module";
 import { CampaignModule } from "@modules/campaign/campaign.module";
 import { ClientModule } from "@modules/client/client.module";
+import { ClientAnalyticsModule } from "@modules/client-analytics/client-analytics.module";
 import { ContentModule } from "@modules/content/content.module";
 import { DashboardModule } from "@modules/dashboard/dashboard.module";
 import { FileModule } from "@modules/file/file.module";
@@ -42,6 +43,7 @@ import { PermissionsGuard } from "@packages/security/guards/permissions.guard";
     OrganizationModule,
     CalendarModule,
     ClientModule,
+    ClientAnalyticsModule,
     CampaignModule,
     ContentModule,
     DashboardModule,
@@ -53,6 +55,7 @@ import { PermissionsGuard } from "@packages/security/guards/permissions.guard";
     GoogleCalendarModule,
     SecurityModule,
   ],
+
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: TenantGuard },
