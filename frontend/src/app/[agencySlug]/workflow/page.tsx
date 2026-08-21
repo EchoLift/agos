@@ -311,11 +311,10 @@ export default function WorkflowPage() {
                   key={column.stage}
                   type="button"
                   onClick={() => setMobileStage(column.stage)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
-                    effectiveMobileStage === column.stage
-                      ? "bg-indigo-500 text-white"
-                      : "bg-zinc-900 text-zinc-400 hover:text-white"
-                  }`}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition ${effectiveMobileStage === column.stage
+                    ? "bg-indigo-500 text-white"
+                    : "bg-zinc-900 text-zinc-400 hover:text-white"
+                    }`}
                 >
                   {column.label} ({column.count})
                 </button>
@@ -359,23 +358,25 @@ export default function WorkflowPage() {
 
       {selectedItem ? (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs">
-          <aside className="h-full w-full max-w-xl overflow-y-auto border-l border-zinc-800 bg-[#09090d] p-4 lg:p-6">
+          <aside className="h-full w-full max-w-xl overflow-y-auto border-l p-4 lg:p-6
+                            border-zinc-200 bg-white text-zinc-900
+                            dark:border-zinc-800 dark:bg-[#09090d] dark:text-white">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-indigo-300">{selectedItem.displayCode}</div>
-                <h2 className="mt-1 text-lg font-semibold text-white">{selectedItem.title}</h2>
+                <h2 className="mt-1 text-lg font-semibold text-zinc-900 dark:text-white">{selectedItem.title}</h2>
                 <p className="mt-1 text-xs text-zinc-500">{selectedItem.clientName} · {selectedItem.campaignName}</p>
               </div>
               <button
                 type="button"
                 onClick={() => selectItem(null)}
-                className="rounded-full border border-zinc-800 p-2 text-zinc-400 transition hover:bg-zinc-900 hover:text-white"
+                className="rounded-full border border-zinc-300 p-2 text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-white"
               >
                 Close
               </button>
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-3">
+            <div className="mt-6 rounded-2xl border border-zinc-200 bg-white space-y-2 p-2 dark:border-zinc-800 dark:bg-[#0b0b11]">
               <Detail label="Stage" value={formatLabel(selectedItem.stage)} />
               <Detail label="Task status" value={selectedItem.taskStatus ? formatLabel(selectedItem.taskStatus) : "None"} />
               <Detail label="Owner" value={selectedItem.owner?.name || "Unassigned"} />
@@ -385,8 +386,13 @@ export default function WorkflowPage() {
             </div>
 
             <div className="mt-6 rounded-2xl border border-zinc-800 bg-[#0b0b11] p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">What happens next</h3>
-              <p className="mt-3 text-sm leading-6 text-zinc-400">{nextActionText(selectedItem)}</p>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-500">
+                What happens next
+              </h3>
+
+              <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+                {nextActionText(selectedItem)}
+              </p>
             </div>
 
             <ClientContextCard
