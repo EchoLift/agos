@@ -1273,6 +1273,21 @@ enum ReportNotificationScheduleType {
   DAYS_BEFORE_MONTH_END
 }
 
+enum ReportNotificationFrequency {
+  MONTHLY
+  WEEKLY
+}
+
+enum ReportNotificationWeekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
 enum ReportNotificationExecutionStatus {
   PENDING
   SENT
@@ -1284,8 +1299,10 @@ model ClientReportNotificationSchedule {
   id                 String                         @id @default(uuid())
   agencyId           String
   clientId           String
+  frequency          ReportNotificationFrequency    @default(MONTHLY)
   scheduleType       ReportNotificationScheduleType
   daysBeforeMonthEnd Int?
+  weeklyDay          ReportNotificationWeekday?
   sendTime           String
   timezone           String                         @default("Asia/Kolkata")
   enabled            Boolean                        @default(true)
@@ -1314,6 +1331,8 @@ model ClientReportNotificationExecution {
   clientId       String
   reportYear     Int
   reportMonth    Int
+  periodStart    DateTime
+  periodEnd      DateTime
   scheduledAt    DateTime
   sentAt         DateTime?
   status         ReportNotificationExecutionStatus @default(PENDING)
@@ -1326,7 +1345,8 @@ model ClientReportNotificationExecution {
 
   schedule ClientReportNotificationSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
 
-  @@unique([scheduleId, reportYear, reportMonth])
+  @@unique([scheduleId, periodStart, periodEnd], map: "client_report_notification_executions_schedule_period_key")
   @@index([agencyId, clientId, reportYear, reportMonth])
+  @@index([agencyId, clientId, periodStart, periodEnd], map: "client_report_notification_executions_agency_client_period_idx")
   @@map("client_report_notification_executions")
 }

@@ -21,6 +21,8 @@ describe("ClientAnalyticsService & R2StorageService", () => {
   let prisma: any;
   let eventBus: any;
   let config: any;
+  let notificationService: any;
+  let crypto: any;
 
   const mockActor: IdentityContext = {
     authUserId: "auth-123",
@@ -56,10 +58,25 @@ describe("ClientAnalyticsService & R2StorageService", () => {
         findFirst: jest.fn(),
         update: jest.fn(),
       },
+      agency: {
+        findUnique: jest.fn(),
+      },
+      user: {
+        findUnique: jest.fn(),
+      },
+      notification: {
+        count: jest.fn(),
+      },
     };
 
     eventBus = {
       publish: jest.fn().mockResolvedValue({}),
+    };
+    notificationService = {
+      notify: jest.fn().mockResolvedValue({ deliveryId: "delivery-1" }),
+    };
+    crypto = {
+      decrypt: jest.fn().mockReturnValue("owner@example.com"),
     };
 
     r2Storage = new R2StorageService(config);
@@ -69,7 +86,40 @@ describe("ClientAnalyticsService & R2StorageService", () => {
       .spyOn(r2Storage, "getSignedDownloadUrl")
       .mockResolvedValue("https://mock-signed-url.example/test.png");
 
-    service = new ClientAnalyticsService(prisma, r2Storage, eventBus);
+    service = new ClientAnalyticsService(
+      prisma,
+      r2Storage,
+      eventBus,
+      {
+        normalizeTimezone: jest.fn((tz?: string | null) => tz || "Asia/Kolkata"),
+        validateScheduleConfig: jest.fn(),
+        generatePreview: jest.fn(() => ({
+          frequency: "MONTHLY",
+          scheduleType: "LAST_WORKING_DAY",
+          weeklyDay: null,
+          daysBeforeMonthEnd: null,
+          sendTime: "10:00",
+          timezone: "Asia/Kolkata",
+          nextRunAt: new Date("2026-08-31T04:30:00.000Z"),
+          reportYear: 2026,
+          reportMonth: 8,
+          periodStart: new Date("2026-07-31T18:30:00.000Z"),
+          periodEnd: new Date("2026-08-31T18:29:59.999Z"),
+          reportPeriodLabel: "August 2026",
+        })),
+        calculateNextRunAt: jest.fn(() => new Date("2026-08-31T04:30:00.000Z")),
+        resolveReportingPeriod: jest.fn(() => ({
+          reportYear: 2026,
+          reportMonth: 8,
+          periodStart: new Date("2026-07-31T18:30:00.000Z"),
+          periodEnd: new Date("2026-08-31T18:29:59.999Z"),
+          label: "August 2026",
+        })),
+      } as any,
+      notificationService,
+      crypto,
+      config,
+    );
   });
 
   describe("File Classification", () => {
@@ -508,6 +558,71 @@ describe("ClientAnalyticsService & R2StorageService", () => {
           }),
         }),
       );
+    });
+  });
+
+  describe("Report Notification Test Email", () => {
+    it("queues a test email only to the authenticated agency user", async () => {
+      prisma.agency.findUnique.mockResolvedValue({
+        id: "agency-456",
+        name: "Socia Expert",
+        displayName: "Socia Expert",
+        slug: "socia-expert",
+      });
+      prisma.client.findFirst.mockResolvedValue({
+        id: "client-1",
+        name: "Test Client",
+      });
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-123",
+        name: "Owner",
+        authUser: { emailEncrypted: "encrypted-email" },
+      });
+      prisma.notification.count.mockResolvedValue(0);
+
+      const result = await service.sendReportNotificationTestEmail(
+        "client-1",
+        {
+          frequency: "WEEKLY" as any,
+          weeklyDay: "SATURDAY" as any,
+          sendTime: "18:00",
+          timezone: "Asia/Kolkata",
+        },
+        mockActor,
+      );
+
+      expect(result.recipientEmail).toBe("owner@example.com");
+      expect(crypto.decrypt).toHaveBeenCalledWith("encrypted-email");
+      expect(notificationService.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          agencyId: "agency-456",
+          userId: "user-123",
+          title: "[TEST] Your latest performance reports are ready",
+          recipientType: "EMPLOYEE",
+          metadata: expect.objectContaining({
+            isTest: true,
+            reportFrequency: "WEEKLY",
+            clientId: "client-1",
+            deepLink: expect.stringMatching(/^https:\/\/socia-expert\..+\/files$/),
+          }),
+        }),
+      );
+    });
+
+    it("rejects client-scoped users", async () => {
+      await expect(
+        service.sendReportNotificationTestEmail(
+          "client-1",
+          {
+            frequency: "WEEKLY" as any,
+            weeklyDay: "SATURDAY" as any,
+            sendTime: "18:00",
+            timezone: "Asia/Kolkata",
+          },
+          { ...mockActor, clientId: "client-1", role: "CLIENT", roles: ["CLIENT"] },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(notificationService.notify).not.toHaveBeenCalled();
     });
   });
 });

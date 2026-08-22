@@ -18,6 +18,8 @@ export interface EmailTemplateData {
   deepLink?: string;
   token?: string;
   additionalContext?: string;
+  reportFrequency?: string;
+  isTest?: boolean;
   frontendUrl?: string;
 }
 
@@ -333,23 +335,51 @@ export function renderEmailTemplate(
 
     case "ClientReportReady": {
       const reportPeriod = data.additionalContext || "this month";
-      const subject = `Your ${reportPeriod} reports are ready`;
-      const text = `Hi ${recipient},\n\n${agency} has uploaded your reports for ${reportPeriod}.\n\nView your analytics and reports in your client portal:\n${deepLink}\n\nAGENCIE Team`;
-      const html = `
-        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#18181b;color:#f4f4f5;border-radius:12px;overflow:hidden;padding:24px;">
-          ${headerHtml}
-          <div style="padding:24px;">
-            <h2 style="color:#ffffff;margin-top:0;">Your ${reportPeriod} reports are ready</h2>
-            <p style="color:#a1a1aa;font-size:15px;">Hi ${recipient},</p>
-            <p style="color:#a1a1aa;font-size:15px;"><strong>${agency}</strong> has uploaded your analytics reports for <strong>${reportPeriod}</strong>. View them in your client portal at any time.</p>
+      const isWeekly = data.reportFrequency === "WEEKLY";
+      const isTest = data.isTest === true;
+      const headline = isWeekly
+        ? "Your latest performance reports are ready"
+        : `Your ${reportPeriod} reports are ready`;
+      const subject = `${isTest ? "[TEST] " : ""}${headline}`;
+      const testText = isTest
+        ? "TEST NOTIFICATION\nThis is a test report notification. This email was sent only to you and was not sent to the client.\n\n"
+        : "";
+      const bodyText = isWeekly
+        ? `${agency} has updated your performance reports. View the latest reports in your client portal.`
+        : `${agency} has uploaded your reports for ${reportPeriod}.`;
+      const text = `Hi ${recipient},\n\n${testText}${bodyText}\n\nView your analytics and reports in your client portal:\n${deepLink}\n\nAGENCIE Team`;
+      const testBannerHtml = isTest
+        ? `
+            <div style="background:#312e81;border:1px solid #818cf8;color:#ffffff;padding:14px 16px;border-radius:8px;margin:0 0 20px;">
+              <p style="margin:0 0 4px;font-size:13px;font-weight:700;letter-spacing:.08em;">TEST NOTIFICATION</p>
+              <p style="margin:0;color:#e0e7ff;font-size:14px;">This is a test report notification. This email was sent only to you and was not sent to the client.</p>
+            </div>
+          `
+        : "";
+      const periodHtml = isWeekly
+        ? ""
+        : `
             <div style="background:#27272a;padding:16px;border-radius:8px;margin:20px 0;">
               <p style="margin:4px 0;color:#818cf8;font-size:14px;font-weight:600;">Reporting period</p>
               <p style="margin:4px 0;color:#ffffff;font-weight:600;font-size:16px;">${reportPeriod}</p>
             </div>
+          `;
+      const scheduleCopy = isWeekly
+        ? "You are receiving this notification because your agency configured a weekly report delivery schedule."
+        : "You are receiving this notification because your agency configured a monthly report delivery schedule.";
+      const html = `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#18181b;color:#f4f4f5;border-radius:12px;overflow:hidden;padding:24px;">
+          ${headerHtml}
+          <div style="padding:24px;">
+            ${testBannerHtml}
+            <h2 style="color:#ffffff;margin-top:0;">${headline}</h2>
+            <p style="color:#a1a1aa;font-size:15px;">Hi ${recipient},</p>
+            <p style="color:#a1a1aa;font-size:15px;"><strong>${agency}</strong> ${isWeekly ? "has updated your performance reports. View the latest reports in your client portal at any time." : `has uploaded your analytics reports for <strong>${reportPeriod}</strong>. View them in your client portal at any time.`}</p>
+            ${periodHtml}
             <div style="margin:28px 0;text-align:center;">
               <a href="${deepLink}" style="background-color:#6366f1;color:#ffffff;padding:12px 28px;text-decoration:none;border-radius:8px;font-weight:600;display:inline-block;">View Reports</a>
             </div>
-            <p style="color:#52525b;font-size:12px;text-align:center;">You are receiving this notification because your agency configured a monthly report delivery schedule.</p>
+            <p style="color:#52525b;font-size:12px;text-align:center;">${scheduleCopy}</p>
           </div>
           ${footerHtml}
         </div>

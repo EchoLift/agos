@@ -1,20 +1,32 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
   PayloadTooLargeException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { FieldCryptoService } from "@packages/crypto/field-crypto.service";
 import { PrismaService } from "@packages/database/prisma.service";
 import { EventBusService } from "@packages/events/event-bus.service";
 import { DomainEvents } from "@packages/events/domain-event";
 import { assertClientScope } from "@packages/security/client-scope";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
+import { NotificationService } from "@modules/notification/notification.service";
+import {
+  NotificationDeliveryIntent,
+  NotificationRecipientType,
+} from "@modules/notification/notification.policy";
+import { buildDeepLink } from "@modules/notification/email/templates/email-templates";
 import {
   AnalyticsFileCategory,
   ClientAnalyticsAsset,
+  ReportNotificationFrequency,
   ReportNotificationScheduleType,
+  ReportNotificationWeekday,
 } from "@prisma/client";
 import { R2StorageService } from "./r2-storage.service";
 import { UploadAnalyticsFilesDto } from "./dto/upload-analytics-files.dto";
@@ -23,6 +35,8 @@ import { ReportScheduleCalculatorService } from "./services/report-schedule-calc
 import {
   UpsertReportNotificationScheduleDto,
   ReportNotificationScheduleResponse,
+  TestReportNotificationScheduleDto,
+  TestReportNotificationScheduleResponse,
 } from "./dto/report-notification-schedule.dto";
 import {
   CategoryCountDto,
@@ -71,6 +85,9 @@ const CATEGORY_ORDER: AnalyticsFileCategory[] = [
   AnalyticsFileCategory.OTHER,
 ];
 
+const REPORT_NOTIFICATION_TEST_LIMIT = 5;
+const REPORT_NOTIFICATION_TEST_WINDOW_MS = 60 * 60 * 1000;
+
 @Injectable()
 export class ClientAnalyticsService {
   private readonly logger = new Logger(ClientAnalyticsService.name);
@@ -80,6 +97,9 @@ export class ClientAnalyticsService {
     private readonly r2Storage: R2StorageService,
     private readonly eventBus: EventBusService,
     private readonly scheduleCalculator: ReportScheduleCalculatorService,
+    private readonly notificationService: NotificationService,
+    private readonly crypto: FieldCryptoService,
+    private readonly config: ConfigService,
   ) {}
 
   classifyAnalyticsFile(
@@ -523,8 +543,10 @@ export class ClientAnalyticsService {
         id: null,
         agencyId,
         clientId,
+        frequency: ReportNotificationFrequency.MONTHLY,
         scheduleType: null,
         daysBeforeMonthEnd: null,
+        weeklyDay: null,
         sendTime: null,
         timezone: "Asia/Kolkata",
         enabled: false,
@@ -535,14 +557,25 @@ export class ClientAnalyticsService {
     }
 
     const lastExecution = schedule.executions[0] ?? null;
+    const lastExecutionPeriod = lastExecution
+      ? this.scheduleCalculator.resolveReportingPeriod({
+          frequency: schedule.frequency,
+          scheduleType: schedule.scheduleType,
+          weeklyDay: schedule.weeklyDay,
+          runDate: lastExecution.scheduledAt,
+          timezone: schedule.timezone,
+        })
+      : null;
 
     return {
       configured: true,
       id: schedule.id,
       agencyId: schedule.agencyId,
       clientId: schedule.clientId,
+      frequency: schedule.frequency,
       scheduleType: schedule.scheduleType,
       daysBeforeMonthEnd: schedule.daysBeforeMonthEnd,
+      weeklyDay: schedule.weeklyDay,
       sendTime: schedule.sendTime,
       timezone: schedule.timezone,
       enabled: schedule.enabled,
@@ -554,7 +587,11 @@ export class ClientAnalyticsService {
             status: lastExecution.status,
             reportYear: lastExecution.reportYear,
             reportMonth: lastExecution.reportMonth,
-            reportPeriodLabel: `${["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][lastExecution.reportMonth - 1]} ${lastExecution.reportYear}`,
+            reportPeriodLabel:
+              lastExecutionPeriod?.label ??
+              `${MONTH_NAMES[lastExecution.reportMonth - 1]} ${lastExecution.reportYear}`,
+            periodStart: lastExecution.periodStart,
+            periodEnd: lastExecution.periodEnd,
             scheduledAt: lastExecution.scheduledAt,
             sentAt: lastExecution.sentAt,
             attemptCount: lastExecution.attemptCount,
@@ -586,23 +623,14 @@ export class ClientAnalyticsService {
 
     assertClientScope(actor, clientId);
 
-    this.scheduleCalculator.validateScheduleInput(
-      dto.scheduleType,
-      dto.daysBeforeMonthEnd ?? null,
-      dto.sendTime,
-      dto.timezone ?? null,
-    );
+    const normalized = this.normalizeReportNotificationInput(dto);
+    this.scheduleCalculator.validateScheduleConfig(normalized);
 
     const timezone = this.scheduleCalculator.normalizeTimezone(dto.timezone);
     const enabled = dto.enabled !== false;
 
     const nextRunAt = enabled
-      ? this.scheduleCalculator.calculateNextRunAt({
-          scheduleType: dto.scheduleType,
-          daysBeforeMonthEnd: dto.daysBeforeMonthEnd,
-          sendTime: dto.sendTime,
-          timezone,
-        })
+      ? this.scheduleCalculator.calculateNextRunAt(normalized)
       : null;
 
     await this.prisma.clientReportNotificationSchedule.upsert({
@@ -610,26 +638,42 @@ export class ClientAnalyticsService {
       create: {
         agencyId,
         clientId,
-        scheduleType: dto.scheduleType,
+        frequency: normalized.frequency,
+        scheduleType:
+          normalized.scheduleType ??
+          ReportNotificationScheduleType.LAST_WORKING_DAY,
         daysBeforeMonthEnd:
-          dto.scheduleType ===
+          normalized.frequency === ReportNotificationFrequency.MONTHLY &&
+          normalized.scheduleType ===
           ReportNotificationScheduleType.DAYS_BEFORE_MONTH_END
-            ? (dto.daysBeforeMonthEnd ?? null)
+            ? (normalized.daysBeforeMonthEnd ?? null)
             : null,
-        sendTime: dto.sendTime,
+        weeklyDay:
+          normalized.frequency === ReportNotificationFrequency.WEEKLY
+            ? normalized.weeklyDay
+            : null,
+        sendTime: normalized.sendTime,
         timezone,
         enabled,
         nextRunAt,
         createdById: userId,
       },
       update: {
-        scheduleType: dto.scheduleType,
+        frequency: normalized.frequency,
+        scheduleType:
+          normalized.scheduleType ??
+          ReportNotificationScheduleType.LAST_WORKING_DAY,
         daysBeforeMonthEnd:
-          dto.scheduleType ===
+          normalized.frequency === ReportNotificationFrequency.MONTHLY &&
+          normalized.scheduleType ===
           ReportNotificationScheduleType.DAYS_BEFORE_MONTH_END
-            ? (dto.daysBeforeMonthEnd ?? null)
+            ? (normalized.daysBeforeMonthEnd ?? null)
             : null,
-        sendTime: dto.sendTime,
+        weeklyDay:
+          normalized.frequency === ReportNotificationFrequency.WEEKLY
+            ? normalized.weeklyDay
+            : null,
+        sendTime: normalized.sendTime,
         timezone,
         enabled,
         nextRunAt,
@@ -640,23 +684,134 @@ export class ClientAnalyticsService {
     return this.getReportNotificationSchedule(clientId, actor);
   }
 
-  async previewReportNotificationSchedule(
-    scheduleType: ReportNotificationScheduleType,
-    daysBeforeMonthEnd: number | null | undefined,
-    sendTime: string,
-    timezone: string | null | undefined,
-  ) {
-    this.scheduleCalculator.validateScheduleInput(
-      scheduleType,
-      daysBeforeMonthEnd ?? null,
-      sendTime,
-      timezone ?? null,
-    );
-    return this.scheduleCalculator.generatePreview({
-      scheduleType,
-      daysBeforeMonthEnd: daysBeforeMonthEnd ?? undefined,
-      sendTime,
-      timezone: timezone ?? undefined,
+  async previewReportNotificationSchedule(dto: TestReportNotificationScheduleDto) {
+    const normalized = this.normalizeReportNotificationInput(dto);
+    this.scheduleCalculator.validateScheduleConfig(normalized);
+    return this.scheduleCalculator.generatePreview(normalized);
+  }
+
+  async sendReportNotificationTestEmail(
+    clientId: string,
+    dto: TestReportNotificationScheduleDto,
+    actor?: IdentityContext,
+  ): Promise<TestReportNotificationScheduleResponse> {
+    const agencyId = actor?.agencyId;
+    const userId = actor?.userId;
+    if (!agencyId || !userId) {
+      throw new BadRequestException("Agency and user context required.");
+    }
+
+    if (actor?.clientId) {
+      throw new ForbiddenException(
+        "Client-scoped users cannot send report notification test emails.",
+      );
+    }
+
+    assertClientScope(actor, clientId);
+
+    const normalized = this.normalizeReportNotificationInput(dto);
+    this.scheduleCalculator.validateScheduleConfig(normalized);
+
+    const [agency, client, user, testCount] = await Promise.all([
+      this.prisma.agency.findUnique({
+        where: { id: agencyId },
+        select: { id: true, name: true, displayName: true, slug: true },
+      }),
+      this.prisma.client.findFirst({
+        where: { id: clientId, agencyId, deletedAt: null },
+        select: { id: true, name: true },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        include: { authUser: true },
+      }),
+      this.prisma.notification.count({
+        where: {
+          agencyId,
+          userId,
+          eventType: "ClientReportReady",
+          title: { startsWith: "[TEST]" },
+          createdAt: {
+            gte: new Date(Date.now() - REPORT_NOTIFICATION_TEST_WINDOW_MS),
+          },
+        },
+      }),
+    ]);
+
+    if (!agency || !client) {
+      throw new NotFoundException("Client not found.");
+    }
+    if (!user?.authUser?.emailEncrypted) {
+      throw new BadRequestException("Authenticated user email not found.");
+    }
+    if (testCount >= REPORT_NOTIFICATION_TEST_LIMIT) {
+      throw new HttpException(
+        "You've reached the test email limit. Try again later.",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const recipientEmail = this.crypto.decrypt(user.authUser.emailEncrypted);
+    const preview = this.scheduleCalculator.generatePreview(normalized);
+    const frontendUrl =
+      this.config.get<string>("FRONTEND_URL") || "https://app.agencie.in";
+    const deepLink = buildDeepLink(frontendUrl, "/files", agency.slug);
+    const isWeekly = normalized.frequency === ReportNotificationFrequency.WEEKLY;
+    const title = isWeekly
+      ? "[TEST] Your latest performance reports are ready"
+      : `[TEST] Your ${preview.reportPeriodLabel} reports are ready`;
+    const body = isWeekly
+      ? `${agency.displayName || agency.name} has updated your performance reports.`
+      : `${agency.displayName || agency.name} has uploaded your reports for ${preview.reportPeriodLabel}.`;
+
+    await this.notificationService.notify({
+      agencyId,
+      userId,
+      title,
+      body,
+      eventType: "ClientReportReady",
+      deliveryIntent: NotificationDeliveryIntent.ClientActionRequired,
+      recipientType: "EMPLOYEE" as NotificationRecipientType,
+      metadata: {
+        isTest: true,
+        reportFrequency: normalized.frequency,
+        scheduleType: normalized.scheduleType,
+        weeklyDay: normalized.weeklyDay,
+        reportYear: preview.reportYear,
+        reportMonth: preview.reportMonth,
+        reportPeriodLabel: preview.reportPeriodLabel,
+        periodStart: preview.periodStart.toISOString(),
+        periodEnd: preview.periodEnd.toISOString(),
+        clientId,
+        clientName: client.name,
+        deepLink,
+      },
     });
+
+    return {
+      success: true,
+      recipientEmail,
+      reportPeriodLabel: preview.reportPeriodLabel,
+      nextRunAt: preview.nextRunAt,
+    };
+  }
+
+  private normalizeReportNotificationInput(dto: TestReportNotificationScheduleDto) {
+    const frequency = dto.frequency ?? ReportNotificationFrequency.MONTHLY;
+    const timezone = this.scheduleCalculator.normalizeTimezone(dto.timezone);
+    return {
+      frequency,
+      scheduleType:
+        frequency === ReportNotificationFrequency.MONTHLY
+          ? (dto.scheduleType ?? ReportNotificationScheduleType.LAST_WORKING_DAY)
+          : null,
+      weeklyDay:
+        frequency === ReportNotificationFrequency.WEEKLY
+          ? (dto.weeklyDay ?? ReportNotificationWeekday.FRIDAY)
+          : null,
+      daysBeforeMonthEnd: dto.daysBeforeMonthEnd ?? null,
+      sendTime: dto.sendTime,
+      timezone,
+    };
   }
 }

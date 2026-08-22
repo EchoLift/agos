@@ -155,6 +155,11 @@ export class NotificationDeliveryProcessor {
         typeof metadata.reportPeriodLabel === "string"
           ? metadata.reportPeriodLabel
           : undefined,
+      reportFrequency:
+        typeof metadata.reportFrequency === "string"
+          ? metadata.reportFrequency
+          : undefined,
+      isTest: metadata.isTest === true,
       frontendUrl,
     });
 

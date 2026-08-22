@@ -1,4 +1,8 @@
-import { ReportNotificationScheduleType } from "@prisma/client";
+import {
+  ReportNotificationFrequency,
+  ReportNotificationScheduleType,
+  ReportNotificationWeekday,
+} from "@prisma/client";
 import { ReportScheduleCalculatorService } from "./report-schedule-calculator.service";
 
 describe("ReportScheduleCalculatorService", () => {
@@ -303,6 +307,111 @@ describe("ReportScheduleCalculatorService", () => {
 
       // Aug 31, 2026 at 10:00 AM EDT (UTC-4) = 2026-08-31T14:00:00.000Z
       expect(nextRun.toISOString()).toBe("2026-08-31T14:00:00.000Z");
+    });
+  });
+
+  describe("weekly scheduling", () => {
+    it("supports each weekday selection", () => {
+      const fromDate = new Date("2026-08-17T00:00:00.000Z"); // Monday
+      const expected: Record<ReportNotificationWeekday, string> = {
+        MONDAY: "2026-08-17T04:30:00.000Z",
+        TUESDAY: "2026-08-18T04:30:00.000Z",
+        WEDNESDAY: "2026-08-19T04:30:00.000Z",
+        THURSDAY: "2026-08-20T04:30:00.000Z",
+        FRIDAY: "2026-08-21T04:30:00.000Z",
+        SATURDAY: "2026-08-22T04:30:00.000Z",
+        SUNDAY: "2026-08-23T04:30:00.000Z",
+      };
+
+      for (const day of Object.values(ReportNotificationWeekday)) {
+        expect(
+          service
+            .calculateNextRunAt({
+              frequency: ReportNotificationFrequency.WEEKLY,
+              weeklyDay: day,
+              sendTime: "10:00",
+              timezone: "Asia/Kolkata",
+              fromDate,
+            })
+            .toISOString(),
+        ).toBe(expected[day]);
+      }
+    });
+
+    it("uses same-day weekly run if scheduled time has not passed", () => {
+      const nextRun = service.calculateNextRunAt({
+        frequency: ReportNotificationFrequency.WEEKLY,
+        weeklyDay: ReportNotificationWeekday.SATURDAY,
+        sendTime: "18:00",
+        timezone: "Asia/Kolkata",
+        fromDate: new Date("2026-08-22T11:00:00.000Z"), // 4:30 PM IST
+      });
+
+      expect(nextRun.toISOString()).toBe("2026-08-22T12:30:00.000Z");
+    });
+
+    it("advances weekly run by one week if same-day time has passed", () => {
+      const nextRun = service.calculateNextRunAt({
+        frequency: ReportNotificationFrequency.WEEKLY,
+        weeklyDay: ReportNotificationWeekday.SATURDAY,
+        sendTime: "18:00",
+        timezone: "Asia/Kolkata",
+        fromDate: new Date("2026-08-22T13:00:00.000Z"), // 6:30 PM IST
+      });
+
+      expect(nextRun.toISOString()).toBe("2026-08-29T12:30:00.000Z");
+    });
+
+    it("resolves Monday-Sunday weekly period across month boundaries", () => {
+      const period = service.resolveReportingPeriod({
+        frequency: ReportNotificationFrequency.WEEKLY,
+        weeklyDay: ReportNotificationWeekday.FRIDAY,
+        runDate: new Date("2026-09-04T04:30:00.000Z"),
+        timezone: "Asia/Kolkata",
+      });
+
+      expect(period.label).toBe("August 31 - September 6, 2026");
+      expect(period.periodStart.toISOString()).toBe("2026-08-30T18:30:00.000Z");
+      expect(period.periodEnd.toISOString()).toBe("2026-09-06T18:29:59.999Z");
+      expect(period.reportYear).toBe(2026);
+      expect(period.reportMonth).toBe(8);
+    });
+
+    it("resolves weekly period across year boundaries", () => {
+      const period = service.resolveReportingPeriod({
+        frequency: ReportNotificationFrequency.WEEKLY,
+        weeklyDay: ReportNotificationWeekday.FRIDAY,
+        runDate: new Date("2026-01-02T10:00:00.000Z"),
+        timezone: "UTC",
+      });
+
+      expect(period.label).toBe("December 29, 2025 - January 4, 2026");
+      expect(period.periodStart.toISOString()).toBe("2025-12-29T00:00:00.000Z");
+      expect(period.periodEnd.toISOString()).toBe("2026-01-04T23:59:59.999Z");
+    });
+
+    it("stores weekly timestamps in UTC for non-Indian timezones", () => {
+      const nextRun = service.calculateNextRunAt({
+        frequency: ReportNotificationFrequency.WEEKLY,
+        weeklyDay: ReportNotificationWeekday.FRIDAY,
+        sendTime: "10:00",
+        timezone: "America/New_York",
+        fromDate: new Date("2026-08-21T12:00:00.000Z"),
+      });
+
+      expect(nextRun.toISOString()).toBe("2026-08-21T14:00:00.000Z");
+    });
+
+    it("handles DST offsets when resolving weekly period boundaries", () => {
+      const period = service.resolveReportingPeriod({
+        frequency: ReportNotificationFrequency.WEEKLY,
+        weeklyDay: ReportNotificationWeekday.FRIDAY,
+        runDate: new Date("2026-03-13T14:00:00.000Z"),
+        timezone: "America/New_York",
+      });
+
+      expect(period.periodStart.toISOString()).toBe("2026-03-09T04:00:00.000Z");
+      expect(period.periodEnd.toISOString()).toBe("2026-03-16T03:59:59.999Z");
     });
   });
 

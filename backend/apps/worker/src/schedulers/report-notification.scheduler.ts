@@ -11,7 +11,9 @@ import {
 } from "@modules/notification/notification.policy";
 import {
   ReportNotificationExecutionStatus,
+  ReportNotificationFrequency,
   ReportNotificationScheduleType,
+  ReportNotificationWeekday,
 } from "@prisma/client";
 
 const MAX_ATTEMPTS = 3;
@@ -81,6 +83,8 @@ export class ReportNotificationSchedulerService {
       agencyId: string;
       clientId: string;
       scheduleType: ReportNotificationScheduleType;
+      frequency: ReportNotificationFrequency;
+      weeklyDay: ReportNotificationWeekday | null;
       daysBeforeMonthEnd: number | null;
       sendTime: string;
       timezone: string;
@@ -93,12 +97,16 @@ export class ReportNotificationSchedulerService {
     const {
       reportYear,
       reportMonth,
+      periodStart,
+      periodEnd,
       label: reportPeriodLabel,
-    } = this.scheduleCalculator.resolveReportPeriod(
-      schedule.scheduleType,
-      now,
-      schedule.timezone,
-    );
+    } = this.scheduleCalculator.resolveReportingPeriod({
+      frequency: schedule.frequency,
+      scheduleType: schedule.scheduleType,
+      weeklyDay: schedule.weeklyDay,
+      runDate: now,
+      timezone: schedule.timezone,
+    });
 
     this.logger.log(
       `Processing schedule ${schedule.id} for client ${schedule.clientId} — ` +
@@ -109,6 +117,8 @@ export class ReportNotificationSchedulerService {
       schedule,
       reportYear,
       reportMonth,
+      periodStart,
+      periodEnd,
       reportPeriodLabel,
       now,
     );
@@ -118,14 +128,11 @@ export class ReportNotificationSchedulerService {
     }
 
     // ── REPORT EXISTENCE CHECK ────────────────────────────────────────────────
-    const reportCount = await this.prisma.clientAnalyticsAsset.count({
-      where: {
-        agencyId: schedule.agencyId,
-        clientId: schedule.clientId,
-        year: reportYear,
-        month: reportMonth,
-        deletedAt: null,
-      },
+    const reportCount = await this.countReportsForPeriod(schedule, {
+      reportYear,
+      reportMonth,
+      periodStart,
+      periodEnd,
     });
 
     if (reportCount === 0) {
@@ -188,6 +195,8 @@ export class ReportNotificationSchedulerService {
     let recipientCount = 0;
     const errors: string[] = [];
 
+    const isWeekly = schedule.frequency === ReportNotificationFrequency.WEEKLY;
+
     for (const membership of clientMemberships) {
       const user = membership.user;
       if (!user?.authUser) continue;
@@ -198,15 +207,23 @@ export class ReportNotificationSchedulerService {
         await this.notificationService.notify({
           agencyId: schedule.agencyId,
           userId: user.id,
-          title: `Your ${reportPeriodLabel} reports are ready`,
-          body: `${schedule.agency.name} has uploaded your reports for ${reportPeriodLabel}.`,
+          title: isWeekly
+            ? "Your latest performance reports are ready"
+            : `Your ${reportPeriodLabel} reports are ready`,
+          body: isWeekly
+            ? `${schedule.agency.name} has updated your performance reports.`
+            : `${schedule.agency.name} has uploaded your reports for ${reportPeriodLabel}.`,
           eventType: "ClientReportReady",
           deliveryIntent: NotificationDeliveryIntent.ClientActionRequired,
           recipientType: "CLIENT" as NotificationRecipientType,
           metadata: {
+            reportFrequency: schedule.frequency,
             reportYear,
             reportMonth,
             reportPeriodLabel,
+            periodStart: periodStart.toISOString(),
+            periodEnd: periodEnd.toISOString(),
+            weeklyDay: schedule.weeklyDay,
             clientId: schedule.clientId,
             deepLink: reportsDeepLink,
           },
@@ -258,18 +275,73 @@ export class ReportNotificationSchedulerService {
     await this.advanceNextRunAt(schedule, now);
   }
 
+  private async countReportsForPeriod(
+    schedule: {
+      agencyId: string;
+      clientId: string;
+      frequency: ReportNotificationFrequency;
+      timezone: string;
+    },
+    period: {
+      reportYear: number;
+      reportMonth: number;
+      periodStart: Date;
+      periodEnd: Date;
+    },
+  ): Promise<number> {
+    if (schedule.frequency === ReportNotificationFrequency.MONTHLY) {
+      return this.prisma.clientAnalyticsAsset.count({
+        where: {
+          agencyId: schedule.agencyId,
+          clientId: schedule.clientId,
+          year: period.reportYear,
+          month: period.reportMonth,
+          deletedAt: null,
+        },
+      });
+    }
+
+    const start = this.scheduleCalculator.getLocalYearMonth(
+      period.periodStart,
+      schedule.timezone,
+    );
+    const end = this.scheduleCalculator.getLocalYearMonth(
+      period.periodEnd,
+      schedule.timezone,
+    );
+    const buckets = new Map<string, { year: number; month: number }>();
+    buckets.set(`${start.year}-${start.month}`, start);
+    buckets.set(`${end.year}-${end.month}`, end);
+
+    return this.prisma.clientAnalyticsAsset.count({
+      where: {
+        agencyId: schedule.agencyId,
+        clientId: schedule.clientId,
+        deletedAt: null,
+        OR: Array.from(buckets.values()).map((bucket) => ({
+          year: bucket.year,
+          month: bucket.month,
+        })),
+      },
+    });
+  }
+
   private async claimExecution(
     schedule: {
       id: string;
       agencyId: string;
       clientId: string;
+      frequency: ReportNotificationFrequency;
       scheduleType: ReportNotificationScheduleType;
+      weeklyDay: ReportNotificationWeekday | null;
       daysBeforeMonthEnd: number | null;
       sendTime: string;
       timezone: string;
     },
     reportYear: number,
     reportMonth: number,
+    periodStart: Date,
+    periodEnd: Date,
     reportPeriodLabel: string,
     now: Date,
   ): Promise<string | null> {
@@ -282,6 +354,8 @@ export class ReportNotificationSchedulerService {
             clientId: schedule.clientId,
             reportYear,
             reportMonth,
+            periodStart,
+            periodEnd,
             scheduledAt: now,
             status: ReportNotificationExecutionStatus.PENDING,
             attemptCount: 1,
@@ -299,10 +373,10 @@ export class ReportNotificationSchedulerService {
     const existingExecution =
       await this.prisma.clientReportNotificationExecution.findUnique({
         where: {
-          scheduleId_reportYear_reportMonth: {
+          scheduleId_periodStart_periodEnd: {
             scheduleId: schedule.id,
-            reportYear,
-            reportMonth,
+            periodStart,
+            periodEnd,
           },
         },
       });
@@ -377,7 +451,9 @@ export class ReportNotificationSchedulerService {
       id: string;
       agencyId: string;
       clientId: string;
+      frequency: ReportNotificationFrequency;
       scheduleType: ReportNotificationScheduleType;
+      weeklyDay: ReportNotificationWeekday | null;
       daysBeforeMonthEnd: number | null;
       sendTime: string;
       timezone: string;
@@ -386,7 +462,9 @@ export class ReportNotificationSchedulerService {
   ): Promise<void> {
     try {
       const nextRunAt = this.scheduleCalculator.calculateNextRunAt({
+        frequency: schedule.frequency,
         scheduleType: schedule.scheduleType,
+        weeklyDay: schedule.weeklyDay,
         daysBeforeMonthEnd: schedule.daysBeforeMonthEnd ?? undefined,
         sendTime: schedule.sendTime,
         timezone: schedule.timezone,
