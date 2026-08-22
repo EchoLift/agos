@@ -8,7 +8,6 @@ import {
   ReportNotificationWeekday,
   UpsertReportSchedulePayload,
   getReportNotificationSchedule,
-  sendReportNotificationTestEmail,
   upsertReportNotificationSchedule,
   previewReportNotificationSchedule,
 } from "@/lib/api/client-analytics";
@@ -211,8 +210,6 @@ export function ReportNotificationScheduleModal({
   const [sendTime, setSendTime] = useState("10:00");
   const [timezone, setTimezone] = useState("Asia/Kolkata");
   const [enabled, setEnabled] = useState(true);
-  const [testMessage, setTestMessage] = useState<string | null>(null);
-  const [testError, setTestError] = useState<string | null>(null);
   const [previewResult, setPreviewResult] = useState<{
     nextRunAt: string;
     reportPeriodLabel: string;
@@ -277,8 +274,6 @@ export function ReportNotificationScheduleModal({
     setPreviewResult(null);
     setPreviewError(null);
     setSaveError(null);
-    setTestMessage(null);
-    setTestError(null);
   }, [
     isOpen,
     schedule?.configured,
@@ -338,36 +333,9 @@ export function ReportNotificationScheduleModal({
     },
   });
 
-  const testEmailMutation = useMutation({
-    mutationFn: (payload: Omit<UpsertReportSchedulePayload, "enabled">) =>
-      sendReportNotificationTestEmail(agencyId, clientId, payload),
-    onMutate: () => {
-      setTestMessage(null);
-      setTestError(null);
-    },
-    onSuccess: (result) => {
-      setTestMessage(`Test email sent to ${result.recipientEmail}`);
-    },
-    onError: (err: unknown) => {
-      const message = getErrorMessage(
-        err,
-        "Unable to send test email. Try again later.",
-      );
-      setTestError(
-        message.toLowerCase().includes("limit")
-          ? "You've reached the test email limit. Try again later."
-          : message,
-      );
-    },
-  });
-
   const handleSave = () => {
     setSaveError(null);
     saveMutation.mutate(buildSchedulePayload(true));
-  };
-
-  const handleSendTestEmail = () => {
-    testEmailMutation.mutate(buildSchedulePayload(false));
   };
 
   // Format a UTC ISO string to local readable format
@@ -617,40 +585,15 @@ export function ReportNotificationScheduleModal({
               </p>
             )}
 
-            {(testMessage || testError) && (
-              <p
-                className={`rounded-lg border px-4 py-3 text-xs ${
-                  testError
-                    ? "border-destructive/30 bg-destructive/10 text-destructive"
-                    : "border-primary/30 bg-primary/10 text-primary"
-                }`}
-              >
-                {testError || testMessage}
-              </p>
-            )}
-
-            <p className="text-xs leading-5 text-muted-foreground">
-              Test emails are sent only to you. Your client will not be
-              notified.
-            </p>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-border px-4 py-4 sm:flex-row sm:justify-between sm:px-6">
-          <button
-            type="button"
-            onClick={handleSendTestEmail}
-            disabled={testEmailMutation.isPending || saveMutation.isPending}
-            className={secondaryButtonClass}
-          >
-            {testEmailMutation.isPending ? "Sending…" : "Send test email"}
-          </button>
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-border px-4 py-4 sm:flex-row sm:justify-end sm:px-6">
           <button
             type="button"
             onClick={onClose}
-            disabled={saveMutation.isPending || testEmailMutation.isPending}
+            disabled={saveMutation.isPending}
             className={secondaryButtonClass}
           >
             Cancel
@@ -663,7 +606,6 @@ export function ReportNotificationScheduleModal({
           >
             {saveMutation.isPending ? "Saving…" : "Save schedule"}
           </button>
-          </div>
         </div>
       </div>
     </div>

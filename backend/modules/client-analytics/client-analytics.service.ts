@@ -1,42 +1,30 @@
 import {
   BadRequestException,
   ForbiddenException,
-  HttpException,
-  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
   PayloadTooLargeException,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { FieldCryptoService } from "@packages/crypto/field-crypto.service";
 import { PrismaService } from "@packages/database/prisma.service";
 import { EventBusService } from "@packages/events/event-bus.service";
 import { DomainEvents } from "@packages/events/domain-event";
 import { assertClientScope } from "@packages/security/client-scope";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
-import { NotificationService } from "@modules/notification/notification.service";
-import {
-  NotificationDeliveryIntent,
-  NotificationRecipientType,
-} from "@modules/notification/notification.policy";
-import { buildDeepLink } from "@modules/notification/email/templates/email-templates";
 import {
   AnalyticsFileCategory,
   ClientAnalyticsAsset,
   ReportNotificationFrequency,
   ReportNotificationScheduleType,
-  ReportNotificationWeekday,
 } from "@prisma/client";
 import { R2StorageService } from "./r2-storage.service";
 import { UploadAnalyticsFilesDto } from "./dto/upload-analytics-files.dto";
 import { QueryAnalyticsFilesDto } from "./dto/query-analytics-files.dto";
 import { ReportScheduleCalculatorService } from "./services/report-schedule-calculator.service";
 import {
+  PreviewReportNotificationScheduleDto,
   UpsertReportNotificationScheduleDto,
   ReportNotificationScheduleResponse,
-  TestReportNotificationScheduleDto,
-  TestReportNotificationScheduleResponse,
 } from "./dto/report-notification-schedule.dto";
 import {
   CategoryCountDto,
@@ -85,9 +73,6 @@ const CATEGORY_ORDER: AnalyticsFileCategory[] = [
   AnalyticsFileCategory.OTHER,
 ];
 
-const REPORT_NOTIFICATION_TEST_LIMIT = 5;
-const REPORT_NOTIFICATION_TEST_WINDOW_MS = 60 * 60 * 1000;
-
 @Injectable()
 export class ClientAnalyticsService {
   private readonly logger = new Logger(ClientAnalyticsService.name);
@@ -97,9 +82,6 @@ export class ClientAnalyticsService {
     private readonly r2Storage: R2StorageService,
     private readonly eventBus: EventBusService,
     private readonly scheduleCalculator: ReportScheduleCalculatorService,
-    private readonly notificationService: NotificationService,
-    private readonly crypto: FieldCryptoService,
-    private readonly config: ConfigService,
   ) {}
 
   classifyAnalyticsFile(
@@ -696,119 +678,17 @@ export class ClientAnalyticsService {
     return this.getReportNotificationSchedule(clientId, actor);
   }
 
-  async previewReportNotificationSchedule(dto: TestReportNotificationScheduleDto) {
+  async previewReportNotificationSchedule(dto: PreviewReportNotificationScheduleDto) {
     const normalized = this.normalizeReportNotificationInput(dto);
     this.scheduleCalculator.validateScheduleConfig(normalized);
     return this.scheduleCalculator.generatePreview(normalized);
   }
 
-  async sendReportNotificationTestEmail(
-    clientId: string,
-    dto: TestReportNotificationScheduleDto,
-    actor?: IdentityContext,
-  ): Promise<TestReportNotificationScheduleResponse> {
-    const agencyId = actor?.agencyId;
-    const userId = actor?.userId;
-    if (!agencyId || !userId) {
-      throw new BadRequestException("Agency and user context required.");
-    }
-
-    if (actor?.clientId) {
-      throw new ForbiddenException(
-        "Client-scoped users cannot send report notification test emails.",
-      );
-    }
-
-    assertClientScope(actor, clientId);
-
-    const normalized = this.normalizeReportNotificationInput(dto);
-    this.scheduleCalculator.validateScheduleConfig(normalized);
-
-    const [agency, client, user, testCount] = await Promise.all([
-      this.prisma.agency.findUnique({
-        where: { id: agencyId },
-        select: { id: true, name: true, displayName: true, slug: true },
-      }),
-      this.prisma.client.findFirst({
-        where: { id: clientId, agencyId, deletedAt: null },
-        select: { id: true, name: true },
-      }),
-      this.prisma.user.findUnique({
-        where: { id: userId },
-        include: { authUser: true },
-      }),
-      this.prisma.notification.count({
-        where: {
-          agencyId,
-          userId,
-          eventType: "ClientReportReady",
-          title: { startsWith: "[TEST]" },
-          createdAt: {
-            gte: new Date(Date.now() - REPORT_NOTIFICATION_TEST_WINDOW_MS),
-          },
-        },
-      }),
-    ]);
-
-    if (!agency || !client) {
-      throw new NotFoundException("Client not found.");
-    }
-    if (!user?.authUser?.emailEncrypted) {
-      throw new BadRequestException("Authenticated user email not found.");
-    }
-    if (testCount >= REPORT_NOTIFICATION_TEST_LIMIT) {
-      throw new HttpException(
-        "You've reached the test email limit. Try again later.",
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
-
-    const recipientEmail = this.crypto.decrypt(user.authUser.emailEncrypted);
-    const preview = this.scheduleCalculator.generatePreview(normalized);
-    const frontendUrl =
-      this.config.get<string>("FRONTEND_URL") || "https://app.agencie.in";
-    const deepLink = buildDeepLink(frontendUrl, "/files", agency.slug);
-    const isWeekly = normalized.frequency === ReportNotificationFrequency.WEEKLY;
-    const title = isWeekly
-      ? "[TEST] Your latest performance reports are ready"
-      : `[TEST] Your ${preview.reportPeriodLabel} reports are ready`;
-    const body = isWeekly
-      ? `${agency.displayName || agency.name} has updated your performance reports.`
-      : `${agency.displayName || agency.name} has uploaded your reports for ${preview.reportPeriodLabel}.`;
-
-    await this.notificationService.notify({
-      agencyId,
-      userId,
-      title,
-      body,
-      eventType: "ClientReportReady",
-      deliveryIntent: NotificationDeliveryIntent.ClientActionRequired,
-      recipientType: "EMPLOYEE" as NotificationRecipientType,
-      metadata: {
-        isTest: true,
-        reportFrequency: normalized.frequency,
-        scheduleType: normalized.scheduleType,
-        weeklyDay: normalized.weeklyDay,
-        reportYear: preview.reportYear,
-        reportMonth: preview.reportMonth,
-        reportPeriodLabel: preview.reportPeriodLabel,
-        periodStart: preview.periodStart.toISOString(),
-        periodEnd: preview.periodEnd.toISOString(),
-        clientId,
-        clientName: client.name,
-        deepLink,
-      },
-    });
-
-    return {
-      success: true,
-      recipientEmail,
-      reportPeriodLabel: preview.reportPeriodLabel,
-      nextRunAt: preview.nextRunAt,
-    };
-  }
-
-  private normalizeReportNotificationInput(dto: TestReportNotificationScheduleDto) {
+  private normalizeReportNotificationInput(
+    dto:
+      | PreviewReportNotificationScheduleDto
+      | UpsertReportNotificationScheduleDto,
+  ) {
     const frequency = dto.frequency ?? ReportNotificationFrequency.MONTHLY;
     const timezone = this.scheduleCalculator.normalizeTimezone(dto.timezone);
     return {

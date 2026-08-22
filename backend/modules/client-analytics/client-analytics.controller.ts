@@ -31,7 +31,6 @@ import { UploadAnalyticsFilesDto } from "./dto/upload-analytics-files.dto";
 import { QueryAnalyticsFilesDto } from "./dto/query-analytics-files.dto";
 import {
   PreviewReportNotificationScheduleDto,
-  TestReportNotificationScheduleDto,
   UpsertReportNotificationScheduleDto,
 } from "./dto/report-notification-schedule.dto";
 
@@ -173,25 +172,6 @@ export class ClientAnalyticsController {
     return this.analyticsService.previewReportNotificationSchedule(dto);
   }
 
-  @Post("notification-schedule/test")
-  @RequirePermissions("CLIENT_UPDATE")
-  @ApiOperation({
-    summary: "Send a report notification test email",
-    description:
-      "Queues a test report notification email to the authenticated agency user only, using the provided unsaved schedule preview values.",
-  })
-  @ApiResponse({ status: HttpStatus.OK, description: "Test email queued for the authenticated user." })
-  async sendReportNotificationTestEmail(
-    @Param("clientId") clientId: string,
-    @Body() dto: TestReportNotificationScheduleDto,
-    @CurrentUser() user: IdentityContext,
-  ) {
-    return this.analyticsService.sendReportNotificationTestEmail(
-      clientId,
-      dto,
-      user,
-    );
-  }
 }
 
 @ApiTags("Client Report Notifications")
@@ -257,26 +237,4 @@ export class ClientReportNotificationScheduleController {
     return this.analyticsService.previewReportNotificationSchedule(dto);
   }
 
-  @Post("test")
-  @RequirePermissions("CLIENT_UPDATE")
-  @ApiOperation({
-    summary: "Send a report notification test email",
-    description:
-      "Queues a test report notification email to the authenticated agency user only, using the provided unsaved schedule preview values.",
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: "Test email queued for the authenticated user.",
-  })
-  async sendReportNotificationTestEmail(
-    @Param("clientId") clientId: string,
-    @Body() dto: TestReportNotificationScheduleDto,
-    @CurrentUser() user: IdentityContext,
-  ) {
-    return this.analyticsService.sendReportNotificationTestEmail(
-      clientId,
-      dto,
-      user,
-    );
-  }
 }

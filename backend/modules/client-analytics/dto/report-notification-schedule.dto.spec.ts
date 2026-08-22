@@ -1,7 +1,6 @@
 import { ArgumentMetadata, ValidationPipe } from "@nestjs/common";
 import {
   PreviewReportNotificationScheduleDto,
-  TestReportNotificationScheduleDto,
   UpsertReportNotificationScheduleDto,
 } from "./report-notification-schedule.dto";
 
@@ -55,23 +54,6 @@ describe("Report notification schedule DTO validation", () => {
     });
   });
 
-  it("accepts MONTHLY + LAST_WORKING_DAY for test email", async () => {
-    await expect(
-      validate(
-        {
-          frequency: "MONTHLY",
-          scheduleType: "LAST_WORKING_DAY",
-          sendTime: "10:00",
-          timezone: "Asia/Kolkata",
-        },
-        TestReportNotificationScheduleDto,
-      ),
-    ).resolves.toMatchObject({
-      frequency: "MONTHLY",
-      scheduleType: "LAST_WORKING_DAY",
-    });
-  });
-
   it("accepts WEEKLY + SATURDAY for preview", async () => {
     await expect(
       validate(
@@ -105,23 +87,6 @@ describe("Report notification schedule DTO validation", () => {
       frequency: "WEEKLY",
       weeklyDay: "SATURDAY",
       enabled: true,
-    });
-  });
-
-  it("accepts WEEKLY + SATURDAY for test email", async () => {
-    await expect(
-      validate(
-        {
-          frequency: "WEEKLY",
-          weeklyDay: "SATURDAY",
-          sendTime: "10:00",
-          timezone: "Asia/Kolkata",
-        },
-        TestReportNotificationScheduleDto,
-      ),
-    ).resolves.toMatchObject({
-      frequency: "WEEKLY",
-      weeklyDay: "SATURDAY",
     });
   });
 
