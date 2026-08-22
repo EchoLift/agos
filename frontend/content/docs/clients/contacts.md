@@ -2,7 +2,7 @@
 title: Contacts
 description: Track the people associated with a business client.
 category: Clients
-order: 3
+order: 4
 roles:
   - OWNER
   - ADMIN

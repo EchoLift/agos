@@ -2,7 +2,7 @@
 title: Client access
 description: Understand how external client users access AGENCIE and how their workspace is scoped.
 category: Clients
-order: 4
+order: 5
 roles:
   - OWNER
   - ADMIN

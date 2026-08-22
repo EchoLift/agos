@@ -20,6 +20,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { CurrentUser } from "@packages/security/decorators/current-user.decorator";
+import { RequirePermissions } from "@packages/security/decorators/require-permissions.decorator";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import {
   ClientAnalyticsService,
@@ -30,6 +31,7 @@ import { UploadAnalyticsFilesDto } from "./dto/upload-analytics-files.dto";
 import { QueryAnalyticsFilesDto } from "./dto/query-analytics-files.dto";
 import {
   PreviewReportNotificationScheduleDto,
+  TestReportNotificationScheduleDto,
   UpsertReportNotificationScheduleDto,
 } from "./dto/report-notification-schedule.dto";
 
@@ -144,9 +146,10 @@ export class ClientAnalyticsController {
   }
 
   @Put("notification-schedule")
+  @RequirePermissions("CLIENT_UPDATE")
   @ApiOperation({
     summary: "Create or update report notification schedule for a client",
-    description: "Upserts the monthly report notification schedule. Only non-client-scoped agency users may configure this. Calculates nextRunAt from the provided schedule template and timezone.",
+    description: "Upserts the report notification schedule. Only authorized non-client-scoped agency users may configure this. Calculates nextRunAt from the provided schedule template and timezone.",
   })
   @ApiResponse({ status: HttpStatus.OK, description: "Updated schedule configuration." })
   async upsertReportNotificationSchedule(
@@ -167,11 +170,26 @@ export class ClientAnalyticsController {
     @Param("clientId") _clientId: string,
     @Body() dto: PreviewReportNotificationScheduleDto,
   ) {
-    return this.analyticsService.previewReportNotificationSchedule(
-      dto.scheduleType,
-      dto.daysBeforeMonthEnd ?? null,
-      dto.sendTime,
-      dto.timezone ?? null,
+    return this.analyticsService.previewReportNotificationSchedule(dto);
+  }
+
+  @Post("notification-schedule/test")
+  @RequirePermissions("CLIENT_UPDATE")
+  @ApiOperation({
+    summary: "Send a report notification test email",
+    description:
+      "Queues a test report notification email to the authenticated agency user only, using the provided unsaved schedule preview values.",
+  })
+  @ApiResponse({ status: HttpStatus.OK, description: "Test email queued for the authenticated user." })
+  async sendReportNotificationTestEmail(
+    @Param("clientId") clientId: string,
+    @Body() dto: TestReportNotificationScheduleDto,
+    @CurrentUser() user: IdentityContext,
+  ) {
+    return this.analyticsService.sendReportNotificationTestEmail(
+      clientId,
+      dto,
+      user,
     );
   }
 }

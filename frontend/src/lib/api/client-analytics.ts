@@ -143,6 +143,17 @@ export type ReportNotificationScheduleType =
   | "LAST_WORKING_DAY"
   | "DAYS_BEFORE_MONTH_END";
 
+export type ReportNotificationFrequency = "MONTHLY" | "WEEKLY";
+
+export type ReportNotificationWeekday =
+  | "MONDAY"
+  | "TUESDAY"
+  | "WEDNESDAY"
+  | "THURSDAY"
+  | "FRIDAY"
+  | "SATURDAY"
+  | "SUNDAY";
+
 export type ReportNotificationExecutionStatus =
   "PENDING" | "SENT" | "SKIPPED_NO_REPORTS" | "FAILED";
 
@@ -152,6 +163,8 @@ export interface ReportScheduleLastExecution {
   reportYear: number;
   reportMonth: number;
   reportPeriodLabel: string;
+  periodStart: string;
+  periodEnd: string;
   scheduledAt: string;
   sentAt: string | null;
   attemptCount: number;
@@ -165,8 +178,10 @@ export interface ReportNotificationScheduleData {
   id: string | null;
   agencyId: string;
   clientId: string;
+  frequency: ReportNotificationFrequency;
   scheduleType: ReportNotificationScheduleType | null;
   daysBeforeMonthEnd: number | null;
+  weeklyDay: ReportNotificationWeekday | null;
   sendTime: string | null;
   timezone: string;
   enabled: boolean;
@@ -176,7 +191,9 @@ export interface ReportNotificationScheduleData {
 }
 
 export interface UpsertReportSchedulePayload {
-  scheduleType: ReportNotificationScheduleType;
+  frequency?: ReportNotificationFrequency;
+  scheduleType?: ReportNotificationScheduleType;
+  weeklyDay?: ReportNotificationWeekday;
   daysBeforeMonthEnd?: number;
   sendTime: string;
   timezone?: string;
@@ -184,14 +201,25 @@ export interface UpsertReportSchedulePayload {
 }
 
 export interface ReportSchedulePreview {
-  scheduleType: ReportNotificationScheduleType;
+  frequency: ReportNotificationFrequency;
+  scheduleType: ReportNotificationScheduleType | null;
+  weeklyDay: ReportNotificationWeekday | null;
   daysBeforeMonthEnd: number | null;
   sendTime: string;
   timezone: string;
   nextRunAt: string;
   reportYear: number;
   reportMonth: number;
+  periodStart: string;
+  periodEnd: string;
   reportPeriodLabel: string;
+}
+
+export interface ReportNotificationTestEmailResponse {
+  success: boolean;
+  recipientEmail: string;
+  reportPeriodLabel: string;
+  nextRunAt: string;
 }
 
 export async function getReportNotificationSchedule(
@@ -230,6 +258,22 @@ export async function previewReportNotificationSchedule(
 ): Promise<ReportSchedulePreview> {
   return apiClient<ReportSchedulePreview>(
     `/clients/${clientId}/analytics/files/notification-schedule/preview`,
+    {
+      method: "POST",
+      agencyId: agencyId || undefined,
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+}
+
+export async function sendReportNotificationTestEmail(
+  agencyId: string | null | undefined,
+  clientId: string,
+  payload: Omit<UpsertReportSchedulePayload, "enabled">,
+): Promise<ReportNotificationTestEmailResponse> {
+  return apiClient<ReportNotificationTestEmailResponse>(
+    `/clients/${clientId}/analytics/files/notification-schedule/test`,
     {
       method: "POST",
       agencyId: agencyId || undefined,

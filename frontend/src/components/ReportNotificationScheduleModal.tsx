@@ -3,9 +3,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  ReportNotificationFrequency,
   ReportNotificationScheduleType,
+  ReportNotificationWeekday,
   UpsertReportSchedulePayload,
   getReportNotificationSchedule,
+  sendReportNotificationTestEmail,
   upsertReportNotificationSchedule,
   previewReportNotificationSchedule,
 } from "@/lib/api/client-analytics";
@@ -106,6 +109,26 @@ const SCHEDULE_OPTIONS: {
   },
 ];
 
+const WEEKLY_OPTIONS: {
+  day: ReportNotificationWeekday;
+  label: string;
+  description: string;
+  recommended?: boolean;
+}[] = [
+  { day: "MONDAY", label: "Monday", description: "Notify every Monday." },
+  { day: "TUESDAY", label: "Tuesday", description: "Notify every Tuesday." },
+  { day: "WEDNESDAY", label: "Wednesday", description: "Notify every Wednesday." },
+  { day: "THURSDAY", label: "Thursday", description: "Notify every Thursday." },
+  {
+    day: "FRIDAY",
+    label: "Friday",
+    description: "Notify every Friday.",
+    recommended: true,
+  },
+  { day: "SATURDAY", label: "Saturday", description: "Notify every Saturday." },
+  { day: "SUNDAY", label: "Sunday", description: "Notify every Sunday." },
+];
+
 const DAYS_BEFORE_OPTIONS = [1, 2, 3, 5, 7];
 
 const TIMEZONE_OPTIONS = [
@@ -178,12 +201,18 @@ export function ReportNotificationScheduleModal({
   const schedule = scheduleQuery.data ?? null;
 
   // Form state
+  const [frequency, setFrequency] =
+    useState<ReportNotificationFrequency>("MONTHLY");
   const [scheduleType, setScheduleType] =
     useState<ReportNotificationScheduleType>("LAST_WORKING_DAY");
+  const [weeklyDay, setWeeklyDay] =
+    useState<ReportNotificationWeekday>("FRIDAY");
   const [daysBeforeMonthEnd, setDaysBeforeMonthEnd] = useState<number>(3);
   const [sendTime, setSendTime] = useState("10:00");
   const [timezone, setTimezone] = useState("Asia/Kolkata");
   const [enabled, setEnabled] = useState(true);
+  const [testMessage, setTestMessage] = useState<string | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
   const [previewResult, setPreviewResult] = useState<{
     nextRunAt: string;
     reportPeriodLabel: string;
@@ -196,18 +225,48 @@ export function ReportNotificationScheduleModal({
     ? TIMEZONE_OPTIONS
     : [{ value: timezone, label: timezone }, ...TIMEZONE_OPTIONS];
 
+  const buildSchedulePayload = useCallback(
+    (includeEnabled = false): UpsertReportSchedulePayload => ({
+      frequency,
+      ...(frequency === "MONTHLY"
+        ? {
+            scheduleType,
+            ...(scheduleType === "DAYS_BEFORE_MONTH_END" && {
+              daysBeforeMonthEnd,
+            }),
+          }
+        : { weeklyDay }),
+      sendTime,
+      timezone,
+      ...(includeEnabled && { enabled }),
+    }),
+    [
+      daysBeforeMonthEnd,
+      enabled,
+      frequency,
+      scheduleType,
+      sendTime,
+      timezone,
+      weeklyDay,
+    ],
+  );
+
   // Sync existing schedule into form when modal opens
   /* eslint-disable react-hooks/set-state-in-effect -- Modal form fields intentionally mirror the fetched schedule whenever the dialog opens. */
   useEffect(() => {
     if (!isOpen) return;
     if (schedule?.configured && schedule.scheduleType) {
+      setFrequency(schedule.frequency ?? "MONTHLY");
       setScheduleType(schedule.scheduleType);
+      setWeeklyDay(schedule.weeklyDay ?? "FRIDAY");
       setDaysBeforeMonthEnd(schedule.daysBeforeMonthEnd ?? 3);
       setSendTime(schedule.sendTime ?? "10:00");
       setTimezone(schedule.timezone ?? "Asia/Kolkata");
       setEnabled(schedule.enabled);
     } else {
+      setFrequency("MONTHLY");
       setScheduleType("LAST_WORKING_DAY");
+      setWeeklyDay("FRIDAY");
       setDaysBeforeMonthEnd(3);
       setSendTime("10:00");
       // Attempt to default to browser/client timezone
@@ -218,14 +277,18 @@ export function ReportNotificationScheduleModal({
     setPreviewResult(null);
     setPreviewError(null);
     setSaveError(null);
+    setTestMessage(null);
+    setTestError(null);
   }, [
     isOpen,
     schedule?.configured,
     schedule?.daysBeforeMonthEnd,
     schedule?.enabled,
+    schedule?.frequency,
     schedule?.scheduleType,
     schedule?.sendTime,
     schedule?.timezone,
+    schedule?.weeklyDay,
   ]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -234,16 +297,10 @@ export function ReportNotificationScheduleModal({
     if (!agencyId || !clientId) return;
     setPreviewError(null);
     try {
-      const payload: Omit<UpsertReportSchedulePayload, "enabled"> = {
-        scheduleType,
-        sendTime,
-        timezone,
-        ...(scheduleType === "DAYS_BEFORE_MONTH_END" && { daysBeforeMonthEnd }),
-      };
       const result = await previewReportNotificationSchedule(
         agencyId,
         clientId,
-        payload,
+        buildSchedulePayload(false),
       );
       setPreviewResult({
         nextRunAt: result.nextRunAt,
@@ -255,11 +312,8 @@ export function ReportNotificationScheduleModal({
     }
   }, [
     agencyId,
+    buildSchedulePayload,
     clientId,
-    scheduleType,
-    daysBeforeMonthEnd,
-    sendTime,
-    timezone,
   ]);
 
   useEffect(() => {
@@ -284,16 +338,36 @@ export function ReportNotificationScheduleModal({
     },
   });
 
+  const testEmailMutation = useMutation({
+    mutationFn: (payload: Omit<UpsertReportSchedulePayload, "enabled">) =>
+      sendReportNotificationTestEmail(agencyId, clientId, payload),
+    onMutate: () => {
+      setTestMessage(null);
+      setTestError(null);
+    },
+    onSuccess: (result) => {
+      setTestMessage(`Test email sent to ${result.recipientEmail}`);
+    },
+    onError: (err: unknown) => {
+      const message = getErrorMessage(
+        err,
+        "Unable to send test email. Try again later.",
+      );
+      setTestError(
+        message.toLowerCase().includes("limit")
+          ? "You've reached the test email limit. Try again later."
+          : message,
+      );
+    },
+  });
+
   const handleSave = () => {
     setSaveError(null);
-    const payload: UpsertReportSchedulePayload = {
-      scheduleType,
-      sendTime,
-      timezone,
-      enabled,
-      ...(scheduleType === "DAYS_BEFORE_MONTH_END" && { daysBeforeMonthEnd }),
-    };
-    saveMutation.mutate(payload);
+    saveMutation.mutate(buildSchedulePayload(true));
+  };
+
+  const handleSendTestEmail = () => {
+    testEmailMutation.mutate(buildSchedulePayload(false));
   };
 
   // Format a UTC ISO string to local readable format
@@ -336,7 +410,7 @@ export function ReportNotificationScheduleModal({
                 id="report-notification-title"
                 className="text-base font-semibold text-foreground"
               >
-                Monthly report notifications
+                Report notifications
               </h3>
             </div>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -344,7 +418,7 @@ export function ReportNotificationScheduleModal({
               <span className="font-medium text-foreground">
                 {clientName || "this client"}
               </span>{" "}
-              when their monthly reports are ready.
+              when their reports are ready.
             </p>
           </div>
           <button
@@ -360,24 +434,64 @@ export function ReportNotificationScheduleModal({
 
         <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
           <div className="space-y-5">
+            <div>
+              <label className="mb-2 block text-xs font-medium text-muted-foreground">
+                Frequency
+              </label>
+              <div className="grid grid-cols-2 rounded-lg border border-border bg-card p-1">
+                {(["MONTHLY", "WEEKLY"] as ReportNotificationFrequency[]).map(
+                  (value) => {
+                    const selected = frequency === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setFrequency(value)}
+                        className={`rounded-md px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                          selected
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        }`}
+                      >
+                        {value === "MONTHLY" ? "Monthly" : "Weekly"}
+                      </button>
+                    );
+                  },
+                )}
+              </div>
+            </div>
+
             {/* Schedule Options */}
             <div
               className="space-y-2"
               role="radiogroup"
-              aria-label="Monthly report notification schedule"
+              aria-label="Report notification schedule"
             >
-              {SCHEDULE_OPTIONS.map((opt) => (
-                <ScheduleOptionButton
-                  key={opt.type}
-                  option={opt}
-                  selected={scheduleType === opt.type}
-                  onSelect={() => setScheduleType(opt.type)}
-                />
-              ))}
+              <p className="text-xs font-medium text-muted-foreground">
+                Notify clients
+              </p>
+              {frequency === "MONTHLY"
+                ? SCHEDULE_OPTIONS.map((opt) => (
+                    <ScheduleOptionButton
+                      key={opt.type}
+                      option={opt}
+                      selected={scheduleType === opt.type}
+                      onSelect={() => setScheduleType(opt.type)}
+                    />
+                  ))
+                : WEEKLY_OPTIONS.map((opt) => (
+                    <ScheduleOptionButton
+                      key={opt.day}
+                      option={opt}
+                      selected={weeklyDay === opt.day}
+                      onSelect={() => setWeeklyDay(opt.day)}
+                    />
+                  ))}
             </div>
 
             {/* Days before month end selector */}
-            {scheduleType === "DAYS_BEFORE_MONTH_END" && (
+            {frequency === "MONTHLY" &&
+              scheduleType === "DAYS_BEFORE_MONTH_END" && (
               <div>
                 <label className="mb-2 block text-xs font-medium text-muted-foreground">
                   Days before month end
@@ -502,15 +616,41 @@ export function ReportNotificationScheduleModal({
                 {saveError}
               </p>
             )}
+
+            {(testMessage || testError) && (
+              <p
+                className={`rounded-lg border px-4 py-3 text-xs ${
+                  testError
+                    ? "border-destructive/30 bg-destructive/10 text-destructive"
+                    : "border-primary/30 bg-primary/10 text-primary"
+                }`}
+              >
+                {testError || testMessage}
+              </p>
+            )}
+
+            <p className="text-xs leading-5 text-muted-foreground">
+              Test emails are sent only to you. Your client will not be
+              notified.
+            </p>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-border px-4 py-4 sm:flex-row sm:justify-end sm:px-6">
+        <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-border px-4 py-4 sm:flex-row sm:justify-between sm:px-6">
+          <button
+            type="button"
+            onClick={handleSendTestEmail}
+            disabled={testEmailMutation.isPending || saveMutation.isPending}
+            className={secondaryButtonClass}
+          >
+            {testEmailMutation.isPending ? "Sending…" : "Send test email"}
+          </button>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onClose}
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || testEmailMutation.isPending}
             className={secondaryButtonClass}
           >
             Cancel
@@ -523,6 +663,7 @@ export function ReportNotificationScheduleModal({
           >
             {saveMutation.isPending ? "Saving…" : "Save schedule"}
           </button>
+          </div>
         </div>
       </div>
     </div>
@@ -535,7 +676,6 @@ function ScheduleOptionButton({
   onSelect,
 }: {
   option: {
-    type: ReportNotificationScheduleType;
     label: string;
     description: string;
     recommended?: boolean;
@@ -595,11 +735,21 @@ interface ReportNotificationStatusProps {
 }
 
 const SCHEDULE_TYPE_LABELS: Record<ReportNotificationScheduleType, string> = {
-  FIRST_DAY: "First day of every month",
-  FIRST_WORKING_DAY: "First working day of every month",
-  LAST_DAY: "Last day of every month",
-  LAST_WORKING_DAY: "Last working day of every month",
+  FIRST_DAY: "First day",
+  FIRST_WORKING_DAY: "First working day",
+  LAST_DAY: "Last day",
+  LAST_WORKING_DAY: "Last working day",
   DAYS_BEFORE_MONTH_END: "Before month end",
+};
+
+const WEEKDAY_LABELS: Record<ReportNotificationWeekday, string> = {
+  MONDAY: "Monday",
+  TUESDAY: "Tuesday",
+  WEDNESDAY: "Wednesday",
+  THURSDAY: "Thursday",
+  FRIDAY: "Friday",
+  SATURDAY: "Saturday",
+  SUNDAY: "Sunday",
 };
 
 const EXECUTION_STATUS_LABELS: Record<string, { text: string; color: string }> =
@@ -635,14 +785,32 @@ export function ReportNotificationStatusWidget({
         month: "short",
         day: "numeric",
         year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
       });
     } catch {
       return iso;
     }
   };
+
+  const formatSendTime = (value: string | null | undefined) => {
+    if (!value) return "";
+    const [hoursRaw, minutes = "00"] = value.split(":");
+    const hours = Number(hoursRaw);
+    if (Number.isNaN(hours)) return value;
+    const suffix = hours >= 12 ? "PM" : "AM";
+    const hour12 = hours % 12 || 12;
+    return `${hour12}:${minutes.padStart(2, "0")} ${suffix}`;
+  };
+
+  const scheduleSummary = schedule?.configured
+    ? schedule.frequency === "WEEKLY"
+      ? `Weekly · ${WEEKDAY_LABELS[schedule.weeklyDay ?? "FRIDAY"]} · ${formatSendTime(schedule.sendTime)}`
+      : `Monthly · ${SCHEDULE_TYPE_LABELS[schedule.scheduleType ?? "LAST_WORKING_DAY"]}${
+          schedule.scheduleType === "DAYS_BEFORE_MONTH_END" &&
+          schedule.daysBeforeMonthEnd
+            ? ` (${schedule.daysBeforeMonthEnd} days before)`
+            : ""
+        } · ${formatSendTime(schedule.sendTime)}`
+    : null;
 
   const lastExec = schedule?.lastExecution;
   const execInfo = lastExec ? EXECUTION_STATUS_LABELS[lastExec.status] : null;
@@ -664,14 +832,9 @@ export function ReportNotificationStatusWidget({
           ) : (
             <div className="mt-0.5 space-y-0.5">
               <p className="text-xs font-medium text-foreground">
-                {SCHEDULE_TYPE_LABELS[schedule.scheduleType!]}
-                {schedule.scheduleType === "DAYS_BEFORE_MONTH_END" &&
-                  schedule.daysBeforeMonthEnd &&
-                  ` (${schedule.daysBeforeMonthEnd} days before)`}
+                {scheduleSummary}
               </p>
-              <p className="text-xs text-muted-foreground">
-                {schedule.sendTime} · {schedule.timezone}
-              </p>
+              <p className="text-xs text-muted-foreground">{schedule.timezone}</p>
               {schedule.nextRunAt && (
                 <p className="text-xs text-primary">
                   Next: {formatNextRun(schedule.nextRunAt, schedule.timezone)}

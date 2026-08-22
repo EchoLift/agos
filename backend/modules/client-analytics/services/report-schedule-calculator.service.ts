@@ -1,8 +1,14 @@
 import { Injectable, BadRequestException } from "@nestjs/common";
-import { ReportNotificationScheduleType } from "@prisma/client";
+import {
+  ReportNotificationFrequency,
+  ReportNotificationScheduleType,
+  ReportNotificationWeekday,
+} from "@prisma/client";
 
 export interface CalculateScheduleInput {
-  scheduleType: ReportNotificationScheduleType;
+  frequency?: ReportNotificationFrequency | null;
+  scheduleType?: ReportNotificationScheduleType | null;
+  weeklyDay?: ReportNotificationWeekday | null;
   daysBeforeMonthEnd?: number | null;
   sendTime: string; // "HH:mm"
   timezone?: string | null;
@@ -10,14 +16,26 @@ export interface CalculateScheduleInput {
 }
 
 export interface SchedulePreviewResult {
-  scheduleType: ReportNotificationScheduleType;
+  frequency: ReportNotificationFrequency;
+  scheduleType: ReportNotificationScheduleType | null;
+  weeklyDay: ReportNotificationWeekday | null;
   daysBeforeMonthEnd: number | null;
   sendTime: string;
   timezone: string;
   nextRunAt: Date;
   reportYear: number;
   reportMonth: number;
+  periodStart: Date;
+  periodEnd: Date;
   reportPeriodLabel: string;
+}
+
+export interface ResolvedReportPeriod {
+  reportYear: number;
+  reportMonth: number;
+  periodStart: Date;
+  periodEnd: Date;
+  label: string;
 }
 
 export const ALLOWED_DAYS_BEFORE_MONTH_END = [1, 2, 3, 5, 7] as const;
@@ -36,6 +54,26 @@ export const MONTH_NAMES = [
   "November",
   "December",
 ] as const;
+
+export const WEEKDAY_LABELS: Record<ReportNotificationWeekday, string> = {
+  [ReportNotificationWeekday.MONDAY]: "Monday",
+  [ReportNotificationWeekday.TUESDAY]: "Tuesday",
+  [ReportNotificationWeekday.WEDNESDAY]: "Wednesday",
+  [ReportNotificationWeekday.THURSDAY]: "Thursday",
+  [ReportNotificationWeekday.FRIDAY]: "Friday",
+  [ReportNotificationWeekday.SATURDAY]: "Saturday",
+  [ReportNotificationWeekday.SUNDAY]: "Sunday",
+};
+
+const WEEKDAY_TO_JS_DAY: Record<ReportNotificationWeekday, number> = {
+  [ReportNotificationWeekday.SUNDAY]: 0,
+  [ReportNotificationWeekday.MONDAY]: 1,
+  [ReportNotificationWeekday.TUESDAY]: 2,
+  [ReportNotificationWeekday.WEDNESDAY]: 3,
+  [ReportNotificationWeekday.THURSDAY]: 4,
+  [ReportNotificationWeekday.FRIDAY]: 5,
+  [ReportNotificationWeekday.SATURDAY]: 6,
+};
 
 @Injectable()
 export class ReportScheduleCalculatorService {
@@ -79,6 +117,48 @@ export class ReportScheduleCalculatorService {
         Intl.DateTimeFormat(undefined, { timeZone: timezone });
       } catch {
         throw new BadRequestException(`Invalid IANA timezone: ${timezone}`);
+      }
+    }
+  }
+
+  validateScheduleConfig(input: CalculateScheduleInput): void {
+    const frequency = input.frequency ?? ReportNotificationFrequency.MONTHLY;
+
+    if (frequency === ReportNotificationFrequency.MONTHLY) {
+      if (!input.scheduleType) {
+        throw new BadRequestException("Schedule type is required.");
+      }
+      this.validateScheduleInput(
+        input.scheduleType,
+        input.daysBeforeMonthEnd,
+        input.sendTime,
+        input.timezone,
+      );
+      return;
+    }
+
+    if (!input.weeklyDay) {
+      throw new BadRequestException("Weekly notification day is required.");
+    }
+
+    if (!Object.values(ReportNotificationWeekday).includes(input.weeklyDay)) {
+      throw new BadRequestException("Invalid weekly notification day.");
+    }
+
+    if (input.sendTime) {
+      const match = /^([01]\d|2[0-3]):([0-5]\d)$/.test(input.sendTime);
+      if (!match) {
+        throw new BadRequestException(
+          "sendTime must be in 24-hour HH:mm format (e.g. 10:00).",
+        );
+      }
+    }
+
+    if (input.timezone) {
+      try {
+        Intl.DateTimeFormat(undefined, { timeZone: input.timezone });
+      } catch {
+        throw new BadRequestException(`Invalid IANA timezone: ${input.timezone}`);
       }
     }
   }
@@ -235,27 +315,81 @@ export class ReportScheduleCalculatorService {
     return { year, month };
   }
 
+  getLocalDateTimeParts(
+    date: Date,
+    timezone: string,
+  ): {
+    year: number;
+    month: number;
+    day: number;
+    hours: number;
+    minutes: number;
+  } {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(date);
+    const read = (type: string) =>
+      parseInt(parts.find((p) => p.type === type)?.value || "0", 10);
+    let hours = read("hour");
+    if (hours === 24) hours = 0;
+    return {
+      year: read("year"),
+      month: read("month"),
+      day: read("day"),
+      hours,
+      minutes: read("minute"),
+    };
+  }
+
+  private addLocalDays(
+    year: number,
+    month: number,
+    day: number,
+    days: number,
+  ): { year: number; month: number; day: number } {
+    const date = new Date(Date.UTC(year, month - 1, day + days));
+    return {
+      year: date.getUTCFullYear(),
+      month: date.getUTCMonth() + 1,
+      day: date.getUTCDate(),
+    };
+  }
+
   /**
    * Calculate next run date (in UTC) for a recurring schedule.
    */
   calculateNextRunAt(input: CalculateScheduleInput): Date {
     const timezone = this.normalizeTimezone(input.timezone);
-    this.validateScheduleInput(
-      input.scheduleType,
-      input.daysBeforeMonthEnd,
-      input.sendTime,
-      timezone,
-    );
+    const frequency = input.frequency ?? ReportNotificationFrequency.MONTHLY;
+    this.validateScheduleConfig({ ...input, timezone });
 
     const fromDate = input.fromDate || new Date();
     const { hours, minutes } = this.parseSendTime(input.sendTime);
+
+    if (frequency === ReportNotificationFrequency.WEEKLY) {
+      return this.calculateWeeklyNextRunAt({
+        weeklyDay: input.weeklyDay!,
+        sendTime: input.sendTime,
+        timezone,
+        fromDate,
+      });
+    }
+
+    const scheduleType = input.scheduleType!;
     let { year, month } = this.getLocalYearMonth(fromDate, timezone);
 
     // Try current month
     const currentMonthDay = this.calculateTargetDayInMonth(
       year,
       month,
-      input.scheduleType,
+      scheduleType,
       input.daysBeforeMonthEnd,
     );
     const currentMonthCandidate = this.getUtcDateFromLocal(
@@ -282,7 +416,7 @@ export class ReportScheduleCalculatorService {
     const nextMonthDay = this.calculateTargetDayInMonth(
       year,
       month,
-      input.scheduleType,
+      scheduleType,
       input.daysBeforeMonthEnd,
     );
     return this.getUtcDateFromLocal(
@@ -293,6 +427,53 @@ export class ReportScheduleCalculatorService {
       minutes,
       timezone,
     );
+  }
+
+  private calculateWeeklyNextRunAt(input: {
+    weeklyDay: ReportNotificationWeekday;
+    sendTime: string;
+    timezone: string;
+    fromDate: Date;
+  }): Date {
+    const { hours, minutes } = this.parseSendTime(input.sendTime);
+    const local = this.getLocalDateTimeParts(input.fromDate, input.timezone);
+    const currentDow = this.getDayOfWeek(local.year, local.month, local.day);
+    const targetDow = WEEKDAY_TO_JS_DAY[input.weeklyDay];
+    const daysUntil = (targetDow - currentDow + 7) % 7;
+    const targetDate = this.addLocalDays(
+      local.year,
+      local.month,
+      local.day,
+      daysUntil,
+    );
+
+    let candidate = this.getUtcDateFromLocal(
+      targetDate.year,
+      targetDate.month,
+      targetDate.day,
+      hours,
+      minutes,
+      input.timezone,
+    );
+
+    if (candidate.getTime() <= input.fromDate.getTime()) {
+      const nextWeek = this.addLocalDays(
+        targetDate.year,
+        targetDate.month,
+        targetDate.day,
+        7,
+      );
+      candidate = this.getUtcDateFromLocal(
+        nextWeek.year,
+        nextWeek.month,
+        nextWeek.day,
+        hours,
+        minutes,
+        input.timezone,
+      );
+    }
+
+    return candidate;
   }
 
   /**
@@ -330,21 +511,153 @@ export class ReportScheduleCalculatorService {
     };
   }
 
+  resolveReportingPeriod(input: {
+    frequency?: ReportNotificationFrequency | null;
+    scheduleType?: ReportNotificationScheduleType | null;
+    weeklyDay?: ReportNotificationWeekday | null;
+    runDate: Date;
+    timezone?: string | null;
+  }): ResolvedReportPeriod {
+    const frequency = input.frequency ?? ReportNotificationFrequency.MONTHLY;
+    const timezone = this.normalizeTimezone(input.timezone);
+
+    if (frequency === ReportNotificationFrequency.WEEKLY) {
+      return this.resolveWeeklyReportPeriod(input.runDate, timezone);
+    }
+
+    if (!input.scheduleType) {
+      throw new BadRequestException("Schedule type is required.");
+    }
+
+    const monthly = this.resolveReportPeriod(
+      input.scheduleType,
+      input.runDate,
+      timezone,
+    );
+    const periodStart = this.getUtcDateFromLocal(
+      monthly.reportYear,
+      monthly.reportMonth,
+      1,
+      0,
+      0,
+      timezone,
+    );
+    const nextMonthYear =
+      monthly.reportMonth === 12 ? monthly.reportYear + 1 : monthly.reportYear;
+    const nextMonth = monthly.reportMonth === 12 ? 1 : monthly.reportMonth + 1;
+    const nextPeriodStart = this.getUtcDateFromLocal(
+      nextMonthYear,
+      nextMonth,
+      1,
+      0,
+      0,
+      timezone,
+    );
+
+    return {
+      ...monthly,
+      periodStart,
+      periodEnd: new Date(nextPeriodStart.getTime() - 1),
+    };
+  }
+
+  private resolveWeeklyReportPeriod(
+    runDate: Date,
+    timezone: string,
+  ): ResolvedReportPeriod {
+    const local = this.getLocalDateTimeParts(runDate, timezone);
+    const currentDow = this.getDayOfWeek(local.year, local.month, local.day);
+    const daysSinceMonday = currentDow === 0 ? 6 : currentDow - 1;
+    const monday = this.addLocalDays(
+      local.year,
+      local.month,
+      local.day,
+      -daysSinceMonday,
+    );
+    const nextMonday = this.addLocalDays(
+      monday.year,
+      monday.month,
+      monday.day,
+      7,
+    );
+    const sunday = this.addLocalDays(
+      monday.year,
+      monday.month,
+      monday.day,
+      6,
+    );
+    const periodStart = this.getUtcDateFromLocal(
+      monday.year,
+      monday.month,
+      monday.day,
+      0,
+      0,
+      timezone,
+    );
+    const nextPeriodStart = this.getUtcDateFromLocal(
+      nextMonday.year,
+      nextMonday.month,
+      nextMonday.day,
+      0,
+      0,
+      timezone,
+    );
+
+    return {
+      reportYear: monday.year,
+      reportMonth: monday.month,
+      periodStart,
+      periodEnd: new Date(nextPeriodStart.getTime() - 1),
+      label: this.formatWeeklyPeriodLabel(monday, sunday),
+    };
+  }
+
+  private formatWeeklyPeriodLabel(
+    start: { year: number; month: number; day: number },
+    end: { year: number; month: number; day: number },
+  ): string {
+    const startMonth = MONTH_NAMES[start.month - 1];
+    const endMonth = MONTH_NAMES[end.month - 1];
+
+    if (start.year === end.year && start.month === end.month) {
+      return `${startMonth} ${start.day}-${end.day}, ${start.year}`;
+    }
+
+    if (start.year === end.year) {
+      return `${startMonth} ${start.day} - ${endMonth} ${end.day}, ${start.year}`;
+    }
+
+    return `${startMonth} ${start.day}, ${start.year} - ${endMonth} ${end.day}, ${end.year}`;
+  }
+
   /**
    * Computes a full schedule preview.
    */
   generatePreview(input: CalculateScheduleInput): SchedulePreviewResult {
     const timezone = this.normalizeTimezone(input.timezone);
-    const nextRunAt = this.calculateNextRunAt(input);
-    const { reportYear, reportMonth, label } = this.resolveReportPeriod(
-      input.scheduleType,
-      nextRunAt,
-      timezone,
-    );
+    const frequency = input.frequency ?? ReportNotificationFrequency.MONTHLY;
+    const nextRunAt = this.calculateNextRunAt({ ...input, timezone });
+    const { reportYear, reportMonth, periodStart, periodEnd, label } =
+      this.resolveReportingPeriod({
+        frequency,
+        scheduleType: input.scheduleType,
+        weeklyDay: input.weeklyDay,
+        runDate: nextRunAt,
+        timezone,
+      });
 
     return {
-      scheduleType: input.scheduleType,
+      frequency,
+      scheduleType:
+        frequency === ReportNotificationFrequency.MONTHLY
+          ? input.scheduleType!
+          : null,
+      weeklyDay:
+        frequency === ReportNotificationFrequency.WEEKLY
+          ? input.weeklyDay!
+          : null,
       daysBeforeMonthEnd:
+        frequency === ReportNotificationFrequency.MONTHLY &&
         input.scheduleType ===
         ReportNotificationScheduleType.DAYS_BEFORE_MONTH_END
           ? input.daysBeforeMonthEnd ?? 1
@@ -354,6 +667,8 @@ export class ReportScheduleCalculatorService {
       nextRunAt,
       reportYear,
       reportMonth,
+      periodStart,
+      periodEnd,
       reportPeriodLabel: label,
     };
   }
