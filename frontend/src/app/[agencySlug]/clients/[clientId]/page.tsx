@@ -69,112 +69,138 @@ export default function ClientDetailPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <button type="button" onClick={() => {
-            clearRememberedEntityId(
-              rememberedEntityKey("client", agencyId),
-            );
-            router.push(getWorkspaceHref(safeAgencySlug, "/clients"));
-          }} className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white">←</button>
-          <div>
-            <p className="text-sm uppercase tracking-[0.3em] text-zinc-500">Client Detail</p>
-            <h1 className="mt-1 text-3xl font-semibold text-white">{playbook?.client.name || (isLoading ? "Loading..." : "Client")}</h1>
-            <p className="mt-2 text-sm text-zinc-400">
-              {playbook ? `${playbook.sections.length} visible sections for your role.` : "Loading role-aware client context."}
-            </p>
+    <div className="w-full">
+      <div className="sticky top-[var(--app-header-height)] z-30 bg-background/95 backdrop-blur-xl">
+        <header className="border-b border-zinc-800">
+          <div className="flex w-full flex-col gap-2 px-4 py-2 sm:flex-row sm:items-center sm:justify-between lg:px-8 xl:px-10">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  clearRememberedEntityId(
+                    rememberedEntityKey("client", agencyId),
+                  );
+                  router.push(getWorkspaceHref(safeAgencySlug, "/clients"));
+                }}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-400 transition hover:bg-zinc-800 hover:text-white"
+              >
+                ←
+              </button>
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.3em] text-zinc-500">Client Detail</p>
+                <h1 className="mt-1 truncate text-2xl font-semibold text-white sm:text-3xl">
+                  {playbook?.client.name || (isLoading ? "Loading..." : "Client")}
+                </h1>
+                <p className="mt-2 text-sm text-zinc-400">
+                  {playbook ? `${playbook.sections.length} visible sections for your role.` : "Loading role-aware client context."}
+                </p>
+              </div>
+            </div>
+            {playbook?.canEdit ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (isEditing) {
+                    setIsEditing(false);
+                    return;
+                  }
+                  setActiveTab("playbook");
+                  setIsEditing(true);
+                }}
+                className="w-full rounded-full border border-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-900 sm:w-auto"
+              >
+                {isEditing ? "Cancel" : "Edit Playbook"}
+              </button>
+            ) : null}
           </div>
-        </div>
-        {activeTab === "playbook" && playbook?.canEdit ? (
-          <button type="button" onClick={() => setIsEditing((value) => !value)} className="rounded-full border border-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-300 transition hover:bg-zinc-900">
-            {isEditing ? "Cancel" : "Edit Playbook"}
-          </button>
-        ) : null}
+        </header>
+
+        {playbook && (
+          <nav className="flex w-full border-b border-zinc-800 px-4 lg:px-8 xl:px-10" aria-label="Client sections">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("playbook");
+                setIsEditing(false);
+              }}
+              className={`border-b-2 px-6 py-2.5 text-sm font-semibold transition ${
+                activeTab === "playbook"
+                  ? "border-indigo-500 text-white"
+                  : "border-transparent text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Playbook
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("analytics");
+                setIsEditing(false);
+              }}
+              className={`border-b-2 px-6 py-2.5 text-sm font-semibold transition ${
+                activeTab === "analytics"
+                  ? "border-indigo-500 text-white"
+                  : "border-transparent text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Analytics Files
+            </button>
+          </nav>
+        )}
       </div>
 
-      {/* Tabs */}
-      {playbook && (
-        <div className="flex border-b border-zinc-800">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("playbook");
-              setIsEditing(false);
-            }}
-            className={`border-b-2 px-6 py-3 text-sm font-semibold transition ${
-              activeTab === "playbook"
-                ? "border-indigo-500 text-white"
-                : "border-transparent text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            Playbook
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("analytics");
-              setIsEditing(false);
-            }}
-            className={`border-b-2 px-6 py-3 text-sm font-semibold transition ${
-              activeTab === "analytics"
-                ? "border-indigo-500 text-white"
-                : "border-transparent text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            Analytics Files
-          </button>
+      <div className="w-full px-4 py-3 lg:px-8 xl:px-10">
+        <div>
+          {isLoading ? (
+            <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 text-sm text-zinc-500">Loading client...</div>
+          ) : firstLoadError ? (
+            <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{firstLoadError}</div>
+          ) : error ? (
+            <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>
+          ) : playbook ? (
+            activeTab === "analytics" ? (
+              <ClientAnalyticsFilesView
+                agencyId={agencyId || ""}
+                clientId={playbook.client.id}
+                clientName={playbook.client.name}
+              />
+            ) : isEditing ? (
+              <form className="space-y-6" onSubmit={handleSubmit(save)}>
+                <ClientPlaybookForm register={register} setValue={setValue} watch={watch} />
+                <ClientFormActions>
+                  <button type="button" onClick={() => setIsEditing(false)} className="rounded-full border border-zinc-800 px-6 py-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={!formState.isValid || isSaving} className="rounded-full bg-indigo-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60">
+                    {isSaving ? "Saving..." : "Save Client"}
+                  </button>
+                </ClientFormActions>
+              </form>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-950/80 p-5 shadow-2xl shadow-black/20">
+                  <span className={statusPillClasses(playbook.client.status, "sm")}>{playbook.client.status}</span>
+                  <span className="text-xs text-zinc-600">ID {playbook.client.id.slice(0, 8)}</span>
+                  <span className="text-xs text-zinc-600">Created {formatDate(playbook.client.createdAt)}</span>
+                </div>
+                {playbook.sections.map((section) => (
+                  <section key={section.id} className="rounded-2xl border border-zinc-800 bg-zinc-950/80 p-3 shadow-2xl shadow-black/20">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h2 className="text-sm font-semibold uppercase tracking-[0.25em] text-zinc-500">{section.title}</h2>
+                      <span className="rounded-full border border-zinc-800 px-2.5 py-1 text-[11px] text-zinc-600">{section.permission}</span>
+                    </div>
+                    <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                      {section.fields.map((field) => (
+                        <Detail key={String(field.key)} label={field.label} value={field.value} />
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )
+          ) : null}
         </div>
-      )}
-
-      {isLoading ? (
-        <div className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-8 text-sm text-zinc-500">Loading client...</div>
-      ) : firstLoadError ? (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{firstLoadError}</div>
-      ) : error ? (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>
-      ) : playbook ? (
-        activeTab === "analytics" ? (
-          <ClientAnalyticsFilesView
-            agencyId={agencyId || ""}
-            clientId={playbook.client.id}
-            clientName={playbook.client.name}
-          />
-        ) : isEditing ? (
-          <form className="space-y-6" onSubmit={handleSubmit(save)}>
-            <ClientPlaybookForm register={register} setValue={setValue} watch={watch} />
-            <ClientFormActions>
-              <button type="button" onClick={() => setIsEditing(false)} className="rounded-full border border-zinc-800 px-6 py-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white">
-                Cancel
-              </button>
-              <button type="submit" disabled={!formState.isValid || isSaving} className="rounded-full bg-indigo-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60">
-                {isSaving ? "Saving..." : "Save Client"}
-              </button>
-            </ClientFormActions>
-          </form>
-        ) : (
-          <div className="space-y-5">
-            <div className="flex flex-wrap items-center gap-3 rounded-3xl border border-zinc-800 bg-zinc-950/80 p-5 shadow-2xl shadow-black/20">
-              <span className={statusPillClasses(playbook.client.status, "sm")}>{playbook.client.status}</span>
-              <span className="text-xs text-zinc-600">ID {playbook.client.id.slice(0, 8)}</span>
-              <span className="text-xs text-zinc-600">Created {formatDate(playbook.client.createdAt)}</span>
-            </div>
-            {playbook.sections.map((section) => (
-              <section key={section.id} className="rounded-3xl border border-zinc-800 bg-zinc-950/80 p-6 shadow-2xl shadow-black/20">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-sm font-semibold uppercase tracking-[0.25em] text-zinc-500">{section.title}</h2>
-                  <span className="rounded-full border border-zinc-800 px-2.5 py-1 text-[11px] text-zinc-600">{section.permission}</span>
-                </div>
-                <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                  {section.fields.map((field) => (
-                    <Detail key={String(field.key)} label={field.label} value={field.value} />
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        )
-      ) : null}
+      </div>
     </div>
   );
 }

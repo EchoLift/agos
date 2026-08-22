@@ -4,6 +4,7 @@
 :root {
   --background: #09090b;
   --foreground: #f4f4f5;
+  --app-header-height: 3.5rem;
   --card: #0b0b11;
   --card-foreground: #f4f4f5;
   --popover: #0b0b11;

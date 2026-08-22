@@ -298,7 +298,7 @@ export default function CampaignDetailPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-2">
+    <div className="w-full px-2 lg:px-2 xl:px-2 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <button

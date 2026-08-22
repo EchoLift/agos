@@ -781,11 +781,11 @@ export function ClientAnalyticsFilesView({
                   </div>
 
                   {/* Group Files Grid */}
-                  <div className="mt-5 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="mt-2 grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                     {group.files.map((file) => (
                       <div
                         key={file.id}
-                        className="w-full min-w-0 max-w-full overflow-hidden group flex flex-col justify-between rounded-2xl border border-zinc-800/80 bg-[#0b0b11] p-4 transition hover:border-zinc-700 hover:bg-zinc-900/60"
+                        className="w-full min-w-0 max-w-full overflow-hidden group flex flex-col justify-between rounded-xl border border-zinc-800/80 bg-[#0b0b11] p-2 transition hover:border-zinc-700 hover:bg-zinc-900/60"
                       >
                         <div>
                           <div className="flex items-start justify-between gap-2">
