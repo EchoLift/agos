@@ -42,7 +42,9 @@ Once configured, AGENCIE automatically checks for reports at the scheduled time 
 
 ### Monthly notifications
 
-Monthly notifications are best when your agency shares one reporting package per month. We recommend:
+Monthly notifications are best when your agency shares one reporting package per month.
+
+We recommend:
 
 **Last working day of every month**
 
@@ -74,9 +76,17 @@ We recommend:
 
 **Friday**
 
-You can choose any weekday from Monday through Sunday. Weekly notifications also use the selected send time, timezone, and enabled or disabled state.
+You can choose any weekday from Monday through Sunday.
 
-Weekly notifications tell the client that their latest performance reports have been updated. Uploaded files are still organized by reporting month in AGENCIE.
+Weekly notifications also use the selected:
+
+- Send time
+- Timezone
+- Enabled or disabled state
+
+Weekly notifications tell the client that their latest performance reports have been updated.
+
+Uploaded files continue to be organized by reporting month in AGENCIE.
 
 ---
 
@@ -118,26 +128,11 @@ If no active reports exist for the scheduled reporting period:
 
 > **No reports were available at the scheduled time.**
 
-The recurring schedule remains active for future months.
+The recurring schedule remains active for future reporting periods.
 
-Uploading reports after a notification has been skipped does **not** automatically send an email for that month.
+Uploading reports after a notification has been skipped does **not** automatically send an email for that reporting period.
 
 This prevents file uploads from unexpectedly triggering client communication.
-
----
-
-## Test emails
-
-Agencies can send a test report notification before saving or changing a schedule.
-
-Test emails:
-
-- Are sent only to the agency user who requests the test.
-- Do not notify the client.
-- Use the current form values shown in the schedule modal.
-- Include the real client portal link so routing can be verified.
-- Do not change the saved schedule.
-- Do not affect future scheduled notifications.
 
 ---
 
@@ -152,6 +147,8 @@ You can change:
 - Notification time
 - Timezone
 - Whether notifications are enabled
+
+When a schedule is changed, AGENCIE calculates the next notification based on the updated configuration.
 
 Disabling notifications does not affect uploaded reports. Clients can continue accessing reports they already have permission to view.
 
@@ -186,6 +183,8 @@ This gives your team the week to update reports while giving clients a predictab
 
 **Uploading a report never sends an immediate client email.**
 
-Client report emails are sent only through the configured Report Notification schedule.
+Client report emails are sent only through the configured **Report Notification** schedule.
 
 If no notification schedule is configured, reports remain available in AGENCIE but no automated report-ready email is sent.
+
+If notifications are disabled, the reports remain available to authorized client users, but scheduled report-ready emails are not sent.
