@@ -10,7 +10,6 @@ describe("Client report notification schedule HTTP routes", () => {
     getReportNotificationSchedule: jest.fn(),
     upsertReportNotificationSchedule: jest.fn(),
     previewReportNotificationSchedule: jest.fn(),
-    sendReportNotificationTestEmail: jest.fn(),
   };
 
   beforeAll(async () => {

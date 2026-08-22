@@ -215,13 +215,6 @@ export interface ReportSchedulePreview {
   reportPeriodLabel: string;
 }
 
-export interface ReportNotificationTestEmailResponse {
-  success: boolean;
-  recipientEmail: string;
-  reportPeriodLabel: string;
-  nextRunAt: string;
-}
-
 export async function getReportNotificationSchedule(
   agencyId: string | null | undefined,
   clientId: string,
@@ -258,22 +251,6 @@ export async function previewReportNotificationSchedule(
 ): Promise<ReportSchedulePreview> {
   return apiClient<ReportSchedulePreview>(
     `/clients/${clientId}/report-notification-schedule/preview`,
-    {
-      method: "POST",
-      agencyId: agencyId || undefined,
-      body: JSON.stringify(payload),
-      headers: { "Content-Type": "application/json" },
-    },
-  );
-}
-
-export async function sendReportNotificationTestEmail(
-  agencyId: string | null | undefined,
-  clientId: string,
-  payload: Omit<UpsertReportSchedulePayload, "enabled">,
-): Promise<ReportNotificationTestEmailResponse> {
-  return apiClient<ReportNotificationTestEmailResponse>(
-    `/clients/${clientId}/report-notification-schedule/test`,
     {
       method: "POST",
       agencyId: agencyId || undefined,

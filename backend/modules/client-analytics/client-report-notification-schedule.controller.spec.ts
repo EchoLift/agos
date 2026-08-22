@@ -17,7 +17,6 @@ describe("ClientReportNotificationScheduleController", () => {
       getReportNotificationSchedule: jest.fn(),
       upsertReportNotificationSchedule: jest.fn(),
       previewReportNotificationSchedule: jest.fn(),
-      sendReportNotificationTestEmail: jest.fn(),
     };
     controller = new ClientReportNotificationScheduleController(service);
   });
@@ -53,26 +52,6 @@ describe("ClientReportNotificationScheduleController", () => {
     await controller.upsertReportNotificationSchedule("client_1", dto, actor);
 
     expect(service.upsertReportNotificationSchedule).toHaveBeenCalledWith(
-      "client_1",
-      dto,
-      actor,
-    );
-  });
-
-  it("uses current unsaved weekly DTO values for test email", async () => {
-    const dto = {
-      frequency: "WEEKLY" as any,
-      weeklyDay: "SATURDAY" as any,
-      sendTime: "10:00",
-      timezone: "Asia/Kolkata",
-    };
-    service.sendReportNotificationTestEmail.mockResolvedValue({
-      success: true,
-    });
-
-    await controller.sendReportNotificationTestEmail("client_1", dto, actor);
-
-    expect(service.sendReportNotificationTestEmail).toHaveBeenCalledWith(
       "client_1",
       dto,
       actor,

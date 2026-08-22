@@ -26,8 +26,6 @@ describe("ClientAnalyticsService & R2StorageService", () => {
   let prisma: any;
   let eventBus: any;
   let config: any;
-  let notificationService: any;
-  let crypto: any;
   let scheduleCalculator: any;
 
   const mockActor: IdentityContext = {
@@ -82,13 +80,6 @@ describe("ClientAnalyticsService & R2StorageService", () => {
     eventBus = {
       publish: jest.fn().mockResolvedValue({}),
     };
-    notificationService = {
-      notify: jest.fn().mockResolvedValue({ deliveryId: "delivery-1" }),
-    };
-    crypto = {
-      decrypt: jest.fn().mockReturnValue("owner@example.com"),
-    };
-
     r2Storage = new R2StorageService(config);
     jest.spyOn(r2Storage, "uploadObject").mockResolvedValue(undefined);
     jest.spyOn(r2Storage, "deleteObject").mockResolvedValue(undefined);
@@ -128,9 +119,6 @@ describe("ClientAnalyticsService & R2StorageService", () => {
       r2Storage,
       eventBus,
       scheduleCalculator,
-      notificationService,
-      crypto,
-      config,
     );
   });
 
@@ -696,71 +684,6 @@ describe("ClientAnalyticsService & R2StorageService", () => {
           }),
         }),
       );
-    });
-  });
-
-  describe("Report Notification Test Email", () => {
-    it("queues a test email only to the authenticated agency user", async () => {
-      prisma.agency.findUnique.mockResolvedValue({
-        id: "agency-456",
-        name: "Socia Expert",
-        displayName: "Socia Expert",
-        slug: "socia-expert",
-      });
-      prisma.client.findFirst.mockResolvedValue({
-        id: "client-1",
-        name: "Test Client",
-      });
-      prisma.user.findUnique.mockResolvedValue({
-        id: "user-123",
-        name: "Owner",
-        authUser: { emailEncrypted: "encrypted-email" },
-      });
-      prisma.notification.count.mockResolvedValue(0);
-
-      const result = await service.sendReportNotificationTestEmail(
-        "client-1",
-        {
-          frequency: "WEEKLY" as any,
-          weeklyDay: "SATURDAY" as any,
-          sendTime: "18:00",
-          timezone: "Asia/Kolkata",
-        },
-        mockActor,
-      );
-
-      expect(result.recipientEmail).toBe("owner@example.com");
-      expect(crypto.decrypt).toHaveBeenCalledWith("encrypted-email");
-      expect(notificationService.notify).toHaveBeenCalledWith(
-        expect.objectContaining({
-          agencyId: "agency-456",
-          userId: "user-123",
-          title: "[TEST] Your latest performance reports are ready",
-          recipientType: "EMPLOYEE",
-          metadata: expect.objectContaining({
-            isTest: true,
-            reportFrequency: "WEEKLY",
-            clientId: "client-1",
-            deepLink: expect.stringMatching(/^https:\/\/socia-expert\..+\/files$/),
-          }),
-        }),
-      );
-    });
-
-    it("rejects client-scoped users", async () => {
-      await expect(
-        service.sendReportNotificationTestEmail(
-          "client-1",
-          {
-            frequency: "WEEKLY" as any,
-            weeklyDay: "SATURDAY" as any,
-            sendTime: "18:00",
-            timezone: "Asia/Kolkata",
-          },
-          { ...mockActor, clientId: "client-1", role: "CLIENT", roles: ["CLIENT"] },
-        ),
-      ).rejects.toThrow(ForbiddenException);
-      expect(notificationService.notify).not.toHaveBeenCalled();
     });
   });
 });

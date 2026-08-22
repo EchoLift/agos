@@ -150,29 +150,6 @@ export class PreviewReportNotificationScheduleDto {
   enabled?: boolean;
 }
 
-export class TestReportNotificationScheduleDto {
-  @ReportNotificationFrequencyField()
-  frequency?: ReportNotificationFrequency;
-
-  @ReportNotificationScheduleTypeField()
-  scheduleType?: ReportNotificationScheduleType;
-
-  @ReportNotificationWeekdayField()
-  weeklyDay?: ReportNotificationWeekday;
-
-  @DaysBeforeMonthEndField()
-  daysBeforeMonthEnd?: number;
-
-  @SendTimeField()
-  sendTime!: string;
-
-  @TimezoneField()
-  timezone?: string;
-
-  @EnabledField()
-  enabled?: boolean;
-}
-
 export interface LastExecutionSummary {
   id: string;
   status: ReportNotificationExecutionStatus;
@@ -204,11 +181,4 @@ export interface ReportNotificationScheduleResponse {
   nextRunAt: Date | null;
   lastRunAt: Date | null;
   lastExecution: LastExecutionSummary | null;
-}
-
-export interface TestReportNotificationScheduleResponse {
-  success: boolean;
-  recipientEmail: string;
-  reportPeriodLabel: string;
-  nextRunAt: Date;
 }
