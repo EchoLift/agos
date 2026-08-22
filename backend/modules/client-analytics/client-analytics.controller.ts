@@ -193,3 +193,90 @@ export class ClientAnalyticsController {
     );
   }
 }
+
+@ApiTags("Client Report Notifications")
+@ApiBearerAuth()
+@Controller({ path: "clients/:clientId/report-notification-schedule", version: "1" })
+export class ClientReportNotificationScheduleController {
+  constructor(private readonly analyticsService: ClientAnalyticsService) {}
+
+  @Get()
+  @ApiOperation({
+    summary: "Get report notification schedule for a client",
+    description:
+      "Returns the report notification configuration, next run time, and last execution status.",
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Schedule configuration or unconfigured state.",
+  })
+  async getReportNotificationSchedule(
+    @Param("clientId") clientId: string,
+    @CurrentUser() user: IdentityContext,
+  ) {
+    return this.analyticsService.getReportNotificationSchedule(clientId, user);
+  }
+
+  @Put()
+  @RequirePermissions("CLIENT_UPDATE")
+  @ApiOperation({
+    summary: "Create or update report notification schedule for a client",
+    description:
+      "Upserts the report notification schedule using the canonical monthly/weekly schedule input.",
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Updated schedule configuration.",
+  })
+  async upsertReportNotificationSchedule(
+    @Param("clientId") clientId: string,
+    @Body() dto: UpsertReportNotificationScheduleDto,
+    @CurrentUser() user: IdentityContext,
+  ) {
+    return this.analyticsService.upsertReportNotificationSchedule(
+      clientId,
+      dto,
+      user,
+    );
+  }
+
+  @Post("preview")
+  @ApiOperation({
+    summary: "Preview next run date and reporting period for a schedule configuration",
+    description:
+      "Returns the backend-computed nextRunAt and resolved reporting period label for a proposed schedule configuration without saving it.",
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Preview result with nextRunAt and reportPeriodLabel.",
+  })
+  async previewReportNotificationSchedule(
+    @Param("clientId") _clientId: string,
+    @Body() dto: PreviewReportNotificationScheduleDto,
+  ) {
+    return this.analyticsService.previewReportNotificationSchedule(dto);
+  }
+
+  @Post("test")
+  @RequirePermissions("CLIENT_UPDATE")
+  @ApiOperation({
+    summary: "Send a report notification test email",
+    description:
+      "Queues a test report notification email to the authenticated agency user only, using the provided unsaved schedule preview values.",
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Test email queued for the authenticated user.",
+  })
+  async sendReportNotificationTestEmail(
+    @Param("clientId") clientId: string,
+    @Body() dto: TestReportNotificationScheduleDto,
+    @CurrentUser() user: IdentityContext,
+  ) {
+    return this.analyticsService.sendReportNotificationTestEmail(
+      clientId,
+      dto,
+      user,
+    );
+  }
+}

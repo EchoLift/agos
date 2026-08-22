@@ -416,6 +416,37 @@ describe("ReportScheduleCalculatorService", () => {
   });
 
   describe("Validation", () => {
+    it("rejects WEEKLY without weeklyDay", () => {
+      expect(() =>
+        service.validateScheduleConfig({
+          frequency: ReportNotificationFrequency.WEEKLY,
+          sendTime: "10:00",
+          timezone: "Asia/Kolkata",
+        }),
+      ).toThrow("Weekly notification day is required.");
+    });
+
+    it("rejects MONTHLY without scheduleType", () => {
+      expect(() =>
+        service.validateScheduleConfig({
+          frequency: ReportNotificationFrequency.MONTHLY,
+          sendTime: "10:00",
+          timezone: "Asia/Kolkata",
+        }),
+      ).toThrow("Schedule type is required.");
+    });
+
+    it("rejects DAYS_BEFORE_MONTH_END without daysBeforeMonthEnd", () => {
+      expect(() =>
+        service.validateScheduleConfig({
+          frequency: ReportNotificationFrequency.MONTHLY,
+          scheduleType: ReportNotificationScheduleType.DAYS_BEFORE_MONTH_END,
+          sendTime: "10:00",
+          timezone: "Asia/Kolkata",
+        }),
+      ).toThrow("daysBeforeMonthEnd must be one of");
+    });
+
     it("rejects invalid daysBeforeMonthEnd", () => {
       expect(() =>
         service.validateScheduleInput(

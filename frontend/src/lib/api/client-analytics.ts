@@ -163,8 +163,8 @@ export interface ReportScheduleLastExecution {
   reportYear: number;
   reportMonth: number;
   reportPeriodLabel: string;
-  periodStart: string;
-  periodEnd: string;
+  periodStart: string | null;
+  periodEnd: string | null;
   scheduledAt: string;
   sentAt: string | null;
   attemptCount: number;
@@ -227,7 +227,7 @@ export async function getReportNotificationSchedule(
   clientId: string,
 ): Promise<ReportNotificationScheduleData> {
   return apiClient<ReportNotificationScheduleData>(
-    `/clients/${clientId}/analytics/files/notification-schedule`,
+    `/clients/${clientId}/report-notification-schedule`,
     {
       method: "GET",
       agencyId: agencyId || undefined,
@@ -241,7 +241,7 @@ export async function upsertReportNotificationSchedule(
   payload: UpsertReportSchedulePayload,
 ): Promise<ReportNotificationScheduleData> {
   return apiClient<ReportNotificationScheduleData>(
-    `/clients/${clientId}/analytics/files/notification-schedule`,
+    `/clients/${clientId}/report-notification-schedule`,
     {
       method: "PUT",
       agencyId: agencyId || undefined,
@@ -257,7 +257,7 @@ export async function previewReportNotificationSchedule(
   payload: Omit<UpsertReportSchedulePayload, "enabled">,
 ): Promise<ReportSchedulePreview> {
   return apiClient<ReportSchedulePreview>(
-    `/clients/${clientId}/analytics/files/notification-schedule/preview`,
+    `/clients/${clientId}/report-notification-schedule/preview`,
     {
       method: "POST",
       agencyId: agencyId || undefined,
@@ -273,7 +273,7 @@ export async function sendReportNotificationTestEmail(
   payload: Omit<UpsertReportSchedulePayload, "enabled">,
 ): Promise<ReportNotificationTestEmailResponse> {
   return apiClient<ReportNotificationTestEmailResponse>(
-    `/clients/${clientId}/analytics/files/notification-schedule/test`,
+    `/clients/${clientId}/report-notification-schedule/test`,
     {
       method: "POST",
       agencyId: agencyId || undefined,

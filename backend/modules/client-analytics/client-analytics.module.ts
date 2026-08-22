@@ -4,13 +4,19 @@ import { DatabaseModule } from "@packages/database/database.module";
 import { EventBusModule } from "@packages/events/event-bus.module";
 import { NotificationModule } from "@modules/notification/notification.module";
 import { ClientAnalyticsService } from "./client-analytics.service";
-import { ClientAnalyticsController } from "./client-analytics.controller";
+import {
+  ClientAnalyticsController,
+  ClientReportNotificationScheduleController,
+} from "./client-analytics.controller";
 import { R2StorageService } from "./r2-storage.service";
 import { ReportScheduleCalculatorService } from "./services/report-schedule-calculator.service";
 
 @Module({
   imports: [DatabaseModule, EventBusModule, NotificationModule, CryptoModule],
-  controllers: [ClientAnalyticsController],
+  controllers: [
+    ClientAnalyticsController,
+    ClientReportNotificationScheduleController,
+  ],
   providers: [ClientAnalyticsService, R2StorageService, ReportScheduleCalculatorService],
   exports: [ClientAnalyticsService, R2StorageService, ReportScheduleCalculatorService],
 })
