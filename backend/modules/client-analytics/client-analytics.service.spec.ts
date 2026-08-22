@@ -4,7 +4,12 @@ import {
   NotFoundException,
   PayloadTooLargeException,
 } from "@nestjs/common";
-import { AnalyticsFileCategory } from "@prisma/client";
+import {
+  AnalyticsFileCategory,
+  ReportNotificationFrequency,
+  ReportNotificationScheduleType,
+  ReportNotificationWeekday,
+} from "@prisma/client";
 import { DomainEvents } from "@packages/events/domain-event";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import {
@@ -23,6 +28,7 @@ describe("ClientAnalyticsService & R2StorageService", () => {
   let config: any;
   let notificationService: any;
   let crypto: any;
+  let scheduleCalculator: any;
 
   const mockActor: IdentityContext = {
     authUserId: "auth-123",
@@ -58,6 +64,10 @@ describe("ClientAnalyticsService & R2StorageService", () => {
         findFirst: jest.fn(),
         update: jest.fn(),
       },
+      clientReportNotificationSchedule: {
+        findUnique: jest.fn(),
+        upsert: jest.fn(),
+      },
       agency: {
         findUnique: jest.fn(),
       },
@@ -86,36 +96,38 @@ describe("ClientAnalyticsService & R2StorageService", () => {
       .spyOn(r2Storage, "getSignedDownloadUrl")
       .mockResolvedValue("https://mock-signed-url.example/test.png");
 
+    scheduleCalculator = {
+      normalizeTimezone: jest.fn((tz?: string | null) => tz || "Asia/Kolkata"),
+      validateScheduleConfig: jest.fn(),
+      generatePreview: jest.fn(() => ({
+        frequency: "MONTHLY",
+        scheduleType: "LAST_WORKING_DAY",
+        weeklyDay: null,
+        daysBeforeMonthEnd: null,
+        sendTime: "10:00",
+        timezone: "Asia/Kolkata",
+        nextRunAt: new Date("2026-08-31T04:30:00.000Z"),
+        reportYear: 2026,
+        reportMonth: 8,
+        periodStart: new Date("2026-07-31T18:30:00.000Z"),
+        periodEnd: new Date("2026-08-31T18:29:59.999Z"),
+        reportPeriodLabel: "August 2026",
+      })),
+      calculateNextRunAt: jest.fn(() => new Date("2026-08-31T04:30:00.000Z")),
+      resolveReportingPeriod: jest.fn(() => ({
+        reportYear: 2026,
+        reportMonth: 8,
+        periodStart: new Date("2026-07-31T18:30:00.000Z"),
+        periodEnd: new Date("2026-08-31T18:29:59.999Z"),
+        label: "August 2026",
+      })),
+    };
+
     service = new ClientAnalyticsService(
       prisma,
       r2Storage,
       eventBus,
-      {
-        normalizeTimezone: jest.fn((tz?: string | null) => tz || "Asia/Kolkata"),
-        validateScheduleConfig: jest.fn(),
-        generatePreview: jest.fn(() => ({
-          frequency: "MONTHLY",
-          scheduleType: "LAST_WORKING_DAY",
-          weeklyDay: null,
-          daysBeforeMonthEnd: null,
-          sendTime: "10:00",
-          timezone: "Asia/Kolkata",
-          nextRunAt: new Date("2026-08-31T04:30:00.000Z"),
-          reportYear: 2026,
-          reportMonth: 8,
-          periodStart: new Date("2026-07-31T18:30:00.000Z"),
-          periodEnd: new Date("2026-08-31T18:29:59.999Z"),
-          reportPeriodLabel: "August 2026",
-        })),
-        calculateNextRunAt: jest.fn(() => new Date("2026-08-31T04:30:00.000Z")),
-        resolveReportingPeriod: jest.fn(() => ({
-          reportYear: 2026,
-          reportMonth: 8,
-          periodStart: new Date("2026-07-31T18:30:00.000Z"),
-          periodEnd: new Date("2026-08-31T18:29:59.999Z"),
-          label: "August 2026",
-        })),
-      } as any,
+      scheduleCalculator,
       notificationService,
       crypto,
       config,
@@ -154,6 +166,132 @@ describe("ClientAnalyticsService & R2StorageService", () => {
       expect(
         service.classifyAnalyticsFile("application/octet-stream", "raw.unknown"),
       ).toBe(AnalyticsFileCategory.OTHER);
+    });
+  });
+
+  describe("Report Notification Schedule Retrieval", () => {
+    const baseSchedule = {
+      id: "schedule-1",
+      agencyId: "agency-456",
+      clientId: "client-1",
+      frequency: ReportNotificationFrequency.MONTHLY,
+      scheduleType: ReportNotificationScheduleType.LAST_WORKING_DAY,
+      daysBeforeMonthEnd: null,
+      weeklyDay: null,
+      sendTime: "10:00",
+      timezone: "Asia/Kolkata",
+      enabled: true,
+      nextRunAt: new Date("2026-08-31T04:30:00.000Z"),
+      lastRunAt: null,
+      executions: [],
+    };
+
+    it("returns an unconfigured response when no schedule exists", async () => {
+      prisma.clientReportNotificationSchedule.findUnique.mockResolvedValue(null);
+
+      const result = await service.getReportNotificationSchedule(
+        "client-1",
+        mockActor,
+      );
+
+      expect(result).toMatchObject({
+        configured: false,
+        frequency: ReportNotificationFrequency.MONTHLY,
+        scheduleType: null,
+        weeklyDay: null,
+        enabled: false,
+      });
+    });
+
+    it("treats legacy monthly schedules with null frequency as MONTHLY", async () => {
+      prisma.clientReportNotificationSchedule.findUnique.mockResolvedValue({
+        ...baseSchedule,
+        frequency: null,
+        scheduleType: ReportNotificationScheduleType.LAST_WORKING_DAY,
+        executions: [
+          {
+            id: "execution-1",
+            status: "SENT",
+            reportYear: 2026,
+            reportMonth: 8,
+            periodStart: null,
+            periodEnd: null,
+            scheduledAt: new Date("2026-08-31T04:30:00.000Z"),
+            sentAt: new Date("2026-08-31T04:31:00.000Z"),
+            attemptCount: 1,
+            lastAttemptAt: new Date("2026-08-31T04:30:00.000Z"),
+            recipientCount: 1,
+            errorDetails: null,
+          },
+        ],
+      });
+
+      const result = await service.getReportNotificationSchedule(
+        "client-1",
+        mockActor,
+      );
+
+      expect(result.configured).toBe(true);
+      expect(result.frequency).toBe(ReportNotificationFrequency.MONTHLY);
+      expect(result.scheduleType).toBe(
+        ReportNotificationScheduleType.LAST_WORKING_DAY,
+      );
+      expect(result.weeklyDay).toBeNull();
+      expect(result.lastExecution?.reportPeriodLabel).toBe("August 2026");
+      expect(result.lastExecution?.periodStart).toEqual(
+        new Date("2026-07-31T18:30:00.000Z"),
+      );
+    });
+
+    it("returns a new monthly schedule unchanged", async () => {
+      prisma.clientReportNotificationSchedule.findUnique.mockResolvedValue({
+        ...baseSchedule,
+        frequency: ReportNotificationFrequency.MONTHLY,
+        scheduleType: ReportNotificationScheduleType.FIRST_DAY,
+      });
+
+      const result = await service.getReportNotificationSchedule(
+        "client-1",
+        mockActor,
+      );
+
+      expect(result.frequency).toBe(ReportNotificationFrequency.MONTHLY);
+      expect(result.scheduleType).toBe(ReportNotificationScheduleType.FIRST_DAY);
+      expect(result.weeklyDay).toBeNull();
+    });
+
+    it("returns a weekly schedule with selected weekday", async () => {
+      prisma.clientReportNotificationSchedule.findUnique.mockResolvedValue({
+        ...baseSchedule,
+        frequency: ReportNotificationFrequency.WEEKLY,
+        scheduleType: ReportNotificationScheduleType.LAST_WORKING_DAY,
+        weeklyDay: ReportNotificationWeekday.FRIDAY,
+        nextRunAt: new Date("2026-08-28T04:30:00.000Z"),
+      });
+
+      const result = await service.getReportNotificationSchedule(
+        "client-1",
+        mockActor,
+      );
+
+      expect(result.frequency).toBe(ReportNotificationFrequency.WEEKLY);
+      expect(result.weeklyDay).toBe(ReportNotificationWeekday.FRIDAY);
+    });
+
+    it("returns a disabled schedule without requiring nextRunAt", async () => {
+      prisma.clientReportNotificationSchedule.findUnique.mockResolvedValue({
+        ...baseSchedule,
+        enabled: false,
+        nextRunAt: null,
+      });
+
+      const result = await service.getReportNotificationSchedule(
+        "client-1",
+        mockActor,
+      );
+
+      expect(result.enabled).toBe(false);
+      expect(result.nextRunAt).toBeNull();
     });
   });
 

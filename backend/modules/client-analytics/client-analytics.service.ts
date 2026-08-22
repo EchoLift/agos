@@ -556,12 +556,20 @@ export class ClientAnalyticsService {
       };
     }
 
+    const frequency =
+      schedule.frequency ?? ReportNotificationFrequency.MONTHLY;
+    const scheduleType =
+      schedule.scheduleType ?? ReportNotificationScheduleType.LAST_WORKING_DAY;
+    const weeklyDay =
+      frequency === ReportNotificationFrequency.WEEKLY
+        ? (schedule.weeklyDay ?? null)
+        : null;
     const lastExecution = schedule.executions[0] ?? null;
     const lastExecutionPeriod = lastExecution
       ? this.scheduleCalculator.resolveReportingPeriod({
-          frequency: schedule.frequency,
-          scheduleType: schedule.scheduleType,
-          weeklyDay: schedule.weeklyDay,
+          frequency,
+          scheduleType,
+          weeklyDay,
           runDate: lastExecution.scheduledAt,
           timezone: schedule.timezone,
         })
@@ -572,10 +580,10 @@ export class ClientAnalyticsService {
       id: schedule.id,
       agencyId: schedule.agencyId,
       clientId: schedule.clientId,
-      frequency: schedule.frequency,
-      scheduleType: schedule.scheduleType,
+      frequency,
+      scheduleType,
       daysBeforeMonthEnd: schedule.daysBeforeMonthEnd,
-      weeklyDay: schedule.weeklyDay,
+      weeklyDay,
       sendTime: schedule.sendTime,
       timezone: schedule.timezone,
       enabled: schedule.enabled,
@@ -590,8 +598,12 @@ export class ClientAnalyticsService {
             reportPeriodLabel:
               lastExecutionPeriod?.label ??
               `${MONTH_NAMES[lastExecution.reportMonth - 1]} ${lastExecution.reportYear}`,
-            periodStart: lastExecution.periodStart,
-            periodEnd: lastExecution.periodEnd,
+            periodStart:
+              lastExecution.periodStart ??
+              lastExecutionPeriod?.periodStart ??
+              null,
+            periodEnd:
+              lastExecution.periodEnd ?? lastExecutionPeriod?.periodEnd ?? null,
             scheduledAt: lastExecution.scheduledAt,
             sentAt: lastExecution.sentAt,
             attemptCount: lastExecution.attemptCount,
@@ -803,11 +815,11 @@ export class ClientAnalyticsService {
       frequency,
       scheduleType:
         frequency === ReportNotificationFrequency.MONTHLY
-          ? (dto.scheduleType ?? ReportNotificationScheduleType.LAST_WORKING_DAY)
+          ? (dto.scheduleType ?? null)
           : null,
       weeklyDay:
         frequency === ReportNotificationFrequency.WEEKLY
-          ? (dto.weeklyDay ?? ReportNotificationWeekday.FRIDAY)
+          ? (dto.weeklyDay ?? null)
           : null,
       daysBeforeMonthEnd: dto.daysBeforeMonthEnd ?? null,
       sendTime: dto.sendTime,

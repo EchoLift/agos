@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "client_report_notification_executions_agencyId_clientId_repo_id" RENAME TO "client_report_notification_executions_agencyId_clientId_rep_idx";
