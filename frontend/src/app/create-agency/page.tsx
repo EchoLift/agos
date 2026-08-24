@@ -47,7 +47,7 @@ export default function CreateAgencyPage() {
     setIsSubmitting(true);
     try {
       const response = await createAgency(data.displayName, finalSlug);
-      router.push(getWorkspaceHref(safeagencySlug, `/${response.agency.slug}`));
+      window.location.assign(getWorkspaceUrl(response.agency.slug));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create agency.");
       setIsSubmitting(false);
