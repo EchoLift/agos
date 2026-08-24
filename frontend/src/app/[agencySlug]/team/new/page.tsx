@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAgency } from "@/components/AgencyProvider";
 import { getRoles, getInvitations, inviteMember, Role } from "@/lib/api/team";
-import { invalidateWorkspaceQueries, queryKeys, useClientsQuery } from "@/lib/query";
+import { queryKeys, useClientsQuery } from "@/lib/query";
 import { getWorkspaceHref } from "@/lib/workspace-url";
 
 export default function InviteMemberPage() {
@@ -18,7 +18,7 @@ export default function InviteMemberPage() {
   const [email, setEmail] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
   const [rolesError, setRolesError] = useState("");
   const safeAgencySlug = agencySlug ?? "";
@@ -61,8 +61,8 @@ export default function InviteMemberPage() {
         setIsSubmitting(false);
         return;
       }
-      if (requiresClient && !selectedClientId) {
-        setError("Select the business client this CLIENT user represents.");
+      if (requiresClient && selectedClientIds.length === 0) {
+        setError("Select at least one business client this CLIENT user can access.");
         setIsSubmitting(false);
         return;
       }
@@ -72,7 +72,7 @@ export default function InviteMemberPage() {
         mobileNumber: mobileNumber || undefined,
         roleId: primaryRoleId,
         roleIds: selectedRoleIds,
-        clientId: requiresClient ? selectedClientId : undefined,
+        clientIds: requiresClient ? selectedClientIds : undefined,
       });
       await queryClient.fetchQuery({
         queryKey: queryKeys.invitations(agencyId),
@@ -101,8 +101,16 @@ export default function InviteMemberPage() {
       .filter((role) => nextRoleIds.includes(role.id))
       .some((role) => role.key === "CLIENT");
     if (!nextRequiresClient) {
-      setSelectedClientId("");
+      setSelectedClientIds([]);
     }
+  };
+
+  const toggleClient = (clientId: string) => {
+    setSelectedClientIds((current) =>
+      current.includes(clientId)
+        ? current.filter((id) => id !== clientId)
+        : [...current, clientId],
+    );
   };
 
   return (
@@ -213,19 +221,22 @@ export default function InviteMemberPage() {
                   Create a business client before inviting a CLIENT user.
                 </div>
               ) : (
-                <select
-                  required
-                  value={selectedClientId}
-                  onChange={(event) => setSelectedClientId(event.target.value)}
-                  className="mt-2 block w-full rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="">Select a business client...</option>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
                   {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.displayName || client.name}
-                    </option>
+                    <label
+                      key={client.id}
+                      className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-sm text-zinc-300 transition hover:border-zinc-700"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedClientIds.includes(client.id)}
+                        onChange={() => toggleClient(client.id)}
+                        className="h-4 w-4 accent-indigo-500"
+                      />
+                      <span>{client.displayName || client.name}</span>
+                    </label>
                   ))}
-                </select>
+                </div>
               )}
             </div>
           ) : null}
@@ -233,7 +244,7 @@ export default function InviteMemberPage() {
           <div className="pt-4">
             <button
               type="submit"
-              disabled={isSubmitting || (requiresClient && !selectedClientId)}
+              disabled={isSubmitting || (requiresClient && selectedClientIds.length === 0)}
               className="w-full rounded-full bg-indigo-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:opacity-50"
             >
               {isSubmitting ? "Sending Invitation..." : "Send Invitation"}

@@ -34,14 +34,19 @@ export function persistAccessToken(accessToken: string, expiresIn: number) {
 
   const expiresAt = Date.now() + expiresIn * 1000;
   window.localStorage.setItem(STORAGE_KEYS.accessToken, accessToken);
-  window.localStorage.setItem(STORAGE_KEYS.accessTokenExpiresAt, String(expiresAt));
+  window.localStorage.setItem(
+    STORAGE_KEYS.accessTokenExpiresAt,
+    String(expiresAt),
+  );
 }
 
 export function getAccessToken() {
   if (typeof window === "undefined") return null;
 
   const token = window.localStorage.getItem(STORAGE_KEYS.accessToken);
-  const expiresAt = Number(window.localStorage.getItem(STORAGE_KEYS.accessTokenExpiresAt) ?? "0");
+  const expiresAt = Number(
+    window.localStorage.getItem(STORAGE_KEYS.accessTokenExpiresAt) ?? "0",
+  );
 
   if (!token || (expiresAt && Date.now() > expiresAt)) {
     return null;
@@ -108,7 +113,11 @@ export async function refreshAccessToken(): Promise<string | null> {
 
   refreshPromise = (async () => {
     try {
-      for (let attempt = 0; attempt <= REFRESH_RETRY_DELAYS_MS.length; attempt += 1) {
+      for (
+        let attempt = 0;
+        attempt <= REFRESH_RETRY_DELAYS_MS.length;
+        attempt += 1
+      ) {
         try {
           const response = await fetchRefreshToken();
 
@@ -168,46 +177,30 @@ export async function logout() {
 export function redirectToCentralLogin() {
   if (typeof window === "undefined") return;
 
-  const isLocal =
-    window.location.hostname === "localhost" ||
-    window.location.hostname.endsWith(".localhost");
-
-  window.location.href = isLocal
-    ? "/login"
-    : `${APP_URL}/login`;
+  window.location.href = "/login";
 }
 
-const APP_URL =
-  process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 export function getCentralLoginUrl(returnTo?: string) {
-  if (typeof window === "undefined") {
-    return `${APP_URL}/login`;
-  }
-
-  const isLocal =
-    window.location.hostname === "localhost" ||
-    window.location.hostname.endsWith(".localhost");
-
-  if (isLocal) {
-    return "/login";
-  }
-
-  const loginUrl = new URL("/login", APP_URL);
+  const loginUrl =
+    typeof window === "undefined"
+      ? new URL("/login", APP_URL)
+      : new URL("/login", window.location.origin);
 
   if (returnTo) {
     loginUrl.searchParams.set("returnTo", returnTo);
   }
 
-  return loginUrl.toString();
+  return typeof window === "undefined"
+    ? loginUrl.toString()
+    : `${loginUrl.pathname}${loginUrl.search}`;
 }
 
 export function redirectToLogin() {
   if (typeof window === "undefined") return;
 
-  const returnTo =
-    `${window.location.origin}${window.location.pathname}` +
-    `${window.location.search}${window.location.hash}`;
+  const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
   window.location.href = getCentralLoginUrl(returnTo);
 }

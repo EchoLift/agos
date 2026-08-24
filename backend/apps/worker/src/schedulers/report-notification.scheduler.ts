@@ -151,32 +151,30 @@ export class ReportNotificationSchedulerService {
       return;
     }
 
-    // ── RESOLVE RECIPIENTS ────────────────────────────────────────────────────
-    // Notify users who have client-scoped membership in this specific client
-    const clientMemberships = await this.prisma.membership.findMany({
+    // ── RESOLVE RECIPIENT ─────────────────────────────────────────────────────
+    // Client-facing report notifications go only to the authoritative primary contact.
+    const clientRecipient = await this.prisma.client.findFirst({
       where: {
+        id: schedule.clientId,
         agencyId: schedule.agencyId,
-        clientId: schedule.clientId,
-        status: "ACTIVE",
         deletedAt: null,
       },
       include: {
-        user: {
+        primaryContactUser: {
           include: { authUser: true },
         },
       },
     });
 
-    if (clientMemberships.length === 0) {
+    if (!clientRecipient?.primaryContactUser?.authUser) {
       this.logger.log(
-        `No active client-scoped members for client ${schedule.clientId}. Recording FAILED for retry.`,
+        `No primary contact recipient for client ${schedule.clientId}. Recording FAILED for retry.`,
       );
       await this.prisma.clientReportNotificationExecution.update({
         where: { id: executionId },
         data: {
           status: ReportNotificationExecutionStatus.FAILED,
-          errorDetails:
-            "No active client-scoped members were available to notify.",
+          errorDetails: "No primary contact recipient was available to notify.",
           updatedAt: now,
         },
       });
@@ -197,46 +195,42 @@ export class ReportNotificationSchedulerService {
 
     const isWeekly = schedule.frequency === ReportNotificationFrequency.WEEKLY;
 
-    for (const membership of clientMemberships) {
-      const user = membership.user;
-      if (!user?.authUser) continue;
+    const user = clientRecipient.primaryContactUser;
+    try {
+      const recipientName = user.name || "there";
 
-      try {
-        const recipientName = user.name || "there";
-
-        await this.notificationService.notify({
-          agencyId: schedule.agencyId,
-          userId: user.id,
-          title: isWeekly
-            ? "Your latest performance reports are ready"
-            : `Your ${reportPeriodLabel} reports are ready`,
-          body: isWeekly
-            ? `${schedule.agency.name} has updated your performance reports.`
-            : `${schedule.agency.name} has uploaded your reports for ${reportPeriodLabel}.`,
-          eventType: "ClientReportReady",
-          deliveryIntent: NotificationDeliveryIntent.ClientActionRequired,
-          recipientType: "CLIENT" as NotificationRecipientType,
-          metadata: {
-            reportFrequency: schedule.frequency,
-            reportYear,
-            reportMonth,
-            reportPeriodLabel,
-            periodStart: periodStart.toISOString(),
-            periodEnd: periodEnd.toISOString(),
-            weeklyDay: schedule.weeklyDay,
-            clientId: schedule.clientId,
-            deepLink: reportsDeepLink,
-          },
-        });
-        recipientCount++;
-        this.logger.log(
-          `Notified user ${user.id} (${recipientName}) for period ${reportPeriodLabel}`,
-        );
-      } catch (notifyErr: any) {
-        const errMsg = `Failed to notify user ${user.id}: ${notifyErr?.message}`;
-        this.logger.error(errMsg, notifyErr);
-        errors.push(errMsg);
-      }
+      await this.notificationService.notify({
+        agencyId: schedule.agencyId,
+        userId: user.id,
+        title: isWeekly
+          ? "Your latest performance reports are ready"
+          : `Your ${reportPeriodLabel} reports are ready`,
+        body: isWeekly
+          ? `${schedule.agency.name} has updated your performance reports.`
+          : `${schedule.agency.name} has uploaded your reports for ${reportPeriodLabel}.`,
+        eventType: "ClientReportReady",
+        deliveryIntent: NotificationDeliveryIntent.ClientActionRequired,
+        recipientType: "CLIENT" as NotificationRecipientType,
+        metadata: {
+          reportFrequency: schedule.frequency,
+          reportYear,
+          reportMonth,
+          reportPeriodLabel,
+          periodStart: periodStart.toISOString(),
+          periodEnd: periodEnd.toISOString(),
+          weeklyDay: schedule.weeklyDay,
+          clientId: schedule.clientId,
+          deepLink: reportsDeepLink,
+        },
+      });
+      recipientCount++;
+      this.logger.log(
+        `Notified primary contact user ${user.id} (${recipientName}) for period ${reportPeriodLabel}`,
+      );
+    } catch (notifyErr: any) {
+      const errMsg = `Failed to notify primary contact user ${user.id}: ${notifyErr?.message}`;
+      this.logger.error(errMsg, notifyErr);
+      errors.push(errMsg);
     }
 
     // ── RECORD OUTCOME ────────────────────────────────────────────────────────

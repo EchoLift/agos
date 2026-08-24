@@ -8,7 +8,7 @@ import { ClientFormActions, ClientPlaybookForm, normalizeClientPayload } from "@
 import { useAgency } from "@/components/AgencyProvider";
 import { Client, ClientPlaybookResponse, CreateClientInput, updateClient } from "@/lib/api/clients";
 import { statusPillClasses } from "@/lib/status-style";
-import { invalidateWorkspaceQueries, queryKeys, setListItem, useClientQuery } from "@/lib/query";
+import { invalidateWorkspaceQueries, queryKeys, setListItem, useClientQuery, useTeamQuery } from "@/lib/query";
 import { getWorkspaceHref } from "@/lib/workspace-url";
 import { clearRememberedEntityId, rememberedEntityKey, useRememberLastVisitedEntity } from "@/lib/remembered-tab";
 
@@ -20,6 +20,7 @@ export default function ClientDetailPage() {
   const queryClient = useQueryClient();
   const { agencyId } = useAgency();
   const playbookQuery = useClientQuery(agencyId, params.clientId);
+  const teamQuery = useTeamQuery(agencyId);
   const playbook = playbookQuery.data ?? null;
   useRememberLastVisitedEntity({
     storageKey: rememberedEntityKey("client", agencyId),
@@ -166,7 +167,13 @@ export default function ClientDetailPage() {
               />
             ) : isEditing ? (
               <form className="space-y-6" onSubmit={handleSubmit(save)}>
-                <ClientPlaybookForm register={register} setValue={setValue} watch={watch} />
+                <ClientPlaybookForm
+                  register={register}
+                  setValue={setValue}
+                  watch={watch}
+                  primaryContactUsers={teamQuery.data ?? []}
+                  clientId={playbook.client.id}
+                />
                 <ClientFormActions>
                   <button type="button" onClick={() => setIsEditing(false)} className="rounded-full border border-zinc-800 px-6 py-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 hover:text-white">
                     Cancel
@@ -255,6 +262,7 @@ function toFormValues(client: Partial<Client>): CreateClientInput {
     buyingBehavior: client.buyingBehavior || "",
     competitors: client.competitors || "",
     primaryContactName: client.primaryContactName || "",
+    primaryContactUserId: client.primaryContactUserId || "",
     primaryContactDesignation: client.primaryContactDesignation || "",
     primaryContactEmail: client.primaryContactEmail || "",
     primaryContactPhone: client.primaryContactPhone || "",

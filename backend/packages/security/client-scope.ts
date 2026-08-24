@@ -13,17 +13,22 @@ export function isClientUser(actor?: IdentityContext): boolean {
 }
 
 export function clientScopeId(actor?: IdentityContext): string | null {
-  return isClientUser(actor) ? (actor?.clientId ?? null) : null;
+  return clientScopeIds(actor)[0] ?? null;
+}
+
+export function clientScopeIds(actor?: IdentityContext): string[] {
+  if (!isClientUser(actor)) return [];
+  return [...new Set([...(actor?.clientIds ?? []), actor?.clientId].filter(Boolean))] as string[];
 }
 
 export function requireClientScope(actor: IdentityContext): string {
-  const clientId = clientScopeId(actor);
-  if (!clientId) {
+  const clientIds = clientScopeIds(actor);
+  if (clientIds.length === 0) {
     throw new ForbiddenException(
       "No client account has been assigned to your access. Contact your agency administrator.",
     );
   }
-  return clientId;
+  return clientIds[0];
 }
 
 export function assertClientScope(
@@ -31,8 +36,11 @@ export function assertClientScope(
   targetClientId: string | null | undefined,
 ) {
   if (!actor || !isClientUser(actor)) return;
-  const clientId = requireClientScope(actor);
-  if (targetClientId !== clientId) {
+  const clientIds = clientScopeIds(actor);
+  if (clientIds.length === 0) {
+    requireClientScope(actor);
+  }
+  if (!targetClientId || !clientIds.includes(targetClientId)) {
     throw new ForbiddenException("You do not have access to this client data.");
   }
 }

@@ -29,6 +29,7 @@ export interface Client {
   buyingBehavior: string | null;
   competitors: string | null;
   primaryContactName: string | null;
+  primaryContactUserId: string | null;
   primaryContactDesignation: string | null;
   primaryContactEmail: string | null;
   primaryContactPhone: string | null;
@@ -95,6 +96,7 @@ export interface CreateClientInput {
   buyingBehavior?: string | null;
   competitors?: string | null;
   primaryContactName?: string | null;
+  primaryContactUserId?: string | null;
   primaryContactDesignation?: string | null;
   primaryContactEmail?: string | null;
   primaryContactPhone?: string | null;

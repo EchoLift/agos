@@ -3,6 +3,7 @@
 import { ReactNode, useState } from "react";
 import { UseFormRegister, UseFormSetValue, UseFormWatch } from "react-hook-form";
 import { CreateClientInput } from "@/lib/api/clients";
+import { Member } from "@/lib/api/team";
 import { industryOptions } from "@/lib/client-options";
 import { ClientFormField, clientFormSections } from "@/lib/client-playbook-fields";
 
@@ -10,12 +11,26 @@ export function ClientPlaybookForm({
   register,
   setValue,
   watch,
+  primaryContactUsers = [],
+  clientId,
 }: {
   register: UseFormRegister<CreateClientInput>;
   setValue: UseFormSetValue<CreateClientInput>;
   watch: UseFormWatch<CreateClientInput>;
+  primaryContactUsers?: Member[];
+  clientId?: string;
 }) {
   const watchedIndustry = watch("industry") || "Technology";
+  const selectedPrimaryContactUserId = watch("primaryContactUserId") || "";
+  const selectedPrimaryContactUser = primaryContactUsers.find(
+    (member) => member.userId === selectedPrimaryContactUserId,
+  );
+  const selectedUserHasAccess = Boolean(
+    clientId &&
+      selectedPrimaryContactUser?.clientAccess?.some(
+        (access) => access.clientId === clientId,
+      ),
+  );
   const [industryChoice, setIndustryChoice] = useState(industryOptions.includes(watchedIndustry) ? watchedIndustry : "Other");
   const [openSection, setOpenSection] = useState("General");
 
@@ -43,6 +58,29 @@ export function ClientPlaybookForm({
                     </select>
                   </label>
                   {industryChoice === "Other" ? <InputField field={{ name: "industry", label: "Custom Industry *", kind: "text", required: true }} register={register} /> : <input type="hidden" {...register("industry", { required: true })} />}
+                </div>
+              ) : null}
+              {section.title === "Primary Contact" ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block text-sm font-medium text-zinc-300">
+                    AGENCIE User *
+                    <select
+                      {...register("primaryContactUserId", { required: true })}
+                      className="mt-2 w-full rounded-2xl border border-zinc-800 bg-[#0b0b11] px-4 py-3 text-base text-white outline-none transition focus:border-indigo-500"
+                    >
+                      <option value="">Select a user...</option>
+                      {primaryContactUsers.map((member) => (
+                        <option key={member.userId} value={member.userId}>
+                          {member.name || member.email || member.userId}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {selectedPrimaryContactUserId && !selectedUserHasAccess ? (
+                    <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-3 text-sm leading-6 text-indigo-200">
+                      Saving will grant this user CLIENT access to this client.
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               <div className="grid gap-4 md:grid-cols-2">

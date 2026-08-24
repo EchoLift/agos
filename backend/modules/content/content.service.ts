@@ -21,8 +21,8 @@ import { GoogleCalendarSyncService } from "@modules/google-calendar/google-calen
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import {
   assertClientScope,
+  clientScopeIds,
   isClientUser,
-  requireClientScope,
 } from "@packages/security/client-scope";
 import { CreateContentAssetDto } from "./dto/create-content-asset.dto";
 import { UpdateContentPlanningDto } from "./dto/update-content-planning.dto";
@@ -444,13 +444,15 @@ export class ContentService {
     campaignId?: string,
     actor?: IdentityContext,
   ) {
-    const clientId =
-      actor && isClientUser(actor) ? requireClientScope(actor) : null;
+    const scopedClientIds =
+      actor && isClientUser(actor) ? clientScopeIds(actor) : [];
     const assets = await this.prisma.contentAsset.findMany({
       where: {
         agencyId,
         status: { not: "DELETED" },
-        ...(clientId ? { clientId } : {}),
+        ...(scopedClientIds.length
+          ? { clientId: { in: scopedClientIds } }
+          : {}),
         ...(campaignId ? { campaignId } : {}),
       },
       include: {

@@ -30,6 +30,13 @@ export interface Member {
     name: string;
     displayName: string;
   } | null;
+  clientAccess?: Array<{
+    clientId: string;
+    clientName: string | null;
+    isPrimaryContact?: boolean;
+    primaryContactUserId?: string | null;
+    primaryContactName?: string | null;
+  }>;
 }
 
 export interface InviteMemberParams {
@@ -38,6 +45,7 @@ export interface InviteMemberParams {
   roleId: string;
   roleIds?: string[];
   clientId?: string;
+  clientIds?: string[];
 }
 
 export type InvitationStatus =
@@ -61,6 +69,10 @@ export interface TeamInvitation {
     name: string;
     displayName: string;
   } | null;
+  clientAccess?: Array<{
+    clientId: string;
+    clientName: string | null;
+  }>;
   invitedBy: {
     membershipId: string;
     name: string | null;
@@ -143,6 +155,8 @@ export async function updateMemberRole(
     roleIds?: string[];
     version: number;
     clientId?: string;
+    clientIds?: string[];
+    primaryContactClientIds?: string[];
   },
 ): Promise<Member> {
   return apiClient<Member>(

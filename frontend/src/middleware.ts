@@ -48,7 +48,7 @@ export function middleware(req: NextRequest) {
 
       const requestedReturnTo = url.searchParams.get("returnTo");
 
-      const returnTo = requestedReturnTo || `${url.protocol}//${host}/`;
+      const returnTo = requestedReturnTo || `/${subdomain}/`;
 
       loginUrl.searchParams.set("returnTo", returnTo);
 

@@ -19,6 +19,10 @@ export class CreateClientDto {
   @IsUUID()
   assignedManagerMembershipId?: string;
 
+  @IsOptional()
+  @IsUUID()
+  primaryContactUserId?: string | null;
+
   @IsString()
   name!: string;
 

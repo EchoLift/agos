@@ -20,6 +20,9 @@ describe("InvitationClaimService", () => {
       membershipRole: {
         createMany: jest.fn(),
       },
+      clientUserAccess: {
+        createMany: jest.fn(),
+      },
       outboxEvent: {
         createMany: jest.fn(),
       },

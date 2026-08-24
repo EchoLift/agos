@@ -26,6 +26,7 @@ export class InvitationClaimService {
         },
         include: {
           roles: true,
+          clientAccesses: true,
         },
         orderBy: { createdAt: "asc" },
       });
@@ -78,6 +79,18 @@ export class InvitationClaimService {
               },
             });
 
+        const clientIds = this.invitationClientIds(invitation);
+        if (clientIds.length > 0) {
+          await tx.clientUserAccess.createMany({
+            data: clientIds.map((clientId) => ({
+              agencyId: invitation.agencyId,
+              clientId,
+              userId: input.userId,
+            })),
+            skipDuplicates: true,
+          });
+        }
+
         const authoritativeRoleIds = this.uniqueRoleIds(
           membership.roleId,
           roleIds,
@@ -99,6 +112,7 @@ export class InvitationClaimService {
           roleId: primaryRoleId,
           roleIds: authoritativeRoleIds,
           clientId: invitation.clientId ?? null,
+          clientIds,
           requestId: input.requestId ?? null,
           correlationId: input.correlationId ?? null,
           occurredAt: new Date().toISOString(),
@@ -148,7 +162,7 @@ export class InvitationClaimService {
     clientId: string | null,
   ) {
     if (membership.status === "ACTIVE" && !membership.deletedAt) {
-      if (membership.clientId === clientId) {
+      if ((membership.clientId ?? null) === clientId) {
         return membership;
       }
 
@@ -172,5 +186,13 @@ export class InvitationClaimService {
 
   private uniqueRoleIds(primaryRoleId: string, roleIds: string[]) {
     return [...new Set([primaryRoleId, ...roleIds].filter(Boolean))];
+  }
+
+  private invitationClientIds(invitation: {
+    clientId?: string | null;
+    clientAccesses?: Array<{ clientId: string }>;
+  }) {
+    const ids = invitation.clientAccesses?.map((access) => access.clientId) ?? [];
+    return [...new Set(ids.length ? ids : invitation.clientId ? [invitation.clientId] : [])];
   }
 }

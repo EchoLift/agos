@@ -15,6 +15,19 @@ describe("ClientService", () => {
         findMany: jest.fn(),
         update: jest.fn(),
       },
+      membership: {
+        findUnique: jest.fn(),
+      },
+      role: {
+        findFirst: jest.fn(),
+      },
+      membershipRole: {
+        createMany: jest.fn(),
+      },
+      clientUserAccess: {
+        upsert: jest.fn(),
+        deleteMany: jest.fn(),
+      },
     };
     eventBus = {
       publish: jest.fn().mockResolvedValue({}),
@@ -29,6 +42,7 @@ describe("ClientService", () => {
       name: "Northwind Studios",
       industry: "E-commerce",
       primaryContactName: "Avery North",
+      primaryContactUserId: "user-primary",
       primaryContactEmail: "avery@northwind.example",
       invitePrimaryContact: false,
       brandVoice: "Confident",
@@ -43,6 +57,14 @@ describe("ClientService", () => {
       industry: dto.industry,
       status: "ACTIVE",
     });
+    prisma.membership.findUnique.mockResolvedValue({
+      id: "mem-primary",
+      status: "ACTIVE",
+      deletedAt: null,
+      role: { systemRole: { key: "MEMBER" } },
+      roles: [],
+    });
+    prisma.role.findFirst.mockResolvedValue({ id: "role-client" });
 
     const client = await service.create(dto, "agency-1", "user-1");
 
@@ -51,12 +73,32 @@ describe("ClientService", () => {
         agencyId: "agency-1",
         name: dto.name,
         industry: dto.industry,
+        primaryContactUserId: "user-primary",
         primaryContactName: dto.primaryContactName,
         primaryContactEmail: dto.primaryContactEmail,
         brandVoice: dto.brandVoice,
         audience: dto.audience,
         competitors: dto.competitors,
         status: "ACTIVE",
+      },
+    });
+    expect(prisma.membershipRole.createMany).toHaveBeenCalledWith({
+      data: [{ membershipId: "mem-primary", roleId: "role-client" }],
+      skipDuplicates: true,
+    });
+    expect(prisma.clientUserAccess.upsert).toHaveBeenCalledWith({
+      where: {
+        agencyId_clientId_userId: {
+          agencyId: "agency-1",
+          clientId: "client-1",
+          userId: "user-primary",
+        },
+      },
+      update: {},
+      create: {
+        agencyId: "agency-1",
+        clientId: "client-1",
+        userId: "user-primary",
       },
     });
     expect(eventBus.publish).toHaveBeenCalledWith(
@@ -96,5 +138,75 @@ describe("ClientService", () => {
       }),
     );
     expect(client).toEqual(expect.objectContaining({ status: "ARCHIVED" }));
+  });
+
+  it("changes primary contact and grants client access atomically", async () => {
+    prisma.client.findUnique.mockResolvedValue({
+      id: "client-1",
+      agencyId: "agency-1",
+      primaryContactUserId: "user-old",
+    });
+    prisma.membership.findUnique.mockResolvedValue({
+      id: "mem-new-primary",
+      status: "ACTIVE",
+      deletedAt: null,
+      role: { systemRole: { key: "MEMBER" } },
+      roles: [],
+    });
+    prisma.role.findFirst.mockResolvedValue({ id: "role-client" });
+    prisma.client.update.mockResolvedValue({
+      id: "client-1",
+      agencyId: "agency-1",
+      primaryContactUserId: "user-new",
+    });
+
+    const result = await service.update(
+      "client-1",
+      { primaryContactUserId: "user-new" },
+      "agency-1",
+      "actor-1",
+    );
+
+    expect(prisma.membershipRole.createMany).toHaveBeenCalledWith({
+      data: [{ membershipId: "mem-new-primary", roleId: "role-client" }],
+      skipDuplicates: true,
+    });
+    expect(prisma.clientUserAccess.upsert).toHaveBeenCalledWith({
+      where: {
+        agencyId_clientId_userId: {
+          agencyId: "agency-1",
+          clientId: "client-1",
+          userId: "user-new",
+        },
+      },
+      update: {},
+      create: {
+        agencyId: "agency-1",
+        clientId: "client-1",
+        userId: "user-new",
+      },
+    });
+    expect(prisma.clientUserAccess.deleteMany).not.toHaveBeenCalled();
+    expect(result.primaryContactUserId).toBe("user-new");
+  });
+
+  it("does not allow clearing a primary contact without a replacement", async () => {
+    prisma.client.findUnique.mockResolvedValue({
+      id: "client-1",
+      agencyId: "agency-1",
+      primaryContactUserId: "user-old",
+    });
+
+    await expect(
+      service.update(
+        "client-1",
+        { primaryContactUserId: null },
+        "agency-1",
+        "actor-1",
+      ),
+    ).rejects.toThrow("Primary contact user is required.");
+
+    expect(prisma.client.update).not.toHaveBeenCalled();
+    expect(prisma.clientUserAccess.upsert).not.toHaveBeenCalled();
   });
 });

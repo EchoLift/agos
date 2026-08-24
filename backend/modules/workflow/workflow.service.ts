@@ -27,7 +27,7 @@ import { isEmailChannelRequired } from "@modules/notification/notification.polic
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import {
   assertClientScope,
-  clientScopeId,
+  clientScopeIds,
   isClientUser,
 } from "@packages/security/client-scope";
 import { ApproveContentDto } from "./dto/approve-content.dto";
@@ -99,10 +99,10 @@ export class WorkflowService {
     const canViewBroadWorkflow = actor
       ? this.canViewBroadWorkflow(actor)
       : true;
-    const actorClientId =
-      actor && isClientUser(actor) ? clientScopeId(actor) : null;
+    const actorClientIds =
+      actor && isClientUser(actor) ? clientScopeIds(actor) : [];
 
-    if (actor && isClientUser(actor) && !actorClientId) {
+    if (actor && isClientUser(actor) && actorClientIds.length === 0) {
       return this.emptyBoard();
     }
 
@@ -130,13 +130,13 @@ export class WorkflowService {
       where: {
         agencyId,
         status: { not: ContentAssetStatus.DELETED },
-        ...(actorClientId
-          ? { clientId: actorClientId }
+        ...(actorClientIds.length
+          ? { clientId: { in: actorClientIds } }
           : query.clientId
             ? { clientId: query.clientId }
             : {}),
         ...(query.campaignId ? { campaignId: query.campaignId } : {}),
-        ...(!actorClientId && !canViewBroadWorkflow && actor?.membershipId
+        ...(!actorClientIds.length && !canViewBroadWorkflow && actor?.membershipId
           ? {
             OR: [
               {

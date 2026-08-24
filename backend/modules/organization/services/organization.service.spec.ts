@@ -92,6 +92,7 @@ describe("OrganizationService Unit Tests", () => {
       },
       client: {
         findFirst: jest.fn(),
+        findMany: jest.fn(),
       },
       $transaction: jest.fn(),
     };
@@ -227,6 +228,72 @@ describe("OrganizationService Unit Tests", () => {
     });
   });
 
+  describe("getMembers", () => {
+    it("returns all CLIENT user client access associations", async () => {
+      repository.findMembersByAgencyId.mockResolvedValue([
+        {
+          id: "mem-client",
+          userId: "user-client",
+          roleId: "role-client",
+          role: {
+            displayName: "Client",
+            systemRole: { key: "CLIENT" },
+          },
+          roles: [
+            {
+              role: {
+                id: "role-client",
+                displayName: "Client",
+                systemRole: { key: "CLIENT" },
+              },
+            },
+          ],
+          clientId: "client-1",
+          client: { id: "client-1", name: "Taaza Kitchen" },
+          status: "ACTIVE",
+          joinedAt: new Date("2026-08-08T00:00:00.000Z"),
+          version: 1,
+          user: {
+            name: "Client User",
+            avatarUrl: null,
+            authUser: { emailEncrypted: "client@example.com" },
+            clientAccesses: [
+              {
+                agencyId: "agency-1",
+                clientId: "client-1",
+                client: { name: "Taaza Kitchen" },
+              },
+              {
+                agencyId: "agency-1",
+                clientId: "client-2",
+                client: { name: "Silicon Agents" },
+              },
+            ],
+          },
+        },
+      ] as any);
+
+      const result = await service.getMembers("agency-1");
+
+      expect(result[0].clientAccess).toEqual([
+        {
+          clientId: "client-1",
+          clientName: "Taaza Kitchen",
+          isPrimaryContact: false,
+          primaryContactName: null,
+          primaryContactUserId: null,
+        },
+        {
+          clientId: "client-2",
+          clientName: "Silicon Agents",
+          isPrimaryContact: false,
+          primaryContactName: null,
+          primaryContactUserId: null,
+        },
+      ]);
+    });
+  });
+
   describe("inviteMember", () => {
     it("should create an invitation for valid inviter and role", async () => {
       const mockInviter = { id: "user-inviter" } as User;
@@ -306,7 +373,7 @@ describe("OrganizationService Unit Tests", () => {
       repository.findMembership.mockResolvedValue(inviterMembership as any);
       repository.findRoleById.mockResolvedValue(clientRole);
       repository.findRoles.mockResolvedValue([clientRole]);
-      prisma.client.findFirst.mockResolvedValue({ id: "client-1" });
+      prisma.client.findMany.mockResolvedValue([{ id: "client-1" }]);
       repository.createInvitation.mockResolvedValue({
         id: "inv-1",
         status: "PENDING",
@@ -335,6 +402,7 @@ describe("OrganizationService Unit Tests", () => {
         ["role-client"],
         null,
         "client-1",
+        ["client-1"],
         "corr-123",
         "encrypted-email",
       );
@@ -353,7 +421,7 @@ describe("OrganizationService Unit Tests", () => {
       repository.findMembership.mockResolvedValue(inviterMembership as any);
       repository.findRoleById.mockResolvedValue(clientRole);
       repository.findRoles.mockResolvedValue([clientRole]);
-      prisma.client.findFirst.mockResolvedValue(null);
+      prisma.client.findMany.mockResolvedValue([]);
 
       await expect(
         service.inviteMember(
@@ -738,6 +806,7 @@ describe("OrganizationService Unit Tests", () => {
         "role-member",
         ["role-member"],
         "client-1",
+        ["client-1"],
         "corr-123",
       );
     });
@@ -939,6 +1008,8 @@ describe("OrganizationService Unit Tests", () => {
         ["role-owner"],
         2,
         null,
+        [],
+        [],
         "auth-allowed",
         "corr-123",
       );
@@ -974,7 +1045,7 @@ describe("OrganizationService Unit Tests", () => {
         editorRole,
         clientRole,
       ] as any);
-      prisma.client.findFirst.mockResolvedValue({ id: "client-1" });
+      prisma.client.findMany.mockResolvedValue([{ id: "client-1" }]);
       repository.updateMembershipRole.mockResolvedValue(
         updatedMembership as any,
       );
@@ -998,12 +1069,279 @@ describe("OrganizationService Unit Tests", () => {
         ["role-editor", "role-client"],
         2,
         "client-1",
+        ["client-1"],
+        [],
         "auth-owner",
         "corr-123",
       );
       expect(result.clientId).toBe("client-1");
       expect(repository.createInvitation).not.toHaveBeenCalled();
       expect(prisma.notificationDelivery.create).not.toHaveBeenCalled();
+    });
+
+    it("allows one CLIENT user to be assigned to two clients and returns both", async () => {
+      const membership = {
+        id: "mem-client",
+        agencyId: "agency-1",
+        userId: "user-client",
+        status: "ACTIVE",
+        role: clientRole,
+        roles: [{ role: clientRole }],
+        user: { name: "Client", avatarUrl: null, authUser: null },
+      };
+      repository.findMembershipById.mockResolvedValue(membership as any);
+      repository.findAgencyRolesByIds.mockResolvedValue([clientRole] as any);
+      prisma.client.findMany.mockResolvedValue([
+        { id: "client-1" },
+        { id: "client-2" },
+      ]);
+      repository.updateMembershipRole.mockResolvedValue({
+        ...membership,
+        roleId: clientRole.id,
+        clientId: "client-1",
+        client: { id: "client-1", name: "Taaza Kitchen" },
+        user: {
+          ...membership.user,
+          clientAccesses: [
+            {
+              agencyId: "agency-1",
+              clientId: "client-1",
+              client: { name: "Taaza Kitchen" },
+            },
+            {
+              agencyId: "agency-1",
+              clientId: "client-2",
+              client: { name: "Silicon Agents" },
+            },
+          ],
+        },
+        joinedAt: new Date("2026-08-08T00:00:00.000Z"),
+        version: 3,
+      } as any);
+
+      const result = await service.updateMemberRole(
+        "agency-1",
+        "mem-client",
+        {
+          roleId: "role-client",
+          roleIds: ["role-client"],
+          clientIds: ["client-1", "client-2"],
+          version: 2,
+        },
+        ownerActor,
+      );
+
+      expect(repository.updateMembershipRole).toHaveBeenCalledWith(
+        "agency-1",
+        "mem-client",
+        "role-client",
+        ["role-client"],
+        2,
+        "client-1",
+        ["client-1", "client-2"],
+        [],
+        "auth-owner",
+        "corr-123",
+      );
+      expect(result.clientAccess).toEqual([
+        {
+          clientId: "client-1",
+          clientName: "Taaza Kitchen",
+          isPrimaryContact: false,
+          primaryContactName: null,
+          primaryContactUserId: null,
+        },
+        {
+          clientId: "client-2",
+          clientName: "Silicon Agents",
+          isPrimaryContact: false,
+          primaryContactName: null,
+          primaryContactUserId: null,
+        },
+      ]);
+    });
+
+    it("assigns primary contact state through the Team role flow without removing access", async () => {
+      const membership = {
+        id: "mem-client",
+        agencyId: "agency-1",
+        userId: "user-b",
+        status: "ACTIVE",
+        role: clientRole,
+        roles: [{ role: clientRole }],
+        user: {
+          id: "user-b",
+          name: "User B",
+          avatarUrl: null,
+          authUser: null,
+          clientAccesses: [
+            {
+              agencyId: "agency-1",
+              clientId: "client-1",
+              client: {
+                id: "client-1",
+                name: "50-BraIns",
+                primaryContactUserId: "user-a",
+                primaryContactUser: { name: "User A" },
+              },
+            },
+          ],
+        },
+      };
+      repository.findMembershipById.mockResolvedValue(membership as any);
+      repository.findAgencyRolesByIds.mockResolvedValue([clientRole] as any);
+      prisma.client.findMany.mockResolvedValue([{ id: "client-1" }]);
+      repository.updateMembershipRole.mockResolvedValue({
+        ...membership,
+        roleId: clientRole.id,
+        clientId: "client-1",
+        user: {
+          ...membership.user,
+          clientAccesses: [
+            {
+              agencyId: "agency-1",
+              clientId: "client-1",
+              client: {
+                id: "client-1",
+                name: "50-BraIns",
+                primaryContactUserId: "user-b",
+                primaryContactUser: { name: "User B" },
+              },
+            },
+          ],
+        },
+        joinedAt: new Date("2026-08-08T00:00:00.000Z"),
+        version: 3,
+      } as any);
+
+      const result = await service.updateMemberRole(
+        "agency-1",
+        "mem-client",
+        {
+          roleId: "role-client",
+          roleIds: ["role-client"],
+          clientIds: ["client-1"],
+          primaryContactClientIds: ["client-1"],
+          version: 2,
+        },
+        ownerActor,
+      );
+
+      expect(repository.updateMembershipRole).toHaveBeenCalledWith(
+        "agency-1",
+        "mem-client",
+        "role-client",
+        ["role-client"],
+        2,
+        "client-1",
+        ["client-1"],
+        ["client-1"],
+        "auth-owner",
+        "corr-123",
+      );
+      expect(result.clientAccess).toEqual([
+        {
+          clientId: "client-1",
+          clientName: "50-BraIns",
+          isPrimaryContact: true,
+          primaryContactName: "User B",
+          primaryContactUserId: "user-b",
+        },
+      ]);
+    });
+
+    it("blocks removing access while the user is primary contact for that client", async () => {
+      repository.findMembershipById.mockResolvedValue({
+        id: "mem-client",
+        agencyId: "agency-1",
+        userId: "user-client",
+        status: "ACTIVE",
+        role: clientRole,
+        roles: [{ role: clientRole }],
+        user: {
+          clientAccesses: [
+            {
+              agencyId: "agency-1",
+              clientId: "client-1",
+              client: { name: "Taaza Kitchen" },
+            },
+            {
+              agencyId: "agency-1",
+              clientId: "client-2",
+              client: { name: "Silicon Agents" },
+            },
+          ],
+        },
+      } as any);
+      repository.findAgencyRolesByIds.mockResolvedValue([clientRole] as any);
+      prisma.client.findMany
+        .mockResolvedValueOnce([{ id: "client-2" }])
+        .mockResolvedValueOnce([{ id: "client-1", name: "Taaza Kitchen" }]);
+
+      await expect(
+        service.updateMemberRole(
+          "agency-1",
+          "mem-client",
+          {
+            roleId: "role-client",
+            roleIds: ["role-client"],
+            clientIds: ["client-2"],
+            version: 2,
+          },
+          ownerActor,
+        ),
+      ).rejects.toThrow(
+        "Cannot remove Taaza Kitchen access because this user is currently the primary contact. Assign another primary contact first.",
+      );
+      expect(repository.updateMembershipRole).not.toHaveBeenCalled();
+    });
+
+    it("blocks removing CLIENT role and reports all primary-contact clients", async () => {
+      repository.findMembershipById.mockResolvedValue({
+        id: "mem-client",
+        agencyId: "agency-1",
+        userId: "user-client",
+        status: "ACTIVE",
+        role: clientRole,
+        roles: [{ role: clientRole }],
+        user: {
+          clientAccesses: [
+            {
+              agencyId: "agency-1",
+              clientId: "client-1",
+              client: { name: "Taaza Kitchen" },
+            },
+            {
+              agencyId: "agency-1",
+              clientId: "client-2",
+              client: { name: "Silicon Agents" },
+            },
+          ],
+        },
+      } as any);
+      repository.findAgencyRolesByIds.mockResolvedValue([editorRole] as any);
+      prisma.client.findMany.mockResolvedValue([
+        { id: "client-2", name: "Silicon Agents" },
+        { id: "client-1", name: "Taaza Kitchen" },
+      ]);
+
+      await expect(
+        service.updateMemberRole(
+          "agency-1",
+          "mem-client",
+          { roleId: "role-editor", roleIds: ["role-editor"], version: 2 },
+          ownerActor,
+        ),
+      ).rejects.toThrow(/Cannot remove Client role\./);
+      await expect(
+        service.updateMemberRole(
+          "agency-1",
+          "mem-client",
+          { roleId: "role-editor", roleIds: ["role-editor"], version: 2 },
+          ownerActor,
+        ),
+      ).rejects.toThrow(/Taaza Kitchen/);
+      expect(repository.updateMembershipRole).not.toHaveBeenCalled();
     });
 
     it("rejects adding CLIENT without a business client", async () => {
@@ -1085,7 +1423,7 @@ describe("OrganizationService Unit Tests", () => {
         editorRole,
         clientRole,
       ] as any);
-      prisma.client.findFirst.mockResolvedValue(null);
+      prisma.client.findMany.mockResolvedValue([]);
 
       await expect(
         service.updateMemberRole(
@@ -1116,7 +1454,7 @@ describe("OrganizationService Unit Tests", () => {
       };
       repository.findMembershipById.mockResolvedValue(membership as any);
       repository.findAgencyRolesByIds.mockResolvedValue([clientRole] as any);
-      prisma.client.findFirst.mockResolvedValue({ id: "client-2" });
+      prisma.client.findMany.mockResolvedValue([{ id: "client-2" }]);
       repository.updateMembershipRole.mockResolvedValue({
         ...membership,
         clientId: "client-2",
@@ -1144,6 +1482,8 @@ describe("OrganizationService Unit Tests", () => {
         ["role-client"],
         2,
         "client-2",
+        ["client-2"],
+        [],
         "auth-owner",
         "corr-123",
       );
@@ -1185,6 +1525,8 @@ describe("OrganizationService Unit Tests", () => {
         ["role-editor"],
         2,
         null,
+        [],
+        [],
         "auth-owner",
         "corr-123",
       );

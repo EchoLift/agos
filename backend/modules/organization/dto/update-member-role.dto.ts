@@ -49,4 +49,28 @@ export class UpdateMemberRoleDto {
   @IsOptional()
   @IsUUID()
   clientId?: string;
+
+  @ApiProperty({
+    example: ["client-uuid-1", "client-uuid-2"],
+    description: "Business clients granted to CLIENT-role members",
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsUUID("all", { each: true })
+  clientIds?: string[];
+
+  @ApiProperty({
+    example: ["client-uuid-1"],
+    description:
+      "Selected client access rows for which this member should become the primary contact.",
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID("all", { each: true })
+  primaryContactClientIds?: string[];
 }

@@ -50,10 +50,12 @@ export default function TeamPage() {
   const [busyInvitationId, setBusyInvitationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [roleUpdateError, setRoleUpdateError] = useState<string | null>(null);
   const [pendingRoleChange, setPendingRoleChange] = useState<{
     member: Member;
     selectedRoleIds: string[];
-    selectedClientId: string;
+    selectedClientIds: string[];
+    selectedPrimaryContactClientIds: string[];
     blockedReason?: string;
   } | null>(null);
   const { agency, agencyId, agencySlug } = useAgency();
@@ -65,9 +67,7 @@ export default function TeamPage() {
   const roles = rolesQuery.data ?? [];
   const activeClients = useMemo(
     () =>
-      (clientsQuery.data ?? []).filter(
-        (client) => client.status === "ACTIVE",
-      ),
+      (clientsQuery.data ?? []).filter((client) => client.status === "ACTIVE"),
     [clientsQuery.data],
   );
   const loading =
@@ -78,10 +78,7 @@ export default function TeamPage() {
     memberHasRole(member, "OWNER"),
   ).length;
   const currentRoleKeys = agency?.roles?.map((role) => role.key) ?? [];
-  const teamCapabilities = useMemo(
-    () => getTeamCapabilities(agency),
-    [agency],
-  );
+  const teamCapabilities = useMemo(() => getTeamCapabilities(agency), [agency]);
   const {
     canInviteMembers,
     canManageInvitations,
@@ -102,8 +99,9 @@ export default function TeamPage() {
     !currentRoleKeys.includes("OWNER") &&
     agency?.role !== "OWNER" &&
     (currentRoleKeys.includes("MANAGER") || agency?.role === "MANAGER");
-  const canUseSelfRoleTestingOverrideForCurrentUser =
-    canUseRoleTestingOverride(profileQuery.data?.id);
+  const canUseSelfRoleTestingOverrideForCurrentUser = canUseRoleTestingOverride(
+    profileQuery.data?.id,
+  );
   const canUseSelfRoleTestingOverride = (member: Member) =>
     canUseSelfRoleTestingOverrideForCurrentUser &&
     member.id === agency?.membershipId;
@@ -153,6 +151,7 @@ export default function TeamPage() {
   }, [filters, members]);
 
   const requestRoleChange = (member: Member) => {
+    setRoleUpdateError(null);
     const selectedRoleIds = member.roles?.length
       ? member.roles.map((role) => role.id)
       : [member.roleId];
@@ -175,7 +174,8 @@ export default function TeamPage() {
     setPendingRoleChange({
       member,
       selectedRoleIds,
-      selectedClientId: member.clientId ?? "",
+      selectedClientIds: memberClientIds(member),
+      selectedPrimaryContactClientIds: memberPrimaryContactClientIds(member),
       blockedReason:
         (isSelfChangeByManager && "Managers cannot change their own role.") ||
         (isOwnerTargetByManager && "Managers cannot change an Owner role.") ||
@@ -184,6 +184,7 @@ export default function TeamPage() {
   };
 
   const togglePendingRole = (roleId: string) => {
+    setRoleUpdateError(null);
     setPendingRoleChange((current) => {
       if (!current || current.blockedReason) return current;
       const next = new Set(current.selectedRoleIds);
@@ -200,15 +201,53 @@ export default function TeamPage() {
       return {
         ...current,
         selectedRoleIds,
-        selectedClientId: nextRequiresClient ? current.selectedClientId : "",
+        selectedClientIds: nextRequiresClient ? current.selectedClientIds : [],
+        selectedPrimaryContactClientIds: nextRequiresClient
+          ? current.selectedPrimaryContactClientIds
+          : [],
       };
     });
   };
 
-  const selectPendingClient = (clientId: string) => {
-    setPendingRoleChange((current) =>
-      current ? { ...current, selectedClientId: clientId } : current,
-    );
+  const togglePendingClient = (clientId: string) => {
+    setRoleUpdateError(null);
+    setPendingRoleChange((current) => {
+      if (!current) return current;
+      const selectedClientIds = current.selectedClientIds.includes(clientId)
+        ? current.selectedClientIds.filter((id) => id !== clientId)
+        : [...current.selectedClientIds, clientId];
+      const selectedPrimaryContactClientIds = selectedClientIds.includes(
+        clientId,
+      )
+        ? current.selectedPrimaryContactClientIds
+        : current.selectedPrimaryContactClientIds.filter(
+            (id) => id !== clientId,
+          );
+      return {
+        ...current,
+        selectedClientIds,
+        selectedPrimaryContactClientIds,
+      };
+    });
+  };
+
+  const togglePendingPrimaryContact = (clientId: string) => {
+    setRoleUpdateError(null);
+    setPendingRoleChange((current) => {
+      if (!current || !current.selectedClientIds.includes(clientId)) {
+        return current;
+      }
+      const next = new Set(current.selectedPrimaryContactClientIds);
+      if (next.has(clientId)) {
+        next.delete(clientId);
+      } else {
+        next.add(clientId);
+      }
+      return {
+        ...current,
+        selectedPrimaryContactClientIds: Array.from(next),
+      };
+    });
   };
 
   const confirmRoleChange = async () => {
@@ -220,13 +259,13 @@ export default function TeamPage() {
 
     const { member, selectedRoleIds } = pendingRoleChange;
     if (selectedRoleIds.length === 0) {
-      setError("Select at least one role.");
+      setRoleUpdateError("Select at least one role.");
       return;
     }
 
     const primaryRole = roles.find((role) => selectedRoleIds.includes(role.id));
     if (!primaryRole) {
-      setError("Select a valid role.");
+      setRoleUpdateError("Select a valid role.");
       return;
     }
 
@@ -237,18 +276,20 @@ export default function TeamPage() {
       isManagerOnly && assignsOwner && !selfRoleTestingOverride;
 
     if (isOwnerAssignmentByManager) {
-      setError("Managers cannot assign the Owner role.");
+      setRoleUpdateError("Managers cannot assign the Owner role.");
       return;
     }
 
     const assignsClient = selectedRoles.some((role) => role.key === "CLIENT");
-    if (assignsClient && !pendingRoleChange.selectedClientId) {
-      setError("Select the business client this CLIENT member represents.");
+    if (assignsClient && pendingRoleChange.selectedClientIds.length === 0) {
+      setRoleUpdateError(
+        "Select at least one business client this CLIENT member can access.",
+      );
       return;
     }
 
     if (isOwnerDemotion && activeOwnerCount <= 1 && !selfRoleTestingOverride) {
-      setError(
+      setRoleUpdateError(
         "This member is the last Owner. Add or promote another Owner before changing this role.",
       );
       return;
@@ -256,13 +297,17 @@ export default function TeamPage() {
 
     setBusyMemberId(member.id);
     setError(null);
+    setRoleUpdateError(null);
     try {
       const updated = await updateMemberRole(agencyId, member.id, {
         roleId: primaryRole.id,
         roleIds: selectedRoleIds,
         version: member.version,
-        clientId: assignsClient
-          ? pendingRoleChange.selectedClientId
+        clientIds: assignsClient
+          ? pendingRoleChange.selectedClientIds
+          : undefined,
+        primaryContactClientIds: assignsClient
+          ? pendingRoleChange.selectedPrimaryContactClientIds
           : undefined,
       });
       queryClient.setQueryData(
@@ -277,14 +322,18 @@ export default function TeamPage() {
         "calendar",
         "campaigns",
         "gigs",
+        "clients",
       ]);
       if (updated.id === agency?.membershipId) {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.memberships() });
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.memberships(),
+        });
       }
       setPendingRoleChange(null);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to change role.");
-      loadTeam();
+      setRoleUpdateError(
+        applicationErrorMessage(err, "Failed to change role."),
+      );
     } finally {
       setBusyMemberId(null);
     }
@@ -323,7 +372,9 @@ export default function TeamPage() {
         "gigs",
       ]);
       if (member.id === agency?.membershipId) {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.memberships() });
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.memberships(),
+        });
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to remove member.");
@@ -660,6 +711,11 @@ export default function TeamPage() {
                       <p className="mt-2 text-xs text-zinc-500">
                         Joined {new Date(member.joinedAt).toLocaleDateString()}
                       </p>
+                      {memberHasRole(member, "CLIENT") ? (
+                        <p className="mt-2 text-xs text-zinc-400">
+                          Client access: {clientAccessLabel(member)}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                   {canEditRolesForMember(member) || canRemoveMembers ? (
@@ -701,6 +757,7 @@ export default function TeamPage() {
                   <tr>
                     <th className="pb-4 font-medium">Name / Email</th>
                     <th className="pb-4 font-medium">Role</th>
+                    <th className="pb-4 font-medium">Client access</th>
                     <th className="pb-4 font-medium">Status</th>
                     <th className="pb-4 font-medium">Joined</th>
                     {canShowMemberActions ? (
@@ -762,6 +819,13 @@ export default function TeamPage() {
                               {role.name}
                             </span>
                           ))}
+                        </div>
+                      </td>
+                      <td className="py-4">
+                        <div className="max-w-xs text-xs text-zinc-500">
+                          {memberHasRole(member, "CLIENT")
+                            ? clientAccessLabel(member)
+                            : "—"}
                         </div>
                       </td>
                       <td className="py-4">
@@ -881,7 +945,7 @@ export default function TeamPage() {
                 {roleChangeRequiresClient ? (
                   <div>
                     <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                      Business Client *
+                      Client access *
                     </label>
                     {clientsQuery.isLoading && !clientsQuery.data ? (
                       <div className="mt-2 rounded-xl border border-zinc-800 bg-zinc-900/60 px-3 py-3 text-sm text-zinc-400">
@@ -897,21 +961,93 @@ export default function TeamPage() {
                         CLIENT role.
                       </div>
                     ) : (
-                      <select
-                        required
-                        value={pendingRoleChange.selectedClientId}
-                        onChange={(event) =>
-                          selectPendingClient(event.target.value)
-                        }
-                        className="mt-2 min-h-11 w-full rounded-xl border border-zinc-800 bg-[#0b0b11] px-3 text-sm text-white outline-none transition focus:border-indigo-500"
-                      >
-                        <option value="">Select business client...</option>
-                        {activeClients.map((client) => (
-                          <option key={client.id} value={client.id}>
-                            {client.displayName || client.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="mt-2 space-y-2">
+                        {activeClients.map((client) => {
+                          const selected =
+                            pendingRoleChange.selectedClientIds.includes(
+                              client.id,
+                            );
+                          const access = memberClientAccessForClient(
+                            pendingRoleChange.member,
+                            client.id,
+                          );
+                          const currentPrimaryContactUserId =
+                            access?.primaryContactUserId ??
+                            client.primaryContactUserId;
+                          const isCurrentPrimary =
+                            access?.isPrimaryContact === true ||
+                            currentPrimaryContactUserId ===
+                              pendingRoleChange.member.userId;
+                          const isPendingPrimary =
+                            isCurrentPrimary ||
+                            pendingRoleChange.selectedPrimaryContactClientIds.includes(
+                              client.id,
+                            );
+                          const replacementName =
+                            access?.primaryContactName ||
+                            client.primaryContactName ||
+                            "the current primary contact";
+
+                          return (
+                            <div
+                              key={client.id}
+                              className="rounded-xl border border-zinc-800 bg-[#0b0b11] px-3 py-2 text-sm text-zinc-300"
+                            >
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <label className="flex cursor-pointer items-start gap-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={selected}
+                                    onChange={() =>
+                                      togglePendingClient(client.id)
+                                    }
+                                    className="mt-1 h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-zinc-950"
+                                  />
+                                  <span>
+                                    {client.displayName || client.name}
+                                  </span>
+                                </label>
+                                {selected ? (
+                                  <label
+                                    className={`flex items-center gap-2 text-xs ${
+                                      isCurrentPrimary
+                                        ? "cursor-not-allowed text-emerald-300"
+                                        : "cursor-pointer text-zinc-400"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isPendingPrimary}
+                                      disabled={isCurrentPrimary}
+                                      onChange={() =>
+                                        togglePendingPrimaryContact(client.id)
+                                      }
+                                      className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-zinc-950 disabled:opacity-60"
+                                    />
+                                    <span>
+                                      {isCurrentPrimary
+                                        ? "Primary contact"
+                                        : "Make primary contact"}
+                                    </span>
+                                  </label>
+                                ) : null}
+                              </div>
+                              {selected &&
+                              !isCurrentPrimary &&
+                              isPendingPrimary &&
+                              currentPrimaryContactUserId ? (
+                                <p className="mt-2 text-xs leading-5 text-amber-300">
+                                  This will replace {replacementName} as the
+                                  primary contact for{" "}
+                                  {client.displayName || client.name}.{" "}
+                                  {replacementName} will keep client access but
+                                  stop receiving client email notifications.
+                                </p>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 ) : null}
@@ -920,6 +1056,11 @@ export default function TeamPage() {
                     Managers can edit skills, but cannot assign or change Owner
                     access.
                   </p>
+                ) : null}
+                {roleUpdateError ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {roleUpdateError}
+                  </div>
                 ) : null}
               </div>
             )}
@@ -939,7 +1080,7 @@ export default function TeamPage() {
                     busyMemberId === pendingRoleChange.member.id ||
                     pendingRoleChange.selectedRoleIds.length === 0 ||
                     (roleChangeRequiresClient &&
-                      !pendingRoleChange.selectedClientId)
+                      pendingRoleChange.selectedClientIds.length === 0)
                   }
                   onClick={confirmRoleChange}
                   className="rounded-full bg-indigo-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400 disabled:opacity-60"
@@ -1031,6 +1172,11 @@ function InvitationsPanel({
               ))}
             </div>
             <div className="mt-3 grid gap-1 text-xs text-zinc-500">
+              {invitation.clientAccess?.length ? (
+                <span>
+                  Client access: {invitationClientAccessLabel(invitation)}
+                </span>
+              ) : null}
               <span>Sent {formatDateTime(invitation.sentAt)}</span>
               <span>Expires {formatDateTime(invitation.expiresAt)}</span>
             </div>
@@ -1053,6 +1199,7 @@ function InvitationsPanel({
             <tr>
               <th className="pb-4 font-medium">Email</th>
               <th className="pb-4 font-medium">Roles</th>
+              <th className="pb-4 font-medium">Client access</th>
               <th className="pb-4 font-medium">Invited by</th>
               <th className="pb-4 font-medium">Sent</th>
               <th className="pb-4 font-medium">Expires</th>
@@ -1087,6 +1234,9 @@ function InvitationsPanel({
                       </span>
                     ))}
                   </div>
+                </td>
+                <td className="py-4 text-xs text-zinc-500">
+                  {invitationClientAccessLabel(invitation)}
                 </td>
                 <td className="py-4">
                   {invitation.invitedBy?.name ||
@@ -1224,6 +1374,47 @@ function memberHasRole(member: Member, roleName: string) {
       (role) => role.name === roleName || role.key === roleName.toUpperCase(),
     ) || member.roleName === roleName
   );
+}
+
+function memberClientIds(member: Member) {
+  const ids = member.clientAccess?.map((access) => access.clientId) ?? [];
+  return ids.length ? ids : member.clientId ? [member.clientId] : [];
+}
+
+function memberPrimaryContactClientIds(member: Member) {
+  return (
+    member.clientAccess
+      ?.filter((access) => access.isPrimaryContact)
+      .map((access) => access.clientId) ?? []
+  );
+}
+
+function memberClientAccessForClient(member: Member, clientId: string) {
+  return member.clientAccess?.find((access) => access.clientId === clientId);
+}
+
+function clientAccessLabel(member: Member) {
+  const names =
+    member.clientAccess
+      ?.map((access) =>
+        access.isPrimaryContact && access.clientName
+          ? `${access.clientName} (Primary)`
+          : access.clientName,
+      )
+      .filter((name): name is string => Boolean(name)) ?? [];
+  if (names.length) return names.join(", ");
+  return (
+    member.client?.displayName || member.client?.name || "No clients assigned"
+  );
+}
+
+function invitationClientAccessLabel(invitation: TeamInvitation) {
+  const names =
+    invitation.clientAccess
+      ?.map((access) => access.clientName)
+      .filter((name): name is string => Boolean(name)) ?? [];
+  if (names.length) return names.join(", ");
+  return invitation.client?.displayName || invitation.client?.name || "—";
 }
 
 function formatDateTime(value: string) {

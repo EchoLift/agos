@@ -78,7 +78,9 @@ model Agency {
   clientContacts              ClientContact[]
   contentAssets               ContentAsset[]
   invitations                 Invitation[]
+  invitationClientAccesses    InvitationClientAccess[]
   memberships                 Membership[]
+  clientUserAccesses          ClientUserAccess[]
   roles                       Role[]
   googleCalendarEvents        GoogleCalendarEvent[]
   workOrders                  WorkOrder[]
@@ -108,6 +110,8 @@ model User {
   deletedAt                          DateTime?
   version                            Int                                @default(1)
   memberships                        Membership[]
+  clientAccesses                     ClientUserAccess[]
+  primaryContactForClients           Client[]                           @relation("ClientPrimaryContact")
   clientContacts                     ClientContact[]
   googleCalendarConnection           GoogleCalendarConnection?
   googleCalendarEvents               GoogleCalendarEvent[]
@@ -204,7 +208,7 @@ model Role {
 }
 
 model Invitation {
-  id                    String           @id @default(uuid())
+  id                    String                   @id @default(uuid())
   agencyId              String
   clientId              String?
   emailHash             String
@@ -212,22 +216,38 @@ model Invitation {
   roleId                String
   invitedByMembershipId String
   mobileNumber          String?
-  status                InvitationStatus @default(PENDING)
-  token                 String           @unique
+  status                InvitationStatus         @default(PENDING)
+  token                 String                   @unique
   expiresAt             DateTime
   lastEmailResentAt     DateTime?
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
-  agency                Agency           @relation(fields: [agencyId], references: [id])
-  client                Client?          @relation("ClientInvitations", fields: [clientId], references: [id], onDelete: SetNull)
-  invitedBy             Membership       @relation("InvitedByMembership", fields: [invitedByMembershipId], references: [id])
-  role                  Role             @relation(fields: [roleId], references: [id])
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  agency                Agency                   @relation(fields: [agencyId], references: [id])
+  client                Client?                  @relation("ClientInvitations", fields: [clientId], references: [id], onDelete: SetNull)
+  invitedBy             Membership               @relation("InvitedByMembership", fields: [invitedByMembershipId], references: [id])
+  role                  Role                     @relation(fields: [roleId], references: [id])
   roles                 InvitationRole[]
+  clientAccesses        InvitationClientAccess[]
 
   @@index([agencyId, emailHash])
   @@index([agencyId, clientId])
   @@index([token])
   @@map("invitations")
+}
+
+model InvitationClientAccess {
+  id           String     @id @default(uuid())
+  agencyId     String
+  invitationId String
+  clientId     String
+  createdAt    DateTime   @default(now())
+  agency       Agency     @relation(fields: [agencyId], references: [id])
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  client       Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([invitationId, clientId])
+  @@index([agencyId, clientId])
+  @@map("invitation_client_accesses")
 }
 
 model InvitationRole {
@@ -264,6 +284,7 @@ model Client {
   id                          String                             @id @default(uuid())
   agencyId                    String
   assignedManagerMembershipId String?
+  primaryContactUserId        String?
   name                        String
   displayName                 String?
   website                     String?
@@ -331,8 +352,11 @@ model Client {
   campaigns                   Campaign[]
   agency                      Agency                             @relation(fields: [agencyId], references: [id])
   assignedManager             Membership?                        @relation("ClientManager", fields: [assignedManagerMembershipId], references: [id])
+  primaryContactUser          User?                              @relation("ClientPrimaryContact", fields: [primaryContactUserId], references: [id], onDelete: Restrict)
   clientMemberships           Membership[]                       @relation("ClientMemberships")
+  userAccesses                ClientUserAccess[]
   invitations                 Invitation[]                       @relation("ClientInvitations")
+  invitationAccesses          InvitationClientAccess[]
   contentAssets               ContentAsset[]
   clientContacts              ClientContact[]
   workOrders                  WorkOrder[]
@@ -341,7 +365,25 @@ model Client {
 
   @@index([agencyId])
   @@index([agencyId, assignedManagerMembershipId])
+  @@index([agencyId, primaryContactUserId])
   @@map("clients")
+}
+
+model ClientUserAccess {
+  id        String   @id @default(uuid())
+  agencyId  String
+  clientId  String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  agency    Agency   @relation(fields: [agencyId], references: [id])
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([agencyId, clientId, userId])
+  @@index([agencyId, userId])
+  @@index([agencyId, clientId])
+  @@map("client_user_accesses")
 }
 
 model ClientContact {

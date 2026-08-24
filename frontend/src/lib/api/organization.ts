@@ -18,6 +18,13 @@ export interface Agency {
     name: string;
     displayName: string;
   } | null;
+  clientAccess?: Array<{
+    clientId: string;
+    clientName: string | null;
+    isPrimaryContact?: boolean;
+    primaryContactUserId?: string | null;
+    primaryContactName?: string | null;
+  }>;
 }
 
 export interface MyMembershipsResponse {
@@ -40,17 +47,30 @@ export interface AcceptInvitationResponse {
   agencyId: string;
   status: string;
   clientId?: string | null;
+  clientIds?: string[];
+  clientAccess?: Array<{
+    clientId: string;
+    clientName: string | null;
+    isPrimaryContact?: boolean;
+    primaryContactUserId?: string | null;
+    primaryContactName?: string | null;
+  }>;
   agency: Agency;
 }
 
-export async function createAgency(displayName: string, slug: string): Promise<CreateAgencyResponse> {
+export async function createAgency(
+  displayName: string,
+  slug: string,
+): Promise<CreateAgencyResponse> {
   return apiClient<CreateAgencyResponse>("/organizations/agencies", {
     method: "POST",
     body: JSON.stringify({ displayName, slug }),
   });
 }
 
-export async function acceptInvitation(token: string): Promise<AcceptInvitationResponse> {
+export async function acceptInvitation(
+  token: string,
+): Promise<AcceptInvitationResponse> {
   return apiClient<AcceptInvitationResponse>(
     `/organizations/invitations/${encodeURIComponent(token)}/accept`,
     {
@@ -70,9 +90,14 @@ export interface ActivateAgencyResponse {
   agency: Agency;
 }
 
-export async function activateAgency(agencyId: string): Promise<ActivateAgencyResponse> {
-  return apiClient<ActivateAgencyResponse>(`/organizations/${agencyId}/activate`, {
-    method: "POST",
-    agencyId,
-  });
+export async function activateAgency(
+  agencyId: string,
+): Promise<ActivateAgencyResponse> {
+  return apiClient<ActivateAgencyResponse>(
+    `/organizations/${agencyId}/activate`,
+    {
+      method: "POST",
+      agencyId,
+    },
+  );
 }

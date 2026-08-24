@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "@packages/database/prisma.service";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import {
-  clientScopeId,
+  clientScopeIds,
   isClientUser,
 } from "@packages/security/client-scope";
 import {
@@ -181,8 +181,8 @@ export class DashboardService {
   }
 
   private async getClientDashboard(agencyId: string, actor: IdentityContext) {
-    const clientId = clientScopeId(actor);
-    if (!clientId) {
+    const scopedClientIds = clientScopeIds(actor);
+    if (scopedClientIds.length === 0) {
       return this.emptyClientDashboard(
         "No client account has been assigned to your access. Contact your agency administrator.",
       );
@@ -194,12 +194,12 @@ export class DashboardService {
 
     const contentAssetWhere: Prisma.ContentAssetWhereInput = {
       agencyId,
-      clientId,
+      clientId: { in: scopedClientIds },
       status: ContentAssetStatus.ACTIVE,
     };
     const workflowTaskClientWhere: Prisma.WorkflowTaskWhereInput = {
       agencyId,
-      workflowInstance: { contentAsset: { clientId } },
+      workflowInstance: { contentAsset: { clientId: { in: scopedClientIds } } },
     };
 
     const [
@@ -214,11 +214,21 @@ export class DashboardService {
       recentActivity,
     ] = await Promise.all([
       this.prisma.client.findFirst({
-        where: { id: clientId, agencyId, status: "ACTIVE", deletedAt: null },
+        where: {
+          id: { in: scopedClientIds },
+          agencyId,
+          status: "ACTIVE",
+          deletedAt: null,
+        },
         select: { id: true, name: true, displayName: true },
+        orderBy: { name: "asc" },
       }),
       this.prisma.campaign.count({
-        where: { agencyId, clientId, status: "ACTIVE" },
+        where: {
+          agencyId,
+          clientId: { in: scopedClientIds },
+          status: "ACTIVE",
+        },
       }),
       this.prisma.contentAsset.count({ where: contentAssetWhere }),
       this.prisma.blocker.count({
@@ -226,7 +236,9 @@ export class DashboardService {
           agencyId,
           status: BlockerStatus.ACTIVE,
           workflowTask: {
-            workflowInstance: { contentAsset: { clientId } },
+            workflowInstance: {
+              contentAsset: { clientId: { in: scopedClientIds } },
+            },
           },
         },
       }),
@@ -234,7 +246,7 @@ export class DashboardService {
         where: {
           agencyId,
           scheduledAt: { gte: todayStart, lt: todayEnd },
-          campaign: { clientId },
+          campaign: { clientId: { in: scopedClientIds } },
         },
       }),
       this.prisma.workflowTask.findMany({
@@ -260,7 +272,7 @@ export class DashboardService {
       this.prisma.workOrder.findMany({
         where: {
           agencyId,
-          clientId,
+          clientId: { in: scopedClientIds },
           deletedAt: null,
           status: {
             in: [
@@ -280,14 +292,18 @@ export class DashboardService {
           agencyId,
           status: SubmissionStatus.SUBMITTED,
           workflowTask: {
-            workflowInstance: { contentAsset: { clientId } },
+            workflowInstance: {
+              contentAsset: { clientId: { in: scopedClientIds } },
+            },
           },
         },
       }),
       this.prisma.workflowTransition.findMany({
         where: {
           agencyId,
-          workflowInstance: { contentAsset: { clientId } },
+          workflowInstance: {
+            contentAsset: { clientId: { in: scopedClientIds } },
+          },
         },
         orderBy: { createdAt: "desc" },
         take: 8,
@@ -304,8 +320,12 @@ export class DashboardService {
     return {
       clientAccess: {
         assigned: true,
-        clientId,
-        clientName: client.displayName || client.name,
+        clientId: client.id,
+        clientIds: scopedClientIds,
+        clientName:
+          scopedClientIds.length > 1
+            ? `${scopedClientIds.length} clients`
+            : client.displayName || client.name,
       },
       myTasks: [
         ...tasks.map((task) => ({

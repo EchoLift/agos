@@ -4,6 +4,7 @@ import { Agency, Membership, Role, Invitation, Prisma } from "@prisma/client";
 
 export const SYSTEM_ROLES = {
   OWNER: "OWNER",
+  CLIENT: "CLIENT",
   MANAGER: "MANAGER",
   MEMBER: "MEMBER",
 };
@@ -117,7 +118,19 @@ export class OrganizationRepository {
       where: { userId, status: "ACTIVE" },
       include: {
         agency: true,
-        client: true,
+        client: { include: { primaryContactUser: true } },
+        user: {
+          include: {
+            clientAccesses: {
+              include: {
+                client: {
+                  include: { primaryContactUser: true },
+                },
+              },
+              orderBy: { createdAt: "asc" },
+            },
+          },
+        },
         role: { include: { systemRole: true } },
         roles: { include: { role: { include: { systemRole: true } } } },
       },
@@ -144,7 +157,20 @@ export class OrganizationRepository {
             },
           },
         },
-        client: true,
+        client: { include: { primaryContactUser: true } },
+        user: {
+          include: {
+            clientAccesses: {
+              where: { agencyId },
+              include: {
+                client: {
+                  include: { primaryContactUser: true },
+                },
+              },
+              orderBy: { createdAt: "asc" },
+            },
+          },
+        },
         roles: {
           include: {
             role: {
@@ -171,9 +197,21 @@ export class OrganizationRepository {
       },
       include: {
         role: { include: { systemRole: true } },
-        client: true,
+        client: { include: { primaryContactUser: true } },
         roles: { include: { role: { include: { systemRole: true } } } },
-        user: true,
+        user: {
+          include: {
+            clientAccesses: {
+              where: { agencyId },
+              include: {
+                client: {
+                  include: { primaryContactUser: true },
+                },
+              },
+              orderBy: { createdAt: "asc" },
+            },
+          },
+        },
       },
     });
   }
@@ -243,6 +281,7 @@ export class OrganizationRepository {
     roleIds: string[] = [roleId],
     mobileNumber: string | null = null,
     clientId: string | null = null,
+    clientIds: string[] = clientId ? [clientId] : [],
     correlationId?: string,
     emailEncrypted?: string | null,
   ): Promise<any> {
@@ -266,6 +305,18 @@ export class OrganizationRepository {
         },
       });
 
+      const uniqueClientIds = [...new Set(clientIds.filter(Boolean))];
+      if (uniqueClientIds.length > 0) {
+        await tx.invitationClientAccess.createMany({
+          data: uniqueClientIds.map((id) => ({
+            agencyId,
+            invitationId: invitation.id,
+            clientId: id,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
       await tx.outboxEvent.create({
         data: {
           aggregateId: invitation.id,
@@ -279,6 +330,7 @@ export class OrganizationRepository {
             roleId,
             roleIds: uniqueRoleIds,
             clientId,
+            clientIds: uniqueClientIds,
             invitedByMembershipId,
             occurredAt: new Date().toISOString(),
           },
@@ -301,7 +353,10 @@ export class OrganizationRepository {
         role: { include: { systemRole: true } },
         roles: { include: { role: { include: { systemRole: true } } } },
         agency: true,
-        client: true,
+        client: { include: { primaryContactUser: true } },
+        clientAccesses: {
+          include: { client: { include: { primaryContactUser: true } } },
+        },
       },
     });
   }
@@ -313,6 +368,7 @@ export class OrganizationRepository {
     roleId: string,
     roleIds: string[] = [roleId],
     clientId: string | null = null,
+    clientIds: string[] = clientId ? [clientId] : [],
     correlationId?: string,
   ): Promise<Membership> {
     return this.prisma.$transaction(async (tx) => {
@@ -341,6 +397,18 @@ export class OrganizationRepository {
         },
       });
 
+      const uniqueClientIds = [...new Set(clientIds.filter(Boolean))];
+      if (uniqueClientIds.length > 0) {
+        await tx.clientUserAccess.createMany({
+          data: uniqueClientIds.map((id) => ({
+            agencyId,
+            clientId: id,
+            userId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
       await tx.membershipRole.createMany({
         data: uniqueRoleIds.map((id) => ({
           membershipId: membership.id,
@@ -362,6 +430,7 @@ export class OrganizationRepository {
               roleId,
               roleIds: uniqueRoleIds,
               clientId,
+              clientIds: uniqueClientIds,
               occurredAt: new Date().toISOString(),
             },
             correlationId,
@@ -369,7 +438,27 @@ export class OrganizationRepository {
         });
       }
 
-      return membership;
+      return tx.membership.findUniqueOrThrow({
+        where: { id: membership.id },
+        include: {
+          role: { include: { systemRole: true } },
+          client: { include: { primaryContactUser: true } },
+          roles: { include: { role: { include: { systemRole: true } } } },
+          user: {
+            include: {
+              clientAccesses: {
+                where: { agencyId },
+                include: {
+                  client: {
+                    include: { primaryContactUser: true },
+                  },
+                },
+                orderBy: { createdAt: "asc" },
+              },
+            },
+          },
+        },
+      });
     });
   }
 
@@ -414,6 +503,8 @@ export class OrganizationRepository {
     roleIds: string[],
     version: number,
     clientId: string | null,
+    clientIds: string[],
+    primaryContactClientIds: string[],
     actorAuthUserId: string,
     correlationId?: string,
   ): Promise<any> {
@@ -445,16 +536,57 @@ export class OrganizationRepository {
         })),
       });
 
+      const membershipUser = await tx.membership.findUniqueOrThrow({
+        where: { id: membershipId },
+        select: { userId: true, user: { select: { name: true } } },
+      });
+      const uniqueClientIds = [...new Set(clientIds.filter(Boolean))];
+      await tx.clientUserAccess.deleteMany({
+        where: {
+          agencyId,
+          userId: membershipUser.userId,
+        },
+      });
+      if (uniqueClientIds.length > 0) {
+        await tx.clientUserAccess.createMany({
+          data: uniqueClientIds.map((id) => ({
+            agencyId,
+            clientId: id,
+            userId: membershipUser.userId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      for (const id of [...new Set(primaryContactClientIds.filter(Boolean))]) {
+        await tx.client.updateMany({
+          where: { id, agencyId, deletedAt: null },
+          data: {
+            primaryContactUserId: membershipUser.userId,
+            primaryContactName: membershipUser.user?.name ?? null,
+          },
+        });
+      }
+
       const membership = await tx.membership.findUniqueOrThrow({
         where: { id: membershipId },
         include: {
           role: { include: { systemRole: true } },
-          client: true,
+          client: { include: { primaryContactUser: true } },
           roles: { include: { role: { include: { systemRole: true } } } },
           user: {
             include: {
               authUser: {
                 select: { emailEncrypted: true },
+              },
+              clientAccesses: {
+                where: { agencyId },
+                include: {
+                  client: {
+                    include: { primaryContactUser: true },
+                  },
+                },
+                orderBy: { createdAt: "asc" },
               },
             },
           },
@@ -473,6 +605,7 @@ export class OrganizationRepository {
             roleId,
             roleIds: uniqueRoleIds,
             clientId,
+            clientIds: uniqueClientIds,
             changedBy: actorAuthUserId,
             version: membership.version,
             occurredAt: new Date().toISOString(),
@@ -510,6 +643,14 @@ export class OrganizationRepository {
       if (updated.count === 0) {
         return false;
       }
+
+      const membershipUser = await tx.membership.findUniqueOrThrow({
+        where: { id: membershipId },
+        select: { userId: true },
+      });
+      await tx.clientUserAccess.deleteMany({
+        where: { agencyId, userId: membershipUser.userId },
+      });
 
       await tx.outboxEvent.create({
         data: {
@@ -578,10 +719,19 @@ export class OrganizationRepository {
             name: true,
             avatarUrl: true,
             authUser: { select: { emailEncrypted: true } },
+            clientAccesses: {
+              where: { agencyId },
+              include: {
+                client: {
+                  include: { primaryContactUser: true },
+                },
+              },
+              orderBy: { createdAt: "asc" },
+            },
           },
         },
         role: { include: { systemRole: true } },
-        client: true,
+        client: { include: { primaryContactUser: true } },
         roles: { include: { role: { include: { systemRole: true } } } },
       },
       orderBy: { joinedAt: "desc" },

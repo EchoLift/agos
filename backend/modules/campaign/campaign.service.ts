@@ -25,8 +25,8 @@ import { isEmailChannelRequired } from "@modules/notification/notification.polic
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import {
   assertClientScope,
+  clientScopeIds,
   isClientUser,
-  requireClientScope,
 } from "@packages/security/client-scope";
 import { CampaignStatusActionDto } from "./dto/campaign-status-action.dto";
 import {
@@ -261,13 +261,15 @@ export class CampaignService {
   }
 
   async findMany(agencyId: string, actor?: IdentityContext) {
-    const clientId =
-      actor && isClientUser(actor) ? requireClientScope(actor) : null;
+    const scopedClientIds =
+      actor && isClientUser(actor) ? clientScopeIds(actor) : [];
     return this.prisma.campaign.findMany({
       where: {
         agencyId,
         status: { not: "DELETED" },
-        ...(clientId ? { clientId } : {}),
+        ...(scopedClientIds.length
+          ? { clientId: { in: scopedClientIds } }
+          : {}),
       },
       include: this.campaignInclude(),
       orderBy: { updatedAt: "desc" },

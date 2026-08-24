@@ -5,6 +5,7 @@ export interface IdentityContext {
   agencyId?: string;
   membershipId?: string;
   clientId?: string | null;
+  clientIds?: string[];
   role?: string;
   roles?: string[];
   permissions: string[];

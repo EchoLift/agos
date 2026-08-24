@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   ArrayMinSize,
+  ArrayUnique,
   IsUUID,
 } from "class-validator";
 
@@ -55,4 +56,16 @@ export class InviteMemberDto {
   @IsOptional()
   @IsUUID()
   clientId?: string;
+
+  @ApiProperty({
+    example: ["client-uuid-1", "client-uuid-2"],
+    description: "Business clients represented by CLIENT-role invitees",
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayUnique()
+  @IsUUID("all", { each: true })
+  clientIds?: string[];
 }

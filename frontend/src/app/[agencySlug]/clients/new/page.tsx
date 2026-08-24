@@ -8,13 +8,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ClientFormActions, ClientPlaybookForm, normalizeClientPayload } from "@/components/ClientPlaybookForm";
 import { useAgency } from "@/components/AgencyProvider";
 import { Client, createClient, CreateClientInput } from "@/lib/api/clients";
-import { invalidateWorkspaceQueries, queryKeys, setListItem } from "@/lib/query";
+import { invalidateWorkspaceQueries, queryKeys, setListItem, useTeamQuery } from "@/lib/query";
 import { getWorkspaceHref } from "@/lib/workspace-url";
 
 export default function NewClientPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { agencyId } = useAgency();
+  const teamQuery = useTeamQuery(agencyId);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const safeAgencySlug = useAgency().agencySlug ?? "";
@@ -26,6 +27,7 @@ export default function NewClientPage() {
       website: "",
       industry: "Technology",
       primaryContactName: "",
+      primaryContactUserId: "",
       primaryContactEmail: "",
       invitePrimaryContact: true,
       businessDescription: "",
@@ -81,7 +83,12 @@ export default function NewClientPage() {
       </div>
 
       <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-        <ClientPlaybookForm register={register} setValue={setValue} watch={watch} />
+        <ClientPlaybookForm
+          register={register}
+          setValue={setValue}
+          watch={watch}
+          primaryContactUsers={teamQuery.data ?? []}
+        />
 
         <label className="flex items-start gap-3 rounded-3xl border border-zinc-800 bg-zinc-950/80 p-5 text-sm text-zinc-300">
           <input

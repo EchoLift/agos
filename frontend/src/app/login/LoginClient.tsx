@@ -33,6 +33,10 @@ const getCurrentAgency = (memberships: MembershipsShape) =>
 function getSafeReturnTo(value: string | null): string | null {
   if (!value) return null;
 
+  if (value.startsWith("/") && !value.startsWith("//")) {
+    return value;
+  }
+
   try {
     const url = new URL(value);
 
@@ -52,7 +56,7 @@ function getSafeReturnTo(value: string | null): string | null {
       return null;
     }
 
-    return url.toString();
+    return `${url.pathname}${url.search}${url.hash}`;
   } catch {
     return null;
   }

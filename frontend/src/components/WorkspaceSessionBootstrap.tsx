@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   getAccessToken,
+  getCentralLoginUrl,
   isAuthTemporarilyUnavailableError,
   refreshAccessToken,
 } from "@/lib/auth";
@@ -12,9 +13,7 @@ type Props = {
   children: React.ReactNode;
 };
 
-export default function WorkspaceSessionBootstrap({
-  children,
-}: Props) {
+export default function WorkspaceSessionBootstrap({ children }: Props) {
   const [ready, setReady] = useState(false);
   const [temporarilyUnavailable, setTemporarilyUnavailable] = useState(false);
 
@@ -59,18 +58,9 @@ export default function WorkspaceSessionBootstrap({
 
       // No valid backend session.
       // Send the user to the central login page.
-      const appUrl =
-        process.env.NEXT_PUBLIC_APP_URL ??
-        "https://app.agencie.in";
+      const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
-      const loginUrl = new URL("/login", appUrl);
-
-      loginUrl.searchParams.set(
-        "returnTo",
-        window.location.href,
-      );
-
-      window.location.replace(loginUrl.toString());
+      window.location.replace(getCentralLoginUrl(returnTo));
     }
 
     void bootstrap();

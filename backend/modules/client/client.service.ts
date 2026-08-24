@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   Optional,
@@ -11,8 +12,8 @@ import { EventBusService } from "@packages/events/event-bus.service";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import {
   assertClientScope,
+  clientScopeIds,
   isClientUser,
-  requireClientScope,
 } from "@packages/security/client-scope";
 import { CryptoService } from "@modules/auth/services/crypto.service";
 import { CreateClientDto } from "./dto/create-client.dto";
@@ -234,6 +235,9 @@ export class ClientService {
         "Primary contact name and email are required.",
       );
     }
+    if (!dto.primaryContactUserId) {
+      throw new BadRequestException("Primary contact user is required.");
+    }
 
     const invitePrimaryContact = dto.invitePrimaryContact !== false;
     const result = await this.prisma.$transaction(async (tx) => {
@@ -242,11 +246,18 @@ export class ClientService {
           agencyId: resolvedAgencyId,
           name: dto.name,
           industry: dto.industry,
+          primaryContactUserId: dto.primaryContactUserId,
           ...this.optionalClientData(dto),
           status: "ACTIVE",
         },
       });
 
+      await this.ensurePrimaryContactAccess(
+        tx,
+        resolvedAgencyId,
+        client.id,
+        dto.primaryContactUserId,
+      );
       await this.createPrimaryContact(tx, client.id, resolvedAgencyId, dto);
 
       const invitation = invitePrimaryContact
@@ -386,6 +397,14 @@ export class ClientService {
       },
     });
 
+    await tx.invitationClientAccess.create({
+      data: {
+        agencyId,
+        invitationId: invitation.id,
+        clientId,
+      },
+    });
+
     await tx.outboxEvent.create({
       data: {
         agencyId,
@@ -419,13 +438,37 @@ export class ClientService {
       throw new NotFoundException("Client not found");
     }
 
-    const client = await this.prisma.client.update({
-      where: { id },
-      data: {
-        ...(dto.name ? { name: dto.name } : {}),
-        ...(dto.industry ? { industry: dto.industry } : {}),
-        ...this.optionalClientData(dto),
-      },
+    const client = await this.prisma.$transaction(async (tx) => {
+      let primaryContactProfile: {
+        name: string | null;
+        email: string | null;
+      } | null = null;
+      if (dto.primaryContactUserId !== undefined) {
+        primaryContactProfile = await this.ensurePrimaryContactAccess(
+          tx,
+          agencyId,
+          id,
+          dto.primaryContactUserId,
+        );
+      }
+
+      return tx.client.update({
+        where: { id },
+        data: {
+          ...(dto.name ? { name: dto.name } : {}),
+          ...(dto.industry ? { industry: dto.industry } : {}),
+          ...this.optionalClientData(dto),
+          ...(dto.primaryContactUserId !== undefined
+            ? { primaryContactUserId: dto.primaryContactUserId }
+            : {}),
+          ...(primaryContactProfile?.name
+            ? { primaryContactName: primaryContactProfile.name }
+            : {}),
+          ...(primaryContactProfile?.email
+            ? { primaryContactEmail: primaryContactProfile.email }
+            : {}),
+        },
+      });
     });
 
     await this.eventBus.publish(DomainEvents.ClientUpdated, {
@@ -506,7 +549,14 @@ export class ClientService {
   }
 
   async findById(id: string, agencyId?: string, actor?: IdentityContext) {
-    const client = await this.prisma.client.findUnique({ where: { id } });
+    const client = await this.prisma.client.findUnique({
+      where: { id },
+      include: {
+        primaryContactUser: {
+          include: { authUser: true },
+        },
+      },
+    });
 
     if (!client) {
       throw new NotFoundException("Client not found");
@@ -522,8 +572,10 @@ export class ClientService {
 
   async findMany(agencyId: string, actor?: IdentityContext) {
     if (actor && isClientUser(actor)) {
-      const clientId = requireClientScope(actor);
-      return this.prisma.client.findMany({ where: { agencyId, id: clientId } });
+      const clientIds = clientScopeIds(actor);
+      return this.prisma.client.findMany({
+        where: { agencyId, id: { in: clientIds } },
+      });
     }
 
     return this.prisma.client.findMany({ where: { agencyId } });
@@ -642,9 +694,16 @@ export class ClientService {
       "status",
       "createdAt",
       "updatedAt",
+      "primaryContactUserId",
     ]);
     visibleSections.forEach((section) =>
       section.fields.forEach((field) => allowedFields.add(field.key)),
+    );
+
+    const primaryContactUser = (client as any).primaryContactUser;
+    const primaryContactName = primaryContactUser?.name ?? null;
+    const primaryContactEmail = this.decryptOptional(
+      primaryContactUser?.authUser?.emailEncrypted,
     );
 
     const visibleClient = Object.fromEntries(
@@ -652,6 +711,12 @@ export class ClientService {
         allowedFields.has(key as keyof ClientRecord),
       ),
     );
+    if (allowedFields.has("primaryContactName") && primaryContactName) {
+      visibleClient.primaryContactName = primaryContactName;
+    }
+    if (allowedFields.has("primaryContactEmail") && primaryContactEmail) {
+      visibleClient.primaryContactEmail = primaryContactEmail;
+    }
 
     return {
       client: visibleClient,
@@ -662,7 +727,13 @@ export class ClientService {
         fields: section.fields.map((field) => ({
           key: field.key,
           label: field.label,
-          value: this.displayValue(client[field.key]),
+          value: this.displayValue(
+            field.key === "primaryContactName"
+              ? (primaryContactName ?? client[field.key])
+              : field.key === "primaryContactEmail"
+                ? (primaryContactEmail ?? client[field.key])
+                : client[field.key],
+          ),
         })),
       })),
       canEdit,
@@ -676,5 +747,89 @@ export class ClientService {
     if (value === null || value === undefined || value === "") return null;
     if (value instanceof Date) return value.toISOString();
     return String(value);
+  }
+
+  private async ensurePrimaryContactAccess(
+    tx: any,
+    agencyId: string,
+    clientId: string,
+    userId?: string | null,
+    grantAccess = true,
+  ) {
+    if (!userId) {
+      throw new BadRequestException("Primary contact user is required.");
+    }
+
+    const [membership, clientRole] = await Promise.all([
+      tx.membership.findUnique({
+        where: { agencyId_userId: { agencyId, userId } },
+        include: {
+          user: { include: { authUser: true } },
+          roles: { include: { role: { include: { systemRole: true } } } },
+          role: { include: { systemRole: true } },
+        },
+      }),
+      tx.role.findFirst({
+        where: {
+          agencyId,
+          deletedAt: null,
+          systemRole: { key: "CLIENT" },
+        },
+      }),
+    ]);
+
+    if (!membership || membership.status !== "ACTIVE" || membership.deletedAt) {
+      throw new BadRequestException(
+        "Primary contact must be an active user in this agency.",
+      );
+    }
+
+    if (!clientRole) {
+      throw new ConflictException("CLIENT role is not configured.");
+    }
+
+    const hasClientRole = [
+      membership.role,
+      ...(membership.roles ?? []).map((item: any) => item.role),
+    ].some((role: any) => role?.systemRole?.key === "CLIENT");
+
+    if (!hasClientRole) {
+      await tx.membershipRole.createMany({
+        data: [{ membershipId: membership.id, roleId: clientRole.id }],
+        skipDuplicates: true,
+      });
+    }
+
+    if (grantAccess) {
+      await tx.clientUserAccess.upsert({
+        where: {
+          agencyId_clientId_userId: {
+            agencyId,
+            clientId,
+            userId,
+          },
+        },
+        update: {},
+        create: {
+          agencyId,
+          clientId,
+          userId,
+        },
+      });
+    }
+
+    return {
+      name: membership.user?.name ?? null,
+      email: this.decryptOptional(membership.user?.authUser?.emailEncrypted),
+    };
+  }
+
+  private decryptOptional(value?: string | null) {
+    if (!value || !this.cryptoService) return null;
+    try {
+      return this.cryptoService.decrypt(value);
+    } catch {
+      return null;
+    }
   }
 }

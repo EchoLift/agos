@@ -14,8 +14,8 @@ import {
 import { PrismaService } from "@packages/database/prisma.service";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import {
+  clientScopeIds,
   isClientUser,
-  requireClientScope,
 } from "@packages/security/client-scope";
 import {
   CalendarEventsQueryDto,
@@ -52,7 +52,7 @@ export class CalendarService {
     const eventTypes = this.csv(query.eventTypes);
     const statuses = this.csv(query.statuses);
     const platforms = this.csv(query.platforms);
-    const clientId = isClientUser(actor) ? requireClientScope(actor) : null;
+    const clientIds = isClientUser(actor) ? clientScopeIds(actor) : [];
     this.ensureMemberFilterAccess(query.memberId, membershipId, actor);
     const accessibleCampaignIds = await this.resolveAccessibleCampaignIds(
       scope,
@@ -84,7 +84,7 @@ export class CalendarService {
             statuses: taskStatuses,
             rawStatuses: statuses,
             accessibleCampaignIds,
-            clientId,
+            clientIds,
           })
         : Promise.resolve([]),
       !eventTypes.length || eventTypes.includes("PUBLISHING")
@@ -101,7 +101,7 @@ export class CalendarService {
             platforms: publishingPlatforms,
             rawPlatforms: platforms,
             accessibleCampaignIds,
-            clientId,
+            clientIds,
           })
         : Promise.resolve([]),
       !eventTypes.length || eventTypes.includes("WORK_ORDER")
@@ -115,7 +115,7 @@ export class CalendarService {
             memberId: query.memberId,
             statuses: workOrderStatuses,
             rawStatuses: statuses,
-            clientId,
+            clientIds,
           })
         : Promise.resolve([]),
     ]);
@@ -158,7 +158,7 @@ export class CalendarService {
     statuses: TaskStatus[];
     rawStatuses: string[];
     accessibleCampaignIds?: string[];
-    clientId?: string | null;
+    clientIds?: string[];
   }) {
     if (params.rawStatuses.length && !params.statuses.length) return [];
     const roleResponsibilities =
@@ -183,12 +183,12 @@ export class CalendarService {
         : {}),
     };
 
-    if (params.clientId) {
+    if (params.clientIds?.length) {
       where.workflowInstance = {
         ...(where.workflowInstance ?? {}),
         contentAsset: {
           ...(where.workflowInstance?.contentAsset ?? {}),
-          clientId: params.clientId,
+          clientId: { in: params.clientIds },
         },
       };
     } else if (params.scope === "MY_SCHEDULE") {
@@ -349,7 +349,7 @@ export class CalendarService {
     platforms: PublishingPlatform[];
     rawPlatforms: string[];
     accessibleCampaignIds?: string[];
-    clientId?: string | null;
+    clientIds?: string[];
   }) {
     if (
       (params.rawStatuses.length && !params.statuses.length) ||
@@ -367,8 +367,8 @@ export class CalendarService {
         : {}),
     };
 
-    if (params.clientId) {
-      where.campaign = { clientId: params.clientId };
+    if (params.clientIds?.length) {
+      where.campaign = { clientId: { in: params.clientIds } };
     } else if (params.scope === "MY_SCHEDULE") {
       const campaignIds = await this.campaignIdsForDirectPublishing(
         params.agencyId,
@@ -434,7 +434,7 @@ export class CalendarService {
     memberId?: string;
     statuses: WorkOrderStatus[];
     rawStatuses: string[];
-    clientId?: string | null;
+    clientIds?: string[];
   }) {
     if (params.rawStatuses.length && !params.statuses.length) return [];
 
@@ -445,8 +445,8 @@ export class CalendarService {
       ...(params.statuses.length ? { status: { in: params.statuses } } : {}),
     };
 
-    if (params.clientId) {
-      where.clientId = params.clientId;
+    if (params.clientIds?.length) {
+      where.clientId = { in: params.clientIds };
     } else if (params.scope === "MY_SCHEDULE") {
       where.OR = [
         { assigneeMembershipId: params.membershipId },
@@ -613,12 +613,12 @@ export class CalendarService {
     campaignId: string,
   ) {
     if (isClientUser(actor)) {
-      const clientId = requireClientScope(actor);
+      const clientIds = clientScopeIds(actor);
       const campaign = await this.prisma.campaign.findFirst({
         where: {
           id: campaignId,
           agencyId,
-          clientId,
+          clientId: { in: clientIds },
           status: { not: "DELETED" },
         },
         select: { id: true },

@@ -27,6 +27,13 @@ import { DomainEvents } from "@packages/events/domain-event";
 import * as crypto from "crypto";
 
 const INVITATION_RESEND_COOLDOWN_MS = 48 * 60 * 60 * 1000;
+type ClientAccessSummary = {
+  clientId: string;
+  clientName: string | null;
+  isPrimaryContact?: boolean;
+  primaryContactUserId?: string | null;
+  primaryContactName?: string | null;
+};
 
 @Injectable()
 export class OrganizationService implements OnModuleInit {
@@ -217,6 +224,7 @@ export class OrganizationService implements OnModuleInit {
             displayName: m.client.displayName || m.client.name,
           }
         : null,
+      clientAccess: this.memberClientAccess(m, m.agencyId),
     }));
 
     const currentAgency = activeAgencyId
@@ -311,31 +319,19 @@ export class OrganizationService implements OnModuleInit {
     const includesClientRole = selectedRoles.some(
       (item) => item.systemRole?.key === "CLIENT",
     );
+    const clientIds = this.normalizeClientIds(dto);
     let clientId: string | null = null;
 
     if (includesClientRole) {
-      if (!dto.clientId) {
+      if (clientIds.length === 0) {
         throw new BadRequestException(
           "A business client is required for CLIENT invitations.",
         );
       }
 
-      const client = await this.prisma.client.findFirst({
-        where: {
-          id: dto.clientId,
-          agencyId,
-          status: "ACTIVE",
-          deletedAt: null,
-        },
-        select: { id: true },
-      });
-      if (!client) {
-        throw new BadRequestException(
-          "Business client must belong to this agency.",
-        );
-      }
-      clientId = client.id;
-    } else if (dto.clientId) {
+      await this.ensureActiveClientsBelongToAgency(agencyId, clientIds);
+      clientId = clientIds[0];
+    } else if (dto.clientId || dto.clientIds?.length) {
       throw new BadRequestException(
         "Business client can only be set for CLIENT invitations.",
       );
@@ -358,6 +354,7 @@ export class OrganizationService implements OnModuleInit {
       roleIds,
       dto.mobileNumber ?? null,
       clientId,
+      clientIds,
       context?.correlationId,
       emailEncrypted,
     );
@@ -373,6 +370,7 @@ export class OrganizationService implements OnModuleInit {
         (item: any) => item.role.displayName,
       ) ?? [role.displayName],
       clientId,
+      clientIds,
       status: invitation.status,
       expiresAt: invitation.expiresAt,
       token: invitation.token,
@@ -524,6 +522,7 @@ export class OrganizationService implements OnModuleInit {
       invitation.roleId,
       invitation.roles?.map((item: any) => item.roleId) ?? [invitation.roleId],
       invitation.clientId ?? null,
+      this.invitationClientIds(invitation),
       context?.correlationId,
     );
 
@@ -536,6 +535,10 @@ export class OrganizationService implements OnModuleInit {
       agencyId: membership.agencyId,
       status: membership.status,
       clientId: membership.clientId ?? invitation.clientId ?? null,
+      clientIds: this.memberClientAccess(membership, invitation.agencyId).map(
+        (access: ClientAccessSummary) => access.clientId,
+      ),
+      clientAccess: this.memberClientAccess(membership, invitation.agencyId),
       agency: {
         id: invitation.agency.id,
         name: invitation.agency.name,
@@ -571,6 +574,7 @@ export class OrganizationService implements OnModuleInit {
             displayName: m.client.displayName || m.client.name,
           }
         : null,
+      clientAccess: this.memberClientAccess(m, agencyId),
       status: m.status,
       joinedAt: m.joinedAt,
       version: m.version,
@@ -616,31 +620,37 @@ export class OrganizationService implements OnModuleInit {
     const assignsClient = targetRoles.some(
       (role) => role.systemRole?.key === "CLIENT",
     );
+    const requestedClientIds = this.normalizeClientIds(dto);
+    const primaryContactClientIds = [
+      ...new Set((dto.primaryContactClientIds ?? []).filter(Boolean)),
+    ];
     let clientId: string | null = null;
+    let clientIds: string[] = [];
     if (assignsClient) {
-      clientId = dto.clientId ?? null;
-      if (!clientId) {
+      clientIds = requestedClientIds;
+      clientId = clientIds[0] ?? null;
+      if (clientIds.length === 0) {
         throw new BadRequestException(
           "A business client is required for CLIENT members.",
         );
       }
-      const client = await this.prisma.client.findFirst({
-        where: {
-          id: clientId,
-          agencyId,
-          status: "ACTIVE",
-          deletedAt: null,
-        },
-        select: { id: true },
-      });
-      if (!client) {
+      await this.ensureActiveClientsBelongToAgency(agencyId, clientIds);
+      const clientIdSet = new Set(clientIds);
+      const invalidPrimaryContactClientIds = primaryContactClientIds.filter(
+        (id) => !clientIdSet.has(id),
+      );
+      if (invalidPrimaryContactClientIds.length > 0) {
         throw new BadRequestException(
-          "Business client must belong to this agency.",
+          "Primary contact can only be assigned for selected client access.",
         );
       }
-    } else if (dto.clientId) {
+    } else if (dto.clientId || dto.clientIds?.length) {
       throw new BadRequestException(
         "Business client can only be set for CLIENT members.",
+      );
+    } else if (primaryContactClientIds.length > 0) {
+      throw new BadRequestException(
+        "Primary contact can only be assigned to CLIENT members.",
       );
     }
 
@@ -695,6 +705,22 @@ export class OrganizationService implements OnModuleInit {
       }
     }
 
+    const currentClientIds = this.memberClientAccess(
+      targetMembership,
+      agencyId,
+    ).map((access: ClientAccessSummary) => access.clientId);
+    const removedClientIds = currentClientIds.filter(
+      (id: string) => !clientIds.includes(id),
+    );
+    if (removedClientIds.length > 0) {
+      await this.ensureClientAccessCanBeRemoved(
+        agencyId,
+        targetMembership.userId,
+        removedClientIds,
+        !assignsClient,
+      );
+    }
+
     const context = this.requestContext.get();
     const updated = await this.repository.updateMembershipRole(
       agencyId,
@@ -703,6 +729,8 @@ export class OrganizationService implements OnModuleInit {
       requestedRoleIds,
       dto.version,
       clientId,
+      clientIds,
+      primaryContactClientIds,
       actor.authUserId,
       context?.correlationId,
     );
@@ -727,6 +755,7 @@ export class OrganizationService implements OnModuleInit {
             displayName: updated.client.displayName || updated.client.name,
           }
         : null,
+      clientAccess: this.memberClientAccess(updated, agencyId),
       status: updated.status,
       joinedAt: updated.joinedAt,
       version: updated.version,
@@ -767,6 +796,15 @@ export class OrganizationService implements OnModuleInit {
         throw new ConflictException("Last owner cannot be removed.");
       }
     }
+
+    await this.ensureClientAccessCanBeRemoved(
+      agencyId,
+      targetMembership.userId,
+      this.memberClientAccess(targetMembership, agencyId).map(
+        (access: ClientAccessSummary) => access.clientId,
+      ),
+      true,
+    );
 
     const context = this.requestContext.get();
     const removed = await this.repository.removeMembership(
@@ -836,6 +874,7 @@ export class OrganizationService implements OnModuleInit {
     return {
       agency: true,
       client: true,
+      clientAccesses: { include: { client: true } },
       role: { include: { systemRole: true } },
       roles: { include: { role: { include: { systemRole: true } } } },
       invitedBy: {
@@ -862,9 +901,11 @@ export class OrganizationService implements OnModuleInit {
         ? {
             id: invitation.client.id,
             name: invitation.client.name,
-            displayName: invitation.client.displayName || invitation.client.name,
+            displayName:
+              invitation.client.displayName || invitation.client.name,
           }
         : null,
+      clientAccess: this.invitationClientAccess(invitation),
       invitedBy: invitation.invitedBy
         ? {
             membershipId: invitation.invitedBy.id,
@@ -1059,5 +1100,125 @@ export class OrganizationService implements OnModuleInit {
     } catch {
       return null;
     }
+  }
+
+  private normalizeClientIds(dto: {
+    clientId?: string | null;
+    clientIds?: string[] | null;
+  }) {
+    return [
+      ...new Set([...(dto.clientIds ?? []), dto.clientId].filter(Boolean)),
+    ] as string[];
+  }
+
+  private async ensureActiveClientsBelongToAgency(
+    agencyId: string,
+    clientIds: string[],
+  ) {
+    const clients = await this.prisma.client.findMany({
+      where: {
+        id: { in: clientIds },
+        agencyId,
+        status: "ACTIVE",
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (clients.length !== new Set(clientIds).size) {
+      throw new BadRequestException(
+        "All business clients must belong to this agency.",
+      );
+    }
+  }
+
+  private memberClientAccess(member: any, agencyId: string) {
+    const accesses = (member.user?.clientAccesses ?? [])
+      .filter((access: any) => access.agencyId === agencyId)
+      .map((access: any) => {
+        const primaryContactUserId =
+          access.client?.primaryContactUserId ?? null;
+        return {
+          clientId: access.clientId,
+          clientName: access.client?.displayName || access.client?.name || null,
+          isPrimaryContact:
+            !!primaryContactUserId &&
+            (primaryContactUserId === member.userId ||
+              primaryContactUserId === member.user?.id),
+          primaryContactUserId,
+          primaryContactName: access.client?.primaryContactUser?.name ?? null,
+        };
+      });
+
+    if (accesses.length > 0) return accesses;
+
+    return member.client
+      ? [
+          {
+            clientId: member.client.id,
+            clientName: member.client.displayName || member.client.name,
+            isPrimaryContact:
+              !!member.client.primaryContactUserId &&
+              (member.client.primaryContactUserId === member.userId ||
+                member.client.primaryContactUserId === member.user?.id),
+            primaryContactUserId: member.client.primaryContactUserId ?? null,
+            primaryContactName: member.client.primaryContactUser?.name ?? null,
+          },
+        ]
+      : [];
+  }
+
+  private invitationClientIds(invitation: any) {
+    const ids = (invitation.clientAccesses ?? []).map(
+      (access: any) => access.clientId,
+    );
+    return ids.length ? ids : invitation.clientId ? [invitation.clientId] : [];
+  }
+
+  private invitationClientAccess(invitation: any) {
+    const accesses = (invitation.clientAccesses ?? []).map((access: any) => ({
+      clientId: access.clientId,
+      clientName: access.client?.displayName || access.client?.name || null,
+    }));
+    if (accesses.length > 0) return accesses;
+    return invitation.client
+      ? [
+          {
+            clientId: invitation.client.id,
+            clientName: invitation.client.displayName || invitation.client.name,
+          },
+        ]
+      : [];
+  }
+
+  private async ensureClientAccessCanBeRemoved(
+    agencyId: string,
+    userId: string,
+    clientIds: string[],
+    removingClientRole: boolean,
+  ) {
+    if (clientIds.length === 0) return;
+    const blockers = await this.prisma.client.findMany({
+      where: {
+        agencyId,
+        id: { in: clientIds },
+        primaryContactUserId: userId,
+        deletedAt: null,
+      },
+      select: { id: true, name: true, displayName: true },
+      orderBy: { name: "asc" },
+    });
+
+    if (blockers.length === 0) return;
+
+    const names = blockers.map((client) => client.displayName || client.name);
+    if (removingClientRole) {
+      throw new ConflictException(
+        `Cannot remove Client role. This user is the primary contact for:\n- ${names.join("\n- ")}\nReassign those primary contacts first.`,
+      );
+    }
+
+    throw new ConflictException(
+      `Cannot remove ${names[0]} access because this user is currently the primary contact. Assign another primary contact first.`,
+    );
   }
 }

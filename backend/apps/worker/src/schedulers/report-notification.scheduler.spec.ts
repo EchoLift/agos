@@ -24,6 +24,8 @@ describe("ReportNotificationSchedulerService execution claiming", () => {
   const periodEnd = new Date("2026-08-31T23:59:59.999Z");
 
   let prisma: any;
+  let notificationService: any;
+  let scheduleCalculator: any;
   let scheduler: ReportNotificationSchedulerService;
 
   beforeEach(() => {
@@ -32,19 +34,41 @@ describe("ReportNotificationSchedulerService execution claiming", () => {
         create: jest.fn(),
         findUnique: jest.fn(),
         updateMany: jest.fn(),
+        update: jest.fn(),
       },
       clientReportNotificationSchedule: {
         update: jest.fn(),
       },
+      clientAnalyticsAsset: {
+        count: jest.fn(),
+      },
+      client: {
+        findFirst: jest.fn(),
+      },
     };
 
-    const scheduleCalculator = {
+    notificationService = {
+      notify: jest.fn(),
+    };
+
+    scheduleCalculator = {
       calculateNextRunAt: jest.fn(() => new Date("2026-09-30T12:30:00.000Z")),
+      resolveReportingPeriod: jest.fn(() => ({
+        reportYear: 2026,
+        reportMonth: 8,
+        periodStart,
+        periodEnd,
+        label: "August 2026",
+      })),
+      getLocalYearMonth: jest.fn((date: Date) => ({
+        year: date.getUTCFullYear(),
+        month: date.getUTCMonth() + 1,
+      })),
     };
 
     scheduler = new ReportNotificationSchedulerService(
       prisma,
-      {} as any,
+      notificationService,
       scheduleCalculator as any,
       { get: jest.fn() } as unknown as ConfigService,
     );
@@ -197,5 +221,62 @@ describe("ReportNotificationSchedulerService execution claiming", () => {
         errorDetails: null,
       }),
     });
+  });
+
+  it("sends scheduled report notifications only to the client primary contact", async () => {
+    prisma.clientReportNotificationExecution.create.mockResolvedValue({
+      id: "execution_1",
+    });
+    prisma.clientAnalyticsAsset.count.mockResolvedValue(1);
+    prisma.client.findFirst.mockResolvedValue({
+      id: "client_1",
+      primaryContactUser: {
+        id: "user-primary",
+        name: "Mani",
+        authUser: { id: "auth-primary" },
+      },
+    });
+
+    await (scheduler as any).processOneSchedule(
+      {
+        ...schedule,
+        agency: { id: "agency_1", name: "AGENCIE", slug: "agency-one" },
+        client: { id: "client_1", name: "50-BraIns", timezone: null },
+      },
+      now,
+    );
+
+    expect(prisma.client.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "client_1",
+        agencyId: "agency_1",
+        deletedAt: null,
+      },
+      include: {
+        primaryContactUser: {
+          include: { authUser: true },
+        },
+      },
+    });
+    expect(notificationService.notify).toHaveBeenCalledTimes(1);
+    expect(notificationService.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agencyId: "agency_1",
+        userId: "user-primary",
+        eventType: "ClientReportReady",
+        recipientType: "CLIENT",
+      }),
+    );
+    expect(
+      prisma.clientReportNotificationExecution.update,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "execution_1" },
+        data: expect.objectContaining({
+          status: ReportNotificationExecutionStatus.SENT,
+          recipientCount: 1,
+        }),
+      }),
+    );
   });
 });

@@ -13,7 +13,7 @@ import { PrismaService } from "@packages/database/prisma.service";
 import { DomainEvents } from "@packages/events/domain-event";
 import { EventBusService } from "@packages/events/event-bus.service";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
-import { assertClientScope, isClientUser, requireClientScope } from "@packages/security/client-scope";
+import { assertClientScope, clientScopeIds, isClientUser } from "@packages/security/client-scope";
 import { GoogleCalendarSyncService } from "@modules/google-calendar/google-calendar-sync.service";
 import { isEmailChannelRequired } from "@modules/notification/notification.policy";
 import { CreateWorkOrderDto } from "./dto/create-work-order.dto";
@@ -116,12 +116,12 @@ export class WorkOrderService {
   async findMany(actor: IdentityContext) {
     const agencyId = this.requireAgency(actor);
     const membershipId = this.requireMembership(actor);
-    const clientId = isClientUser(actor) ? requireClientScope(actor) : null;
+    const scopedClientIds = isClientUser(actor) ? clientScopeIds(actor) : [];
     const where: Prisma.WorkOrderWhereInput = {
       agencyId,
       deletedAt: null,
-      ...(clientId
-        ? { clientId }
+      ...(scopedClientIds.length
+        ? { clientId: { in: scopedClientIds } }
         : this.canManage(actor)
           ? {}
           : {

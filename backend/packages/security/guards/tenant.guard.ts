@@ -63,7 +63,8 @@ export class TenantGuard implements CanActivate {
 
     user.agencyId = resolvedAgencyId;
     user.membershipId = membership.id;
-    user.clientId = (membership as any).clientId ?? null;
+    user.clientIds = this.clientAccessIds(membership, resolvedAgencyId);
+    user.clientId = user.clientIds[0] ?? ((membership as any).clientId ?? null);
     const assignedRoles = this.authoritativeRoles(membership);
 
     const roleKeys = assignedRoles
@@ -88,6 +89,7 @@ export class TenantGuard implements CanActivate {
       agencyId: resolvedAgencyId,
       membershipId: membership.id,
       clientId: user.clientId,
+      clientIds: user.clientIds,
       role: user.role,
       roles: user.roles,
       permissions: user.permissions,
@@ -113,5 +115,13 @@ export class TenantGuard implements CanActivate {
     }
 
     return membership.role ? [membership.role] : [];
+  }
+
+  private clientAccessIds(membership: any, agencyId: string) {
+    const ids =
+      membership.user?.clientAccesses
+        ?.filter((access: any) => access.agencyId === agencyId)
+        .map((access: any) => access.clientId) ?? [];
+    return [...new Set(ids.length ? ids : membership.clientId ? [membership.clientId] : [])] as string[];
   }
 }
