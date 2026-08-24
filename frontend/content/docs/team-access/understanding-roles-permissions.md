@@ -1,6 +1,6 @@
 ---
 title: Understanding roles & permissions
-description: Understand how roles, assignments, memberships, and client scope control access in AGENCIE.
+description: Understand how roles, assignments, memberships, client access, and Primary Contact responsibilities control access in AGENCIE.
 category: Team & Access
 order: 2
 roles:
@@ -21,7 +21,7 @@ status: AVAILABLE
 
 AGENCIE uses several layers to decide what a person can see and do.
 
-The most important distinction is:
+The most important distinctions are:
 
 **Agency Membership**
 → Which agency workspace you belong to
@@ -32,8 +32,11 @@ The most important distinction is:
 **Assignment**
 → Which specific work you are responsible for
 
-**Client Association**
-→ Which business client a CLIENT user represents
+**Client Access**
+→ Which business clients a CLIENT user can access
+
+**Primary Contact**
+→ Which CLIENT user is the main communication recipient for a business client
 
 These concepts work together but serve different purposes.
 
@@ -111,27 +114,38 @@ Member represents basic internal agency access without the specialized capabilit
 
 ### CLIENT
 
-CLIENT represents an external user associated with a business client.
+CLIENT enables supported client-facing access.
 
-CLIENT access is scoped differently from normal internal agency roles.
+Unlike normal internal roles, CLIENT works together with explicit client access.
 
-A CLIENT-only user is associated with a specific business client and should only receive the client-facing access available for that business.
+A CLIENT user can be given access to one or more business clients.
+
+For example:
+
+Maya
+→ CLIENT
+→ Client A
+→ Client B
+
+Maya can receive supported client-facing access for Client A and Client B but does not automatically receive access to Client C.
 
 ## Multiple Roles
 
-A person can have more than one internal role.
+A person can have more than one role.
 
 For example:
 
 Writer + Editor
 
-or:
-
 DOP + Editor
 
-AGENCIE combines the capabilities available through the person's internal roles where supported.
+Editor + CLIENT
+
+AGENCIE combines the capabilities available through the person's roles where supported.
 
 This allows one person to perform multiple functions without requiring separate accounts.
+
+CLIENT additionally uses explicit client access to determine which business clients are available to that user.
 
 ## Role Does Not Mean Assignment
 
@@ -179,21 +193,119 @@ When the workflow reaches editing, ownership can move to the appropriate assigne
 
 CLIENT is different from internal agency roles.
 
-A CLIENT membership is associated with a specific business client.
+The CLIENT role enables client-facing capabilities, while **client access** determines which business clients the person can access.
 
 For example:
 
 Agency
-→ Client A
-→ CLIENT User A
+├── Client A
+│   ├── Maya
+│   └── Arun
+│
+└── Client B
+    ├── Arun
+    └── Priya
 
-That user should not receive access to Client B simply because both clients belong to the same agency.
+Maya
+→ CLIENT access to Client A
 
-Client association therefore acts as an additional access boundary.
+Arun
+→ CLIENT access to Client A and Client B
+
+Priya
+→ CLIENT access to Client B
+
+Arun can therefore participate in supported client-facing areas for both clients without requiring separate agency memberships.
+
+Client access to one business does not grant access to every business managed by the agency.
+
+## Primary Contact
+
+Primary Contact is separate from roles and client access.
+
+A business client can have multiple CLIENT users but one user can be designated as its **Primary Contact**.
+
+For example:
+
+Client A
+├── Maya — CLIENT + Primary Contact
+├── Arun — CLIENT
+└── Priya — CLIENT
+
+All three users can have supported access to Client A.
+
+Maya is additionally the client's main communication recipient.
+
+For supported automated client-facing notifications:
+
+Maya
+→ Receives the email
+
+Arun
+→ No automated client email
+
+Priya
+→ No automated client email
+
+Arun and Priya keep their permitted portal access.
+
+Primary Contact therefore controls communication ownership rather than access level.
+
+## Primary Contact Is Not A Role
+
+Primary Contact does not appear as another agency role alongside Writer, Editor, CLIENT, or Manager.
+
+It is a relationship between:
+
+Business Client
+→ CLIENT User
+
+A user must have CLIENT access to the relevant business client to serve as its Primary Contact.
+
+Being Primary Contact does not:
+
+- Grant internal agency permissions
+- Grant access to additional business clients
+- Override resource permissions
+- Automatically assign workflow work
+- Replace the CLIENT role
+
+It identifies who represents the client's main communication endpoint inside AGENCIE.
+
+## Primary Contact Protection
+
+Because Primary Contact is tied to a CLIENT user, AGENCIE protects that relationship during access changes.
+
+If a user is Primary Contact for a business client, AGENCIE blocks changes that would remove the access required by that relationship.
+
+This includes attempting to:
+
+- Remove their access to that client
+- Remove their CLIENT role
+- Remove their agency membership
+
+The Primary Contact must first be reassigned to another eligible CLIENT user.
+
+For example:
+
+Client A
+→ Maya — Primary Contact
+
+To remove Maya's Client A access:
+
+Client A
+→ Assign Arun as Primary Contact
+→ Maya remains CLIENT temporarily
+→ Remove Maya's Client A access
+
+Changing Primary Contact does not automatically remove the previous user's client access.
+
+> [!IMPORTANT] Primary Contact Protection
+> Reassign Primary Contact before removing the current Primary Contact's CLIENT access, CLIENT role, or agency membership.
 
 ## CLIENT With Internal Roles
 
-A person can also have CLIENT together with legitimate internal roles where required.
+A person can have CLIENT together with legitimate internal roles where required.
 
 For example:
 
@@ -201,9 +313,41 @@ Editor + CLIENT
 
 In this situation, AGENCIE preserves the access provided by the person's internal agency role.
 
-The CLIENT association does not automatically reduce an internal employee to client-only access.
+The CLIENT role does not automatically reduce an internal employee to client-only access.
 
-A CLIENT-only membership, however, remains scoped to the associated business client.
+For example:
+
+Editor + CLIENT
+→ Editor capabilities according to agency permissions
+→ Client-facing access according to assigned client access
+
+A CLIENT-only external user, however, receives only the supported client-facing access available through CLIENT.
+
+## Client Access vs Primary Contact
+
+These concepts answer different questions.
+
+**CLIENT role**
+→ Can this person use client-facing capabilities?
+
+**Client access**
+→ Which business clients can this person access?
+
+**Primary Contact**
+→ For which business client is this person the main communication recipient?
+
+For example:
+
+Maya
+→ CLIENT
+→ Client A — Primary Contact
+→ Client B — Access only
+
+Maya can access both clients.
+
+She receives Primary Contact communication for Client A.
+
+She does not receive Primary Contact communication for Client B.
 
 ## Viewing vs Managing
 
@@ -235,18 +379,25 @@ AGENCIE can also consider:
 - Active agency
 - Membership status
 - Resource ownership
-- Client scope
+- Client access
+- Primary Contact responsibilities
 - Assignment
 - Current workflow state
 - Current Gig state
 
 For example, an Editor may have permission to perform editing work but still cannot act on a task assigned to another Editor.
 
+Similarly, an Owner may normally be allowed to remove a CLIENT user but cannot remove that user while they remain Primary Contact for a business client.
+
 ## Workspace Navigation
 
 AGENCIE adapts workspace navigation according to the current user's access.
 
 Different roles may therefore see different sections of the same agency workspace.
+
+For example, a CLIENT user with valid client access can receive supported client-facing navigation such as Files.
+
+Removing CLIENT access can remove those client-facing navigation capabilities.
 
 Missing navigation does not necessarily mean the workspace is broken.
 
@@ -260,8 +411,10 @@ Hiding a button or navigation item improves the user experience, but protected o
 
 Directly opening a protected URL does not grant additional access.
 
+Client isolation and Primary Contact protection are therefore enforced beyond the visible interface.
+
 > [!IMPORTANT] Access Model
-> Think about AGENCIE access using four questions:
+> Think about AGENCIE access using five questions:
 >
 > **Which agency do I belong to?**
 > → Membership
@@ -272,5 +425,8 @@ Directly opening a protected URL does not grant additional access.
 > **Which work is mine?**
 > → Assignments
 >
-> **Which business can I access as a client user?**
-> → Client association
+> **Which business clients can I access?**
+> → Client access
+>
+> **Who receives official automated communication for a client?**
+> → Primary Contact

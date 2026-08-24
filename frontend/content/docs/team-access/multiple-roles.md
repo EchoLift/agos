@@ -2,7 +2,7 @@
 title: Multiple roles
 description: Give one person more than one responsibility inside an agency.
 category: Team & Access
-order: 3
+order: 7
 roles:
   - OWNER
   - ADMIN
