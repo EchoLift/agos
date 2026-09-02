@@ -12,6 +12,7 @@ const ROOT_ROUTES = new Set([
   "/demo-workspace",
   "/privacy",
   "/terms",
+  "/platform-admin",
   "/favicon.ico",
 ]);
 

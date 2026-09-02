@@ -11,6 +11,7 @@ import { RequestContextService } from "@packages/request-context/request-context
 import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
 import { SecurityErrorCode } from "../constants/error-codes.enum";
 import { IdentityContext } from "../interfaces/identity-context.interface";
+import { SKIP_TENANT_KEY } from "../decorators/skip-tenant.decorator";
 
 @Injectable()
 export class TenantGuard implements CanActivate {
@@ -30,6 +31,11 @@ export class TenantGuard implements CanActivate {
     if (isPublic) {
       return true;
     }
+    const skipTenant = this.reflector.getAllAndOverride<boolean>(
+      SKIP_TENANT_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (skipTenant) return true;
 
     const request = context.switchToHttp().getRequest();
     const user: IdentityContext = request.user;
@@ -64,7 +70,7 @@ export class TenantGuard implements CanActivate {
     user.agencyId = resolvedAgencyId;
     user.membershipId = membership.id;
     user.clientIds = this.clientAccessIds(membership, resolvedAgencyId);
-    user.clientId = user.clientIds[0] ?? ((membership as any).clientId ?? null);
+    user.clientId = user.clientIds[0] ?? (membership as any).clientId ?? null;
     const assignedRoles = this.authoritativeRoles(membership);
 
     const roleKeys = assignedRoles
@@ -122,6 +128,10 @@ export class TenantGuard implements CanActivate {
       membership.user?.clientAccesses
         ?.filter((access: any) => access.agencyId === agencyId)
         .map((access: any) => access.clientId) ?? [];
-    return [...new Set(ids.length ? ids : membership.clientId ? [membership.clientId] : [])] as string[];
+    return [
+      ...new Set(
+        ids.length ? ids : membership.clientId ? [membership.clientId] : [],
+      ),
+    ] as string[];
   }
 }

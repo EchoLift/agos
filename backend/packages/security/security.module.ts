@@ -8,15 +8,24 @@ import { SecurityContextService } from "./services/security-context.service";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { TenantGuard } from "./guards/tenant.guard";
 import { PermissionsGuard } from "./guards/permissions.guard";
+import { EntitlementGuard } from "./guards/entitlement.guard";
+import { EntitlementModule } from "@modules/entitlement/entitlement.module";
 
 @Global()
 @Module({
-  imports: [AuthModule, UserModule, OrganizationModule, RequestContextModule],
+  imports: [
+    AuthModule,
+    UserModule,
+    OrganizationModule,
+    RequestContextModule,
+    EntitlementModule,
+  ],
   providers: [
     SecurityContextService,
     JwtAuthGuard,
     TenantGuard,
     PermissionsGuard,
+    EntitlementGuard,
     Reflector,
   ],
   exports: [
@@ -24,6 +33,7 @@ import { PermissionsGuard } from "./guards/permissions.guard";
     JwtAuthGuard,
     TenantGuard,
     PermissionsGuard,
+    EntitlementGuard,
   ],
 })
 export class SecurityModule {}

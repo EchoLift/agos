@@ -25,6 +25,7 @@ import { ConfigService } from "@nestjs/config";
 import { EventBusService } from "@packages/events/event-bus.service";
 import { DomainEvents } from "@packages/events/domain-event";
 import * as crypto from "crypto";
+import { EntitlementService } from "@modules/entitlement/entitlement.service";
 
 const INVITATION_RESEND_COOLDOWN_MS = 48 * 60 * 60 * 1000;
 type ClientAccessSummary = {
@@ -47,6 +48,7 @@ export class OrganizationService implements OnModuleInit {
     private readonly requestContext: RequestContextService,
     private readonly configService: ConfigService,
     private readonly eventBus: EventBusService,
+    private readonly entitlementService: EntitlementService,
   ) {}
 
   async onModuleInit() {
@@ -225,6 +227,7 @@ export class OrganizationService implements OnModuleInit {
           }
         : null,
       clientAccess: this.memberClientAccess(m, m.agencyId),
+      entitlement: this.entitlementService.evaluate(m.agency.subscription),
     }));
 
     const currentAgency = activeAgencyId

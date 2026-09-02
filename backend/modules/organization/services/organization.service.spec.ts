@@ -22,6 +22,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { ConfigService } from "@nestjs/config";
+import { EntitlementService } from "@modules/entitlement/entitlement.service";
 
 describe("OrganizationService Unit Tests", () => {
   let service: OrganizationService;
@@ -112,6 +113,22 @@ describe("OrganizationService Unit Tests", () => {
         { provide: CryptoService, useValue: mockCrypto },
         { provide: RequestContextService, useValue: mockRequestContext },
         { provide: EventBusService, useValue: mockEventBus },
+        {
+          provide: EntitlementService,
+          useValue: {
+            evaluate: jest
+              .fn()
+              .mockReturnValue({
+                allowed: false,
+                status: null,
+                plan: null,
+                trialEndsAt: null,
+                startsAt: null,
+                endsAt: null,
+                reason: "NO_ENTITLEMENT",
+              }),
+          },
+        },
         {
           provide: ConfigService,
           useValue: {

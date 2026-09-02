@@ -3,6 +3,7 @@
 import { createContext, useContext, ReactNode } from "react";
 import { Agency } from "@/lib/api/organization";
 import { useAgencyBySlugQuery } from "@/lib/query";
+import WorkspaceEntitlementBlocked from "@/components/WorkspaceEntitlementBlocked";
 
 interface AgencyContextType {
   agencyId: string | null;
@@ -53,6 +54,10 @@ export default function AgencyProvider({ slug, children }: { slug: string; child
   }
 
   const displayName = agency.displayName || agency.name || slug;
+
+  if (agency.entitlement && !agency.entitlement.allowed) {
+    return <WorkspaceEntitlementBlocked agency={agency} />;
+  }
 
   return (
     <AgencyContext.Provider

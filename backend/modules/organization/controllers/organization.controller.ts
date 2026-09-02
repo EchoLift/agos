@@ -24,6 +24,7 @@ import { UpdateMemberRoleDto } from "../dto/update-member-role.dto";
 import { CurrentUser } from "@packages/security/decorators/current-user.decorator";
 import { IdentityContext } from "@packages/security/interfaces/identity-context.interface";
 import { RequirePermissions } from "@packages/security/decorators/require-permissions.decorator";
+import { SkipEntitlement } from "@packages/security/decorators/skip-entitlement.decorator";
 
 @ApiTags("Organizations")
 @ApiBearerAuth()
@@ -32,6 +33,7 @@ export class OrganizationController {
   constructor(private readonly organizationService: OrganizationService) {}
 
   @Post("agencies")
+  @SkipEntitlement()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: "Create a new agency and become its Owner" })
   @ApiResponse({
@@ -54,6 +56,7 @@ export class OrganizationController {
   }
 
   @Get("me")
+  @SkipEntitlement()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Get current user's active agency and all memberships",
@@ -157,6 +160,7 @@ export class OrganizationController {
   }
 
   @Post(":agencyId/activate")
+  @SkipEntitlement()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Activate an agency for the current session" })
   @ApiResponse({
@@ -224,6 +228,7 @@ export class OrganizationController {
   }
 
   @Post("invitations/:token/accept")
+  @SkipEntitlement()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Accept an agency invitation" })
   @ApiResponse({

@@ -23,7 +23,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "seed:demo": "ts-node -r tsconfig-paths/register scripts/demo-seed/index.ts",
-    "seed:demo:reset": "ts-node -r tsconfig-paths/register scripts/demo-seed/index.ts --reset"
+    "seed:demo:reset": "ts-node -r tsconfig-paths/register scripts/demo-seed/index.ts --reset",
+    "platform:access": "ts-node -r tsconfig-paths/register scripts/platform-access.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1115.0",

@@ -86,6 +86,7 @@ model Agency {
   workOrders                  WorkOrder[]
   clientAnalyticsAssets       ClientAnalyticsAsset[]
   reportNotificationSchedules ClientReportNotificationSchedule[]
+  subscription                AgencySubscription?
 
   @@map("agencies")
 }
@@ -109,6 +110,7 @@ model User {
   updatedAt                          DateTime                           @updatedAt
   deletedAt                          DateTime?
   version                            Int                                @default(1)
+  platformRole                       PlatformRole                       @default(USER)
   memberships                        Membership[]
   clientAccesses                     ClientUserAccess[]
   primaryContactForClients           Client[]                           @relation("ClientPrimaryContact")
@@ -120,6 +122,23 @@ model User {
   authUser                           AuthUser                           @relation(fields: [authUserId], references: [id])
 
   @@map("users")
+}
+
+model AgencySubscription {
+  id          String             @id @default(uuid())
+  agencyId    String             @unique
+  status      SubscriptionStatus
+  plan        String
+  trialEndsAt DateTime?
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  version     Int                @default(1)
+  agency      Agency             @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("agency_subscriptions")
 }
 
 model Membership {
@@ -987,6 +1006,19 @@ enum AgencyStatus {
   ACTIVE
   SUSPENDED
   DELETED
+}
+
+enum PlatformRole {
+  USER
+  ADMIN
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
 }
 
 enum MembershipStatus {

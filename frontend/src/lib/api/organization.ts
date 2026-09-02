@@ -1,4 +1,9 @@
 import { apiClient } from "../api-client";
+export {
+  SUBSCRIPTION_STATUSES,
+  type SubscriptionStatus,
+} from "../subscription-status";
+import type { SubscriptionStatus } from "../subscription-status";
 
 export interface Agency {
   id: string;
@@ -25,6 +30,17 @@ export interface Agency {
     primaryContactUserId?: string | null;
     primaryContactName?: string | null;
   }>;
+  entitlement?: AgencyEntitlement;
+}
+
+export interface AgencyEntitlement {
+  allowed: boolean;
+  status: SubscriptionStatus | null;
+  plan: string | null;
+  trialEndsAt: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  reason: string | null;
 }
 
 export interface MyMembershipsResponse {

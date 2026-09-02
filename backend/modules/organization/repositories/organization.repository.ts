@@ -117,7 +117,7 @@ export class OrganizationRepository {
     return this.prisma.membership.findMany({
       where: { userId, status: "ACTIVE" },
       include: {
-        agency: true,
+        agency: { include: { subscription: true } },
         client: { include: { primaryContactUser: true } },
         user: {
           include: {

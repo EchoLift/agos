@@ -16,6 +16,8 @@ import { OrganizationModule } from "@modules/organization/organization.module";
 import { UserModule } from "@modules/user/user.module";
 import { WorkflowModule } from "@modules/workflow/workflow.module";
 import { WorkOrderModule } from "@modules/work-order/work-order.module";
+import { EntitlementModule } from "@modules/entitlement/entitlement.module";
+import { PlatformAdminModule } from "@modules/platform-admin/platform-admin.module";
 import { ConfigValidationModule } from "@packages/config/config-validation.module";
 import { DatabaseModule } from "@packages/database/database.module";
 import { EventBusModule } from "@packages/events/event-bus.module";
@@ -27,6 +29,7 @@ import { APP_GUARD } from "@nestjs/core";
 import { JwtAuthGuard } from "@packages/security/guards/jwt-auth.guard";
 import { TenantGuard } from "@packages/security/guards/tenant.guard";
 import { PermissionsGuard } from "@packages/security/guards/permissions.guard";
+import { EntitlementGuard } from "@packages/security/guards/entitlement.guard";
 
 @Module({
   imports: [
@@ -35,6 +38,7 @@ import { PermissionsGuard } from "@packages/security/guards/permissions.guard";
     DatabaseModule,
     EventBusModule,
     RequestContextModule,
+    EntitlementModule,
     ActivationModule,
     LoggerModule,
     ExceptionFilterModule,
@@ -53,12 +57,14 @@ import { PermissionsGuard } from "@packages/security/guards/permissions.guard";
     AuditModule,
     FileModule,
     GoogleCalendarModule,
+    PlatformAdminModule,
     SecurityModule,
   ],
 
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: TenantGuard },
+    { provide: APP_GUARD, useClass: EntitlementGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
 })
