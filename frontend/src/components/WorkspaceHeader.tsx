@@ -9,7 +9,8 @@ import { logout } from "@/lib/auth";
 import { Agency } from "@/lib/api/organization";
 import { useActivateAgencyMutation, useMembershipsQuery, useProfileQuery } from "@/lib/query";
 import { visibleWorkspaceNavItems } from "@/lib/workspace-access";
-import { getWorkspaceUrl, getRootDomainUrl, getWorkspaceHref, getHelpHref } from "@/lib/workspace-url";
+import { getWorkspaceUrl, getRootDomainUrl, getWorkspaceHref, getHelpHref, getCentralAppHref } from "@/lib/workspace-url";
+import { canShowPlatformAdministration, platformAdministrationMenuItem } from "@/lib/profile-menu";
 import { clearAgencyScopedUiState } from "@/lib/workspace-cache";
 import { rememberedEntityKey, useRememberedEntityId } from "@/lib/remembered-tab";
 import { useDialog } from "@/components/ui/DialogProvider";
@@ -109,6 +110,9 @@ export default function WorkspaceHeader({
     .join("")
     .slice(0, 2)
     .toUpperCase();
+  const platformAdministrationItem = platformAdministrationMenuItem(
+    getCentralAppHref,
+  );
 
   const switchWorkspace = async (targetAgency: Agency) => {
     if (targetAgency.id === agency?.id) {
@@ -255,6 +259,16 @@ export default function WorkspaceHeader({
                     <div className="flex min-h-11 cursor-not-allowed items-center rounded-md px-3 text-sm text-zinc-600">
                       Notifications
                     </div>
+                    {canShowPlatformAdministration(profile) ? (
+                      <div className="mt-2 border-t border-zinc-800 pt-2">
+                        <MenuLink
+                          href={platformAdministrationItem.href}
+                          label={platformAdministrationItem.label}
+                          onClick={() => setIsMenuOpen(false)}
+                          openInNewTab
+                        />
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="border-b border-zinc-800 p-2">
@@ -369,15 +383,19 @@ function MenuLink({
   href,
   label,
   onClick,
+  openInNewTab = false,
 }: {
   href: string;
   label: string;
   onClick: () => void;
+  openInNewTab?: boolean;
 }) {
   return (
     <Link
       href={href}
       onClick={onClick}
+      target={openInNewTab ? "_blank" : undefined}
+      rel={openInNewTab ? "noopener noreferrer" : undefined}
       className="flex min-h-11 items-center rounded-md px-3 text-sm text-zinc-300 transition hover:bg-zinc-900 hover:text-white"
     >
       {label}

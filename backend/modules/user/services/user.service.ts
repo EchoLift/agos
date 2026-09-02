@@ -173,6 +173,7 @@ export class UserService {
       workLocation: user.workLocation,
       statusMessage: user.statusMessage,
       statusExpiresAt: user.statusExpiresAt,
+      platformRole: user.platformRole,
       updatedAt: user.updatedAt,
     };
   }

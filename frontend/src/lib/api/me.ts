@@ -2,6 +2,7 @@ import { apiClient } from "../api-client";
 
 export type PresenceStatus = "AVAILABLE" | "BUSY" | "DO_NOT_DISTURB" | "AWAY" | "OFFLINE";
 export type WorkLocation = "WFO" | "WFH" | "REMOTE";
+export type PlatformRole = "USER" | "ADMIN";
 
 export interface Profile {
   id: string;
@@ -17,6 +18,7 @@ export interface Profile {
   workLocation: WorkLocation | null;
   statusMessage: string | null;
   statusExpiresAt: string | null;
+  platformRole: PlatformRole;
   updatedAt: string;
 }
 
