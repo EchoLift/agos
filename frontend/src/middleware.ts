@@ -13,6 +13,7 @@ const ROOT_ROUTES = new Set([
   "/privacy",
   "/terms",
   "/platform-admin",
+  "/billing",
   "/favicon.ico",
 ]);
 

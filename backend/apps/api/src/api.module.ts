@@ -18,6 +18,7 @@ import { WorkflowModule } from "@modules/workflow/workflow.module";
 import { WorkOrderModule } from "@modules/work-order/work-order.module";
 import { EntitlementModule } from "@modules/entitlement/entitlement.module";
 import { PlatformAdminModule } from "@modules/platform-admin/platform-admin.module";
+import { BillingModule } from "@modules/billing/billing.module";
 import { ConfigValidationModule } from "@packages/config/config-validation.module";
 import { DatabaseModule } from "@packages/database/database.module";
 import { EventBusModule } from "@packages/events/event-bus.module";
@@ -58,6 +59,7 @@ import { EntitlementGuard } from "@packages/security/guards/entitlement.guard";
     FileModule,
     GoogleCalendarModule,
     PlatformAdminModule,
+    BillingModule,
     SecurityModule,
   ],
 

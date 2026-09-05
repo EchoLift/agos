@@ -7,16 +7,33 @@ import { Search } from "lucide-react";
 import { useAgency } from "@/components/AgencyProvider";
 import { logout } from "@/lib/auth";
 import { Agency } from "@/lib/api/organization";
-import { useActivateAgencyMutation, useMembershipsQuery, useProfileQuery } from "@/lib/query";
+import {
+  useActivateAgencyMutation,
+  useMembershipsQuery,
+  useProfileQuery,
+} from "@/lib/query";
 import { visibleWorkspaceNavItems } from "@/lib/workspace-access";
-import { getWorkspaceUrl, getRootDomainUrl, getWorkspaceHref, getHelpHref, getCentralAppHref } from "@/lib/workspace-url";
-import { canShowPlatformAdministration, platformAdministrationMenuItem } from "@/lib/profile-menu";
+import {
+  getWorkspaceUrl,
+  getRootDomainUrl,
+  getWorkspaceHref,
+  getHelpHref,
+  getCentralAppHref,
+} from "@/lib/workspace-url";
+import {
+  canShowPlatformAdministration,
+  platformAdministrationMenuItem,
+} from "@/lib/profile-menu";
 import { clearAgencyScopedUiState } from "@/lib/workspace-cache";
-import { rememberedEntityKey, useRememberedEntityId } from "@/lib/remembered-tab";
+import {
+  rememberedEntityKey,
+  useRememberedEntityId,
+} from "@/lib/remembered-tab";
 import { useDialog } from "@/components/ui/DialogProvider";
 import { AgencieLoader } from "@/components/ui/AgencieLoader";
 import GlobalSearch from "@/components/GlobalSearch";
 import MobileWorkspaceNav from "@/components/MobileWorkspaceNav";
+import { billingExpiryWarning, hasBillingRole } from "@/lib/billing-ui";
 
 export default function WorkspaceHeader({
   agencySlug,
@@ -34,7 +51,13 @@ export default function WorkspaceHeader({
   const { data: memberships } = useMembershipsQuery();
   const activateAgencyMutation = useActivateAgencyMutation();
   const agencies = memberships?.agencies ?? [];
-  const baseNavItems = visibleWorkspaceNavItems(agency, agencySlug, profile?.id);
+  const canBillAnyAgency = agencies.some(hasBillingRole);
+  const accessWarning = agency ? billingExpiryWarning(agency) : null;
+  const baseNavItems = visibleWorkspaceNavItems(
+    agency,
+    agencySlug,
+    profile?.id,
+  );
   const rememberedClientId = useRememberedEntityId(
     rememberedEntityKey("client", agency?.id),
   );
@@ -52,14 +75,14 @@ export default function WorkspaceHeader({
     const rememberedByKey = {
       clients: rememberedClientId
         ? `/clients/${rememberedClientId}`
-        : '/clients',
+        : "/clients",
       campaigns: rememberedCampaignId
         ? `/campaigns/${rememberedCampaignId}`
-        : '/campaigns',
-      gigs: rememberedGigId ? `/gigs/${rememberedGigId}` : '/gigs',
+        : "/campaigns",
+      gigs: rememberedGigId ? `/gigs/${rememberedGigId}` : "/gigs",
       workflow: rememberedWorkflowId
         ? `/workflow/${rememberedWorkflowId}`
-        : `/workflow`
+        : `/workflow`,
     };
 
     return baseNavItems.map((item) => {
@@ -80,7 +103,7 @@ export default function WorkspaceHeader({
     rememberedCampaignId,
     rememberedClientId,
     rememberedGigId,
-    rememberedWorkflowId
+    rememberedWorkflowId,
   ]);
   const [switchingAgencyId, setSwitchingAgencyId] = useState<string | null>(
     null,
@@ -110,9 +133,8 @@ export default function WorkspaceHeader({
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  const platformAdministrationItem = platformAdministrationMenuItem(
-    getCentralAppHref,
-  );
+  const platformAdministrationItem =
+    platformAdministrationMenuItem(getCentralAppHref);
 
   const switchWorkspace = async (targetAgency: Agency) => {
     if (targetAgency.id === agency?.id) {
@@ -126,7 +148,9 @@ export default function WorkspaceHeader({
     try {
       const previousAgencyId = agency?.id;
 
-      const response = await activateAgencyMutation.mutateAsync(targetAgency.id);
+      const response = await activateAgencyMutation.mutateAsync(
+        targetAgency.id,
+      );
 
       clearAgencyScopedUiState(previousAgencyId, response.activeAgencyId);
 
@@ -160,6 +184,19 @@ export default function WorkspaceHeader({
   return (
     <>
       <header className="sticky top-0 z-50 border-b border-zinc-800/70 bg-[#09090b]/95 backdrop-blur-xl">
+        {accessWarning && (
+          <div className="flex min-h-10 items-center justify-center gap-3 bg-amber-400/10 px-3 text-center text-sm text-amber-800">
+            <span>{accessWarning}</span>
+            {agency ? (
+              <Link
+                className="font-semibold underline"
+                href={getCentralAppHref(`/billing?agencyId=${agency.id}`)}
+              >
+                Extend access
+              </Link>
+            ) : null}
+          </div>
+        )}
         <div className="flex min-h-14 w-full items-center justify-between px-3 py-1.5 md:px-4 lg:px-5">
           <div className="flex items-center gap-2">
             <div className="rounded-md bg-indigo-500/15 px-3 py-2 text-sm font-semibold text-indigo-200">
@@ -252,7 +289,10 @@ export default function WorkspaceHeader({
                     />
 
                     <MenuLink
-                      href={getWorkspaceHref(agencySlug, "/settings/appearance")}
+                      href={getWorkspaceHref(
+                        agencySlug,
+                        "/settings/appearance",
+                      )}
                       label="Appearance"
                       onClick={() => setIsMenuOpen(false)}
                     />
@@ -268,6 +308,13 @@ export default function WorkspaceHeader({
                           openInNewTab
                         />
                       </div>
+                    ) : null}
+                    {canBillAnyAgency ? (
+                      <MenuLink
+                        href={getCentralAppHref("/billing")}
+                        label="Billing & Plans"
+                        onClick={() => setIsMenuOpen(false)}
+                      />
                     ) : null}
                   </div>
 
@@ -369,10 +416,11 @@ function WorkspaceNavLink({
   return (
     <Link
       href={href}
-      className={`rounded-md px-3 py-2 transition ${isActive
-        ? "bg-indigo-500/15 text-indigo-200"
-        : "hover:bg-zinc-900 hover:text-white"
-        }`}
+      className={`rounded-md px-3 py-2 transition ${
+        isActive
+          ? "bg-indigo-500/15 text-indigo-200"
+          : "hover:bg-zinc-900 hover:text-white"
+      }`}
     >
       {label}
     </Link>

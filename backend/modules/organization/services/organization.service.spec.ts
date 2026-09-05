@@ -74,6 +74,8 @@ describe("OrganizationService Unit Tests", () => {
         .mockReturnValue({ correlationId: "corr-123", requestId: "req-123" }),
     };
     const mockPrisma: any = {
+      agencySubscription: { findUnique: jest.fn().mockResolvedValue(null) },
+      membership: { count: jest.fn().mockResolvedValue(0) },
       systemRole: { upsert: jest.fn() },
       permission: { upsert: jest.fn() },
       systemRolePermission: { upsert: jest.fn() },
@@ -116,17 +118,15 @@ describe("OrganizationService Unit Tests", () => {
         {
           provide: EntitlementService,
           useValue: {
-            evaluate: jest
-              .fn()
-              .mockReturnValue({
-                allowed: false,
-                status: null,
-                plan: null,
-                trialEndsAt: null,
-                startsAt: null,
-                endsAt: null,
-                reason: "NO_ENTITLEMENT",
-              }),
+            evaluate: jest.fn().mockReturnValue({
+              allowed: false,
+              status: null,
+              plan: null,
+              trialEndsAt: null,
+              startsAt: null,
+              endsAt: null,
+              reason: "NO_ENTITLEMENT",
+            }),
           },
         },
         {

@@ -87,6 +87,7 @@ model Agency {
   clientAnalyticsAssets       ClientAnalyticsAsset[]
   reportNotificationSchedules ClientReportNotificationSchedule[]
   subscription                AgencySubscription?
+  paymentOrders               AgencyPaymentOrder[]
 
   @@map("agencies")
 }
@@ -111,6 +112,9 @@ model User {
   deletedAt                          DateTime?
   version                            Int                                @default(1)
   platformRole                       PlatformRole                       @default(USER)
+  trialAvailedAt                     DateTime?
+  trialAgencyId                      String?
+  paymentOrders                      AgencyPaymentOrder[]
   memberships                        Membership[]
   clientAccesses                     ClientUserAccess[]
   primaryContactForClients           Client[]                           @relation("ClientPrimaryContact")
@@ -139,6 +143,38 @@ model AgencySubscription {
 
   @@index([status])
   @@map("agency_subscriptions")
+}
+
+model AgencyPaymentOrder {
+  id                    String             @id @default(uuid())
+  agencyId              String
+  payerUserId           String
+  payerMembershipId     String
+  period                BillingPeriod
+  durationMonths        Int
+  amountMinor           Int
+  currency              String             @default("INR")
+  teamLimitSnapshot     Int?
+  entitlementStartsAt   DateTime?
+  entitlementEndsAt     DateTime?
+  cashfreeOrderId       String             @unique
+  cashfreeCfOrderId     String?
+  cashfreePaymentId     String?            @unique
+  paymentSessionId      String?
+  status                PaymentOrderStatus @default(CREATING)
+  providerFailureCode   String?
+  providerFailureReason String?
+  paidAt                DateTime?
+  processedAt           DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  agency                Agency             @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  payer                 User               @relation(fields: [payerUserId], references: [id], onDelete: Restrict)
+
+  @@index([agencyId, createdAt])
+  @@index([payerUserId, createdAt])
+  @@index([status])
+  @@map("agency_payment_orders")
 }
 
 model Membership {
@@ -1019,6 +1055,21 @@ enum SubscriptionStatus {
   PAST_DUE
   SUSPENDED
   CANCELLED
+}
+
+enum BillingPeriod {
+  THREE_MONTHS
+  SIX_MONTHS
+  TWELVE_MONTHS
+}
+
+enum PaymentOrderStatus {
+  CREATING
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  EXPIRED
 }
 
 enum MembershipStatus {

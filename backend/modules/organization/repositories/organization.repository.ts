@@ -53,64 +53,100 @@ export class OrganizationRepository {
     sessionId?: string,
     correlationId?: string,
   ): Promise<{ agency: Agency; membership: Membership }> {
-    return this.prisma.$transaction(async (tx) => {
-      const agency = await tx.agency.create({
-        data: {
-          name: slug, // slug is used as the canonical name (subdomain identifier)
-          displayName, // human-readable display name
-          slug,
-        },
-      });
+    return this.prisma.$transaction(
+      async (tx) => {
+        const trialNow = new Date();
+        const agency = await tx.agency.create({
+          data: {
+            name: slug, // slug is used as the canonical name (subdomain identifier)
+            displayName, // human-readable display name
+            slug,
+          },
+        });
 
-      // Provision all system roles for this new agency
-      const agencyRoles = await this.provisionAgencyRoles(tx, agency.id);
-      const ownerRole = agencyRoles[SYSTEM_ROLES.OWNER];
+        const trialClaim = await tx.user.updateMany({
+          where: { id: userId, trialAvailedAt: null },
+          data: { trialAvailedAt: trialNow, trialAgencyId: agency.id },
+        });
+        const trialEndsAt = new Date(trialNow);
+        trialEndsAt.setUTCDate(trialEndsAt.getUTCDate() + 14);
+        if (trialClaim.count === 1)
+          await tx.agencySubscription.create({
+            data: {
+              agencyId: agency.id,
+              status: "TRIAL",
+              plan: "TRIAL",
+              startsAt: trialNow,
+              trialEndsAt,
+            },
+          });
 
-      if (!ownerRole) {
-        throw new Error("OWNER SystemRole is missing");
-      }
+        // Provision all system roles for this new agency
+        const agencyRoles = await this.provisionAgencyRoles(tx, agency.id);
+        const ownerRole = agencyRoles[SYSTEM_ROLES.OWNER];
 
-      const membership = await tx.membership.create({
-        data: {
-          agencyId: agency.id,
-          userId,
-          roleId: ownerRole.id,
-          status: "ACTIVE",
-          roles: {
-            create: {
-              roleId: ownerRole.id,
+        if (!ownerRole) {
+          throw new Error("OWNER SystemRole is missing");
+        }
+
+        const membership = await tx.membership.create({
+          data: {
+            agencyId: agency.id,
+            userId,
+            roleId: ownerRole.id,
+            status: "ACTIVE",
+            roles: {
+              create: {
+                roleId: ownerRole.id,
+              },
             },
           },
-        },
-      });
-
-      if (sessionId) {
-        await tx.session.update({
-          where: { id: sessionId },
-          data: { activeAgencyId: agency.id },
         });
-      }
 
-      await tx.outboxEvent.create({
-        data: {
-          aggregateId: agency.id,
-          aggregateType: "Agency",
-          eventType: "AgencyCreated",
-          payload: {
-            agencyId: agency.id,
-            ownerMembershipId: membership.id,
-            createdBy: authUserId,
-            slug: agency.slug,
-            displayName: agency.displayName,
-            occurredAt: new Date().toISOString(),
+        if (sessionId) {
+          await tx.session.update({
+            where: { id: sessionId },
+            data: { activeAgencyId: agency.id },
+          });
+        }
+
+        await tx.outboxEvent.create({
+          data: {
+            aggregateId: agency.id,
+            aggregateType: "Agency",
+            eventType: "AgencyCreated",
+            payload: {
+              agencyId: agency.id,
+              ownerMembershipId: membership.id,
+              createdBy: authUserId,
+              slug: agency.slug,
+              displayName: agency.displayName,
+              occurredAt: new Date().toISOString(),
+              correlationId,
+            },
             correlationId,
           },
-          correlationId,
-        },
-      });
+        });
+        if (trialClaim.count === 1)
+          await tx.auditEvent.create({
+            data: {
+              agencyId: agency.id,
+              actorId: userId,
+              eventType: "TrialStarted",
+              entityType: "AgencySubscription",
+              entityId: agency.id,
+              metadataJson: {
+                source: "SELF_SERVICE",
+                startsAt: trialNow.toISOString(),
+                trialEndsAt: trialEndsAt.toISOString(),
+              },
+            },
+          });
 
-      return { agency, membership };
-    });
+        return { agency, membership };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   async findMembershipsByUserId(userId: string): Promise<any[]> {

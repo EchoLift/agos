@@ -9,7 +9,10 @@ import { ApiModule } from "./api.module";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 async function bootstrap() {
-  const app = await NestFactory.create(ApiModule, { bufferLogs: true });
+  const app = await NestFactory.create(ApiModule, {
+    bufferLogs: true,
+    rawBody: true,
+  });
   app.useLogger(app.get(Logger));
 
   const config = app.get(ConfigService);
@@ -67,9 +70,11 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup("docs", app, document);
 
-  app.getHttpAdapter().get("/", (_req, res) =>
-    res.json({ status: "ok", api: "/api", docs: "/api/docs" }),
-  );
+  app
+    .getHttpAdapter()
+    .get("/", (_req, res) =>
+      res.json({ status: "ok", api: "/api", docs: "/api/docs" }),
+    );
 
   const port = Number(
     config.get<string>("PORT") ?? config.get<string>("API_PORT") ?? 4000,

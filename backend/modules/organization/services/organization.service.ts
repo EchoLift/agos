@@ -26,6 +26,10 @@ import { EventBusService } from "@packages/events/event-bus.service";
 import { DomainEvents } from "@packages/events/domain-event";
 import * as crypto from "crypto";
 import { EntitlementService } from "@modules/entitlement/entitlement.service";
+import {
+  BILLING_PERIODS,
+  TRIAL_TEAM_LIMIT,
+} from "@modules/billing/billing.constants";
 
 const INVITATION_RESEND_COOLDOWN_MS = 48 * 60 * 60 * 1000;
 type ClientAccessSummary = {
@@ -173,7 +177,7 @@ export class OrganizationService implements OnModuleInit {
 
     const context = this.requestContext.get();
 
-    const { agency, membership } = await this.repository.createAgencyWithOwner(
+    const created = await this.repository.createAgencyWithOwner(
       dto.displayName,
       slug,
       user.id,
@@ -181,6 +185,7 @@ export class OrganizationService implements OnModuleInit {
       sessionId,
       context?.correlationId,
     );
+    const { agency, membership } = created;
 
     return {
       agency: {
@@ -300,6 +305,8 @@ export class OrganizationService implements OnModuleInit {
     if (!inviterMembership) {
       throw new ForbiddenException("You are not a member of this agency.");
     }
+
+    await this.ensureTeamCapacity(agencyId);
 
     const role = await this.repository.findRoleById(dto.roleId);
     if (!role) {
@@ -518,6 +525,7 @@ export class OrganizationService implements OnModuleInit {
     }
 
     const context = this.requestContext.get();
+    await this.ensureTeamCapacity(invitation.agencyId);
     const membership = await this.repository.acceptInvitation(
       invitation.id,
       invitation.agencyId,
@@ -530,6 +538,29 @@ export class OrganizationService implements OnModuleInit {
     );
 
     return this.acceptInvitationResponse(membership, invitation);
+  }
+
+  private async ensureTeamCapacity(agencyId: string) {
+    const subscription = await this.prisma.agencySubscription.findUnique({
+      where: { agencyId },
+    });
+    const limit =
+      subscription?.status === "TRIAL"
+        ? TRIAL_TEAM_LIMIT
+        : subscription?.plan
+          ? ((BILLING_PERIODS as any)[subscription.plan]?.teamLimit ?? null)
+          : null;
+    if (limit === null) return;
+    const active = await this.prisma.membership.count({
+      where: { agencyId, status: "ACTIVE", deletedAt: null },
+    });
+    if (active >= limit)
+      throw new ConflictException({
+        message: "Agency team capacity has been reached.",
+        currentActiveMembers: active,
+        selectedPlanLimit: limit,
+        membersToRemove: active - limit + 1,
+      });
   }
 
   private acceptInvitationResponse(membership: any, invitation: any) {
