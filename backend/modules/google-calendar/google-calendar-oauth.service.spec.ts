@@ -1,5 +1,6 @@
 import { UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import {describe, expect, it, beforeEach, jest} from "@jest/globals";
 import { CryptoService } from "@modules/auth/services/crypto.service";
 import { GoogleCalendarOAuthService } from "./google-calendar-oauth.service";
 
