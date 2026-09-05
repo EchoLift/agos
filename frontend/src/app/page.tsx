@@ -3,7 +3,13 @@ import Particles from "@/components/Particles";
 import RootRedirect from "@/components/RootRedirect";
 import MobileNav from "@/components/MobileNav";
 
-const problemItems = ["WhatsApp", "Excel", "Notion", "Google Drive", "Phone calls"];
+const problemItems = [
+  "WhatsApp",
+  "Excel",
+  "Notion",
+  "Google Drive",
+  "Phone calls",
+];
 
 const outcomes = [
   "Lost approvals",
@@ -57,8 +63,7 @@ const features = [
   },
   {
     title: "Google Calendar",
-    description:
-      "Optional sync for eligible assignments and deadlines.",
+    description: "Optional sync for eligible assignments and deadlines.",
   },
 ];
 
@@ -213,15 +218,20 @@ export default function Home() {
                 AGENCIE
               </span>
               <span className="block text-2xl font-semibold tracking-tight text-foreground sm:text-3xl mt-2">
-                Run every client, campaign, and creative workflow from one place.
+                Run every client, campaign, and creative workflow from one
+                place.
               </span>
             </h1>
             <p className="mt-5 text-base font-medium leading-relaxed text-foreground/90">
-              Replace scattered WhatsApp follow-ups, spreadsheets, and status calls with clear ownership, deadlines, approvals, and production workflows.
+              Replace scattered WhatsApp follow-ups, spreadsheets, and status
+              calls with clear ownership, deadlines, approvals, and production
+              workflows.
             </p>
 
             <p className="mt-3 text-base leading-7 text-muted-foreground">
-              From campaign planning to scripts, shoots, edits, reviews and publishing, AGENCIE keeps everyone clear on what they own and what happens next.
+              From campaign planning to scripts, shoots, edits, reviews and
+              publishing, AGENCIE keeps everyone clear on what they own and what
+              happens next.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
@@ -251,8 +261,12 @@ export default function Home() {
             <div className="rounded-none border border-none bg-card p-0 backdrop-blur">
               <div className="mb-5 flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Operations overview</p>
-                  <p className="text-lg font-semibold text-foreground">This week at a glance</p>
+                  <p className="text-sm text-muted-foreground">
+                    Operations overview
+                  </p>
+                  <p className="text-lg font-semibold text-foreground">
+                    This week at a glance
+                  </p>
                 </div>
                 <div className="rounded-full bg-emerald-500/15 px-3 py-1 text-sm text-emerald-300">
                   12 on track
@@ -260,20 +274,32 @@ export default function Home() {
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="rounded-2xl border border-border bg-background p-4">
-                  <p className="text-sm text-muted-foreground">Waiting approval</p>
-                  <p className="mt-2 text-3xl font-semibold text-foreground">12</p>
+                  <p className="text-sm text-muted-foreground">
+                    Waiting approval
+                  </p>
+                  <p className="mt-2 text-3xl font-semibold text-foreground">
+                    12
+                  </p>
                 </div>
                 <div className="rounded-2xl border border-border bg-background p-4">
                   <p className="text-sm text-muted-foreground">Blocked</p>
-                  <p className="mt-2 text-3xl font-semibold text-orange-400">3</p>
+                  <p className="mt-2 text-3xl font-semibold text-orange-400">
+                    3
+                  </p>
                 </div>
                 <div className="rounded-2xl border border-border bg-background p-4">
                   <p className="text-sm text-muted-foreground">Due today</p>
-                  <p className="mt-2 text-3xl font-semibold text-foreground">5</p>
+                  <p className="mt-2 text-3xl font-semibold text-foreground">
+                    5
+                  </p>
                 </div>
                 <div className="rounded-2xl border border-border bg-background p-4">
-                  <p className="text-sm text-muted-foreground">Publishing this week</p>
-                  <p className="mt-2 text-3xl font-semibold text-emerald-400">8</p>
+                  <p className="text-sm text-muted-foreground">
+                    Publishing this week
+                  </p>
+                  <p className="mt-2 text-3xl font-semibold text-emerald-400">
+                    8
+                  </p>
                 </div>
               </div>
             </div>
@@ -284,23 +310,44 @@ export default function Home() {
         {/* ── Trust & Security ── */}
         <section className="mx-auto max-w-7xl mt-2 px-1 py-1 lg:px-2">
           <div className="rounded-none border-t bg-card p-1 lg:p-2">
-            <p className="text-lg font-medium uppercase tracking-[0.2em] text-muted-foreground">Built for agency boundaries</p>
+            <p className="text-lg font-medium uppercase tracking-[0.2em] text-muted-foreground">
+              Built for agency boundaries
+            </p>
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-border bg-background p-4">
-                <p className="font-semibold text-foreground">Multi-agency isolation</p>
-                <p className="mt-2 text-sm text-muted-foreground">Each agency operates in an isolated workspace so client data stays private.</p>
+                <p className="font-semibold text-foreground">
+                  Multi-agency isolation
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Each agency operates in an isolated workspace so client data
+                  stays private.
+                </p>
               </div>
               <div className="rounded-2xl border border-border bg-background p-4">
-                <p className="font-semibold text-foreground">Role-based access</p>
-                <p className="mt-2 text-sm text-muted-foreground">Owners, managers, production roles and clients see capabilities appropriate to them.</p>
+                <p className="font-semibold text-foreground">
+                  Role-based access
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Owners, managers, production roles and clients see
+                  capabilities appropriate to them.
+                </p>
               </div>
               <div className="rounded-2xl border border-border bg-background p-4">
-                <p className="font-semibold text-foreground">Client-scoped access</p>
-                <p className="mt-2 text-sm text-muted-foreground">Invite clients with limited scopes for review and approval without exposing internal operations.</p>
+                <p className="font-semibold text-foreground">
+                  Client-scoped access
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Invite clients with limited scopes for review and approval
+                  without exposing internal operations.
+                </p>
               </div>
               <div className="rounded-2xl border border-border bg-background p-4">
-                <p className="font-semibold text-foreground">Google authentication</p>
-                <p className="mt-2 text-sm text-muted-foreground">Secure sign-in and optional Calendar sync for convenience.</p>
+                <p className="font-semibold text-foreground">
+                  Google authentication
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Secure sign-in and optional Calendar sync for convenience.
+                </p>
               </div>
             </div>
           </div>
@@ -315,7 +362,8 @@ export default function Home() {
                 One model for every piece of client work.
               </h2>
               <p className="mt-4 text-base leading-7 text-muted-foreground">
-                Client → Plan → Production → Review → Publish — with ownership, deadlines, and clear next actions at every step.
+                Client → Plan → Production → Review → Publish — with ownership,
+                deadlines, and clear next actions at every step.
               </p>
             </div>
             <div className="mt-8 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -352,9 +400,9 @@ export default function Home() {
                 ))}
               </ul>
               <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                AGENCIE replaces fragmented agency coordination with a structured
-                workflow where client work, ownership, deadlines, production
-                status, reviews, and approvals stay connected.
+                AGENCIE replaces fragmented agency coordination with a
+                structured workflow where client work, ownership, deadlines,
+                production status, reviews, and approvals stay connected.
               </p>
             </div>
             <div className="rounded-none border-t bg-background p-0">
@@ -363,7 +411,10 @@ export default function Home() {
               </p>
               <ul className="mt-2 space-y-2 text-lg text-foreground">
                 {outcomes.map((item) => (
-                  <li key={item} className="rounded-xl border border-border bg-card px-4 py-3">
+                  <li
+                    key={item}
+                    className="rounded-xl border border-border bg-card px-4 py-3"
+                  >
                     {item}
                   </li>
                 ))}
@@ -373,7 +424,10 @@ export default function Home() {
         </section>
 
         {/* ── How AGENCIE works ── */}
-        <section id="how-it-works" className="mx-auto max-w-7xl px-1 py-1 lg:px-1">
+        <section
+          id="how-it-works"
+          className="mx-auto max-w-7xl px-1 py-1 lg:px-1"
+        >
           <div className="rounded-none border-t bg-card p-1 lg:p-2">
             <div className="max-w-2xl">
               <p className="text-lg font-medium uppercase tracking-[0.2em] text-muted-foreground">
@@ -392,7 +446,9 @@ export default function Home() {
                   <span className="font-mono text-xs font-semibold text-indigo-400">
                     {step.number}
                   </span>
-                  <p className="mt-2 font-semibold text-foreground">{step.title}</p>
+                  <p className="mt-2 font-semibold text-foreground">
+                    {step.title}
+                  </p>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
                     {step.description}
                   </p>
@@ -409,21 +465,38 @@ export default function Home() {
               <p className="text-lg font-medium uppercase tracking-[0.2em] text-muted-foreground">
                 How you can run work
               </p>
-              <h2 className="mt-3 text-3xl font-semibold text-foreground">Two ways to run work: Campaigns or Gigs</h2>
+              <h2 className="mt-3 text-3xl font-semibold text-foreground">
+                Two ways to run work: Campaigns or Gigs
+              </h2>
               <p className="mt-4 text-base leading-7 text-muted-foreground">
-                Campaigns for structured, multi-stage client work; Gigs for fast standalone assignments that need an owner, deadline, and review.
+                Campaigns for structured, multi-stage client work; Gigs for fast
+                standalone assignments that need an owner, deadline, and review.
               </p>
             </div>
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-border bg-background p-6">
-                <p className="text-sm font-medium text-muted-foreground">Campaigns</p>
-                <p className="mt-2 font-semibold text-foreground">Structured workflows for launches and retainers.</p>
-                <p className="mt-2 text-sm text-muted-foreground">Plan multiple deliverables, assign owners, and track progress across production stages.</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Campaigns
+                </p>
+                <p className="mt-2 font-semibold text-foreground">
+                  Structured workflows for launches and retainers.
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Plan multiple deliverables, assign owners, and track progress
+                  across production stages.
+                </p>
               </div>
               <div className="rounded-2xl border border-border bg-background p-6">
-                <p className="text-sm font-medium text-muted-foreground">Gigs</p>
-                <p className="mt-2 font-semibold text-foreground">Quick assignments with a clear owner and deadline.</p>
-                <p className="mt-2 text-sm text-muted-foreground">Great for one-off tasks, freelance exchanges, or small requests that need review and approval.</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Gigs
+                </p>
+                <p className="mt-2 font-semibold text-foreground">
+                  Quick assignments with a clear owner and deadline.
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Great for one-off tasks, freelance exchanges, or small
+                  requests that need review and approval.
+                </p>
               </div>
             </div>
           </div>
@@ -440,7 +513,9 @@ export default function Home() {
                 Know exactly where every deliverable stands.
               </h2>
               <p className="mt-4 text-base leading-7 text-muted-foreground">
-                Follow content from writing through review, production, editing, approval and publishing without asking the team for status updates.
+                Follow content from writing through review, production, editing,
+                approval and publishing without asking the team for status
+                updates.
               </p>
               <div className="mt-8 space-y-3">
                 {workflowRows.map((row) => (
@@ -450,13 +525,16 @@ export default function Home() {
                   >
                     <div>
                       <p className="font-medium text-foreground">{row.label}</p>
-                      <p className="text-sm text-muted-foreground">{row.status}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {row.status}
+                      </p>
                     </div>
                     <div
-                      className={`rounded-full px-3 py-1 text-sm ${row.done
+                      className={`rounded-full px-3 py-1 text-sm ${
+                        row.done
                           ? "bg-emerald-500/15 text-emerald-300"
                           : "bg-muted text-muted-foreground"
-                        }`}
+                      }`}
                     >
                       {row.done ? "✓" : "⏳"}
                     </div>
@@ -487,7 +565,10 @@ export default function Home() {
         </section>
 
         {/* ── Features ── */}
-        <section id="features" className="mx-auto border-t max-w-7xl px-1 py-1 lg:px-2">
+        <section
+          id="features"
+          className="mx-auto border-t max-w-7xl px-1 py-1 lg:px-2"
+        >
           <div className="mb-2">
             <p className="text-lg font-medium uppercase tracking-[0.2em] text-muted-foreground">
               Features
@@ -495,8 +576,13 @@ export default function Home() {
           </div>
           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {features.map((feature) => (
-              <div key={feature.title} className="rounded-2xl border border-border bg-card p-2">
-                <h3 className="text-xl font-semibold text-foreground">{feature.title}</h3>
+              <div
+                key={feature.title}
+                className="rounded-2xl border border-border bg-card p-2"
+              >
+                <h3 className="text-xl font-semibold text-foreground">
+                  {feature.title}
+                </h3>
                 <p className="mt-3 text-sm leading-7 text-muted-foreground">
                   {feature.description}
                 </p>
@@ -514,7 +600,7 @@ export default function Home() {
                 </p>
 
                 <h2 className="mt-3 text-3xl font-semibold text-foreground">
-                  You shouldn't need a training call to understand AGENCIE.
+                  You shouldn&apos;t need a training call to understand AGENCIE.
                 </h2>
 
                 <p className="mt-4 text-base leading-7 text-muted-foreground">
@@ -524,8 +610,8 @@ export default function Home() {
                 </p>
 
                 <p className="mt-3 text-base leading-7 text-muted-foreground">
-                  Start with the basics or jump directly to the workflow you're trying
-                  to complete.
+                  Start with the basics or jump directly to the workflow you&apos;re
+                  trying to complete.
                 </p>
 
                 <Link
@@ -560,7 +646,10 @@ export default function Home() {
         </section>
 
         {/* ── Google Calendar integration ── */}
-        <section id="google-calendar" className="mx-auto max-w-7xl px-1 py-1 lg:px-2">
+        <section
+          id="google-calendar"
+          className="mx-auto max-w-7xl px-1 py-1 lg:px-2"
+        >
           <div className="rounded-none border-t bg-card p-2 lg:p-2">
             <div className="grid gap-10 lg:grid-cols-[1fr_auto]">
               <div className="max-w-2xl">
@@ -583,10 +672,10 @@ export default function Home() {
                   keep your AGENCIE work schedule available wherever you work.
                 </p>
                 <p className="mt-3 text-base leading-7 text-muted-foreground">
-                  When Google Calendar integration is enabled, AGENCIE can create a
-                  dedicated AGENCIE calendar and sync eligible assigned work,
-                  deadlines, shoots, reviews, and publishing schedules to it.
-                  AGENCIE creates and manages calendar events only after you
+                  When Google Calendar integration is enabled, AGENCIE can
+                  create a dedicated AGENCIE calendar and sync eligible assigned
+                  work, deadlines, shoots, reviews, and publishing schedules to
+                  it. AGENCIE creates and manages calendar events only after you
                   explicitly connect your Google account.
                 </p>
                 <p className="mt-4 text-sm text-muted-foreground">
@@ -596,10 +685,22 @@ export default function Home() {
               </div>
               <div className="flex flex-col gap-4 self-center lg:w-56">
                 {[
-                  { label: "Assigned work", color: "bg-indigo-500/15 text-indigo-300" },
-                  { label: "Shoot schedules", color: "bg-violet-500/15 text-violet-300" },
-                  { label: "Review deadlines", color: "bg-sky-500/15 text-sky-300" },
-                  { label: "Publishing dates", color: "bg-emerald-500/15 text-emerald-300" },
+                  {
+                    label: "Assigned work",
+                    color: "bg-indigo-500/15 text-indigo-300",
+                  },
+                  {
+                    label: "Shoot schedules",
+                    color: "bg-violet-500/15 text-violet-300",
+                  },
+                  {
+                    label: "Review deadlines",
+                    color: "bg-sky-500/15 text-sky-300",
+                  },
+                  {
+                    label: "Publishing dates",
+                    color: "bg-emerald-500/15 text-emerald-300",
+                  },
                 ].map((item) => (
                   <div
                     key={item.label}
@@ -627,22 +728,31 @@ export default function Home() {
                 See what needs attention before someone has to ask.
               </h2>
               <p className="mt-4 text-lg leading-8 text-muted-foreground">
-                A concise operational view for owners, managers, and production leads showing pending approvals, blockers, and urgent deadlines.
+                A concise operational view for owners, managers, and production
+                leads showing pending approvals, blockers, and urgent deadlines.
               </p>
             </div>
             <div className="rounded-none border border-none bg-none p-0">
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="rounded-2xl border border-border bg-background p-4">
-                  <p className="text-sm text-muted-foreground">Waiting approval</p>
-                  <p className="mt-2 text-2xl font-semibold text-foreground">12</p>
+                  <p className="text-sm text-muted-foreground">
+                    Waiting approval
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold text-foreground">
+                    12
+                  </p>
                 </div>
                 <div className="rounded-2xl border border-border bg-background p-4">
                   <p className="text-sm text-muted-foreground">Blocked</p>
-                  <p className="mt-2 text-2xl font-semibold text-orange-400">3</p>
+                  <p className="mt-2 text-2xl font-semibold text-orange-400">
+                    3
+                  </p>
                 </div>
                 <div className="rounded-2xl border border-border bg-background p-4">
                   <p className="text-sm text-muted-foreground">Due today</p>
-                  <p className="mt-2 text-2xl font-semibold text-foreground">5</p>
+                  <p className="mt-2 text-2xl font-semibold text-foreground">
+                    5
+                  </p>
                 </div>
               </div>
               <div className="mt-4 rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
@@ -672,19 +782,46 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── Early Access ── */}
+        {/* ── Pricing ── */}
         <section id="pricing" className="mx-auto max-w-7xl px-1 py-1 lg:px-2">
           <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/10 p-2 lg:p-12">
-            <div className="max-w-2xl">
+            <div className="max-w-3xl">
               <p className="text-sm font-medium uppercase tracking-[0.2em] text-indigo-300">
-                Early Access
+                Billing periods
               </p>
               <h2 className="mt-3 text-3xl font-semibold text-foreground">
-                Built with the first agencies, not just for them.
+                All features are included.
               </h2>
               <p className="mt-4 text-lg leading-8 text-muted-foreground">
-                AGENCIE supports client management, campaigns, Gigs, production workflows, team assignments, reviews, calendars, and role-based access. Join early agencies using the product in real operations and help shape what gets built next.
+                Start with a 14-day free trial. Continue with the billing period
+                and team capacity that fits your agency. Payments are one-time
+                purchases in INR with no automatic renewal.
               </p>
+            </div>
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
+              {[
+                ["3 Months", "₹3,499", "Up to 50 team members"],
+                ["6 Months", "₹5,999", "Up to 120 team members"],
+                ["12 Months", "₹9,999", "Unlimited team members"],
+              ].map(([period, price, capacity]) => (
+                <div
+                  key={period}
+                  className="rounded-2xl border border-border bg-background/80 p-6"
+                >
+                  <p className="text-sm font-semibold text-indigo-300">
+                    {period}
+                  </p>
+                  <p className="mt-3 text-3xl font-bold text-foreground">
+                    {price}
+                  </p>
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    {capacity}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    All features
+                  </p>
+                </div>
+              ))}
             </div>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link
@@ -715,7 +852,9 @@ export default function Home() {
                   key={item.question}
                   className="rounded-2xl border border-border bg-background p-5"
                 >
-                  <p className="font-semibold text-foreground">{item.question}</p>
+                  <p className="font-semibold text-foreground">
+                    {item.question}
+                  </p>
                   <p className="mt-2 text-sm leading-7 text-muted-foreground">
                     {item.answer}
                   </p>
@@ -745,17 +884,26 @@ export default function Home() {
               </p>
               <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
                 <li>
-                  <a href="#features" className="transition hover:text-foreground">
+                  <a
+                    href="#features"
+                    className="transition hover:text-foreground"
+                  >
                     Features
                   </a>
                 </li>
                 <li>
-                  <a href="#pricing" className="transition hover:text-foreground">
-                    Early Access
+                  <a
+                    href="#pricing"
+                    className="transition hover:text-foreground"
+                  >
+                    Pricing
                   </a>
                 </li>
                 <li>
-                  <Link href="/help" className="transition hover:text-foreground">
+                  <Link
+                    href="/help"
+                    className="transition hover:text-foreground"
+                  >
                     Documentation
                   </Link>
                 </li>
@@ -767,21 +915,35 @@ export default function Home() {
               </p>
               <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
                 <li>
-                  <a
-                    href="mailto:echoliftagency@gmail.com"
+                  <Link
+                    href="/contact"
                     className="transition hover:text-foreground"
                   >
-                    Contact
-                  </a>
+                    Contact Us
+                  </Link>
                 </li>
                 <li>
-                  <Link href="/privacy" className="transition hover:text-foreground">
+                  <Link
+                    href="/privacy"
+                    className="transition hover:text-foreground"
+                  >
                     Privacy Policy
                   </Link>
                 </li>
                 <li>
-                  <Link href="/terms" className="transition hover:text-foreground">
+                  <Link
+                    href="/terms"
+                    className="transition hover:text-foreground"
+                  >
                     Terms of Service
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/refunds-cancellations"
+                    className="transition hover:text-foreground"
+                  >
+                    Refunds &amp; Cancellations
                   </Link>
                 </li>
               </ul>
