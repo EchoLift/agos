@@ -18,4 +18,22 @@ describe("CashfreeService", () => {
       UnauthorizedException,
     );
   });
+
+  it("accepts Cashfree dashboard timestamps expressed in Unix seconds", () => {
+    const secret = "secret";
+    const service = new CashfreeService({
+      get: (key: string) =>
+        key === "CASHFREE_CLIENT_SECRET" ? secret : "sandbox",
+    } as never);
+    const raw = Buffer.from('{"type":"TEST"}');
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = crypto
+      .createHmac("sha256", secret)
+      .update(timestamp + raw.toString())
+      .digest("base64");
+
+    expect(() =>
+      service.verifyWebhook(raw, timestamp, signature),
+    ).not.toThrow();
+  });
 });

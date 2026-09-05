@@ -67,9 +67,13 @@ export class CashfreeService {
     const secret = this.clientSecret;
     if (!secret || !timestamp || !signature)
       throw new UnauthorizedException("Invalid Cashfree webhook signature.");
-    const timestampMs = Number(timestamp);
+    const timestampValue = Number(timestamp);
+    const timestampMs =
+      timestampValue < 1_000_000_000_000
+        ? timestampValue * 1_000
+        : timestampValue;
     if (
-      !Number.isFinite(timestampMs) ||
+      !Number.isFinite(timestampValue) ||
       Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000
     )
       throw new UnauthorizedException("Stale Cashfree webhook timestamp.");
