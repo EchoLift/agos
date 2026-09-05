@@ -46,3 +46,6 @@ yarn-error.log*
 frontend/.git/
 .vercel
 .env*
+
+.env.example
+env.example
