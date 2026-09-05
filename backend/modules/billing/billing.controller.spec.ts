@@ -8,6 +8,14 @@ describe("BillingController webhook", () => {
 
   beforeEach(() => jest.clearAllMocks());
 
+  it("answers dashboard endpoint checks without processing a payment", () => {
+    expect(controller.webhookHealth()).toEqual({
+      ok: true,
+      service: "cashfree-webhook",
+    });
+    expect(service.webhook).not.toHaveBeenCalled();
+  });
+
   it("rejects an empty webhook body as unauthorized", async () => {
     await expect(
       controller.webhook({ body: {} } as any, "timestamp", "signature"),

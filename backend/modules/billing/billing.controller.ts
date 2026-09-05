@@ -48,6 +48,11 @@ export class BillingController {
   ) {
     return this.service.order(u.userId, id);
   }
+  @Get("cashfree/webhook")
+  @Public()
+  webhookHealth() {
+    return { ok: true, service: "cashfree-webhook" };
+  }
   @Post("cashfree/webhook") @Public() async webhook(
     @Req() req: RawBodyRequest<Request>,
     @Headers("x-webhook-timestamp") ts: string,
