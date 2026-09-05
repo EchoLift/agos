@@ -36,4 +36,40 @@ describe("CashfreeService", () => {
       service.verifyWebhook(raw, timestamp, signature),
     ).not.toThrow();
   });
+
+  it("retrieves payment attempts for return-page reconciliation", async () => {
+    const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          payment_status: "USER_DROPPED",
+          payment_time: "2026-09-05T20:00:00+05:30",
+        },
+      ],
+    } as Response);
+    const service = new CashfreeService({
+      get: (key: string) =>
+        ({
+          CASHFREE_CLIENT_ID: "client-id",
+          CASHFREE_CLIENT_SECRET: "secret",
+          CASHFREE_ENVIRONMENT: "sandbox",
+        })[key],
+    } as never);
+
+    await expect(service.getOrderPayments("agencie/order id")).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ payment_status: "USER_DROPPED" }),
+      ]),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://sandbox.cashfree.com/pg/orders/agencie%2Forder%20id/payments",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "x-api-version": CashfreeService.apiVersion,
+          "x-client-id": "client-id",
+        }),
+      }),
+    );
+    fetchMock.mockRestore();
+  });
 });

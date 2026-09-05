@@ -8,7 +8,7 @@ describe("billing launch policy", () => {
   it("keeps backend-authoritative price and capacity snapshots", () => {
     expect(BILLING_PERIODS[BillingPeriod.THREE_MONTHS]).toEqual({
       months: 3,
-      amountMinor: 349900,
+      amountMinor: 100,
       teamLimit: 50,
     });
     expect(BILLING_PERIODS[BillingPeriod.SIX_MONTHS].teamLimit).toBe(120);

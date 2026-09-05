@@ -222,12 +222,52 @@ export class BillingService {
     }
   }
   async order(userId: string, id: string) {
-    const o = await this.prisma.agencyPaymentOrder.findUnique({
+    let o = await this.prisma.agencyPaymentOrder.findUnique({
       where: { id },
       include: { agency: { select: { displayName: true, name: true } } },
     });
     if (!o) throw new NotFoundException();
     await this.billingMembership(o.agencyId, userId);
+    if (o.status === PaymentOrderStatus.PENDING) {
+      try {
+        const payments = await this.cashfree.getOrderPayments(
+          o.cashfreeOrderId,
+        );
+        const latest = [...payments]
+          .filter((payment) => payment.payment_time)
+          .sort(
+            (a, b) =>
+              new Date(b.payment_time!).getTime() -
+              new Date(a.payment_time!).getTime(),
+          )[0];
+        const status =
+          latest?.payment_status === "FAILED"
+            ? PaymentOrderStatus.FAILED
+            : ["USER_DROPPED", "CANCELLED", "VOID"].includes(
+                  latest?.payment_status,
+                )
+              ? PaymentOrderStatus.CANCELLED
+              : null;
+        if (status) {
+          o = await this.prisma.agencyPaymentOrder.update({
+            where: { id: o.id },
+            data: {
+              status,
+              providerFailureCode: latest?.error_details?.error_code,
+              providerFailureReason:
+                latest?.error_details?.error_description ??
+                latest?.payment_message,
+              processedAt: new Date(),
+            },
+            include: {
+              agency: { select: { displayName: true, name: true } },
+            },
+          });
+        }
+      } catch {
+        // Webhooks remain authoritative; keep polling if provider lookup fails.
+      }
+    }
     return { ...o, paymentSessionId: undefined };
   }
   async webhook(payload: any) {

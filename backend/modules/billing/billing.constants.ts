@@ -3,7 +3,7 @@ import { BillingPeriod } from "@prisma/client";
 export const BILLING_PERIODS = {
   [BillingPeriod.THREE_MONTHS]: {
     months: 3,
-    amountMinor: 349900,
+    amountMinor: 100,
     teamLimit: 50,
   },
   [BillingPeriod.SIX_MONTHS]: {

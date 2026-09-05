@@ -63,6 +63,27 @@ export class CashfreeService {
       payment_session_id: string;
     };
   }
+  async getOrderPayments(orderId: string) {
+    const response = await fetch(
+      `${this.baseUrl}/orders/${encodeURIComponent(orderId)}/payments`,
+      { headers: this.headers() },
+    );
+    const data = (await response.json()) as any;
+    if (!response.ok)
+      throw new InternalServerErrorException({
+        message: "Unable to retrieve Cashfree payment status.",
+        providerCode: data?.code,
+      });
+    return data as Array<{
+      payment_status: string;
+      payment_time?: string;
+      payment_message?: string;
+      error_details?: {
+        error_code?: string;
+        error_description?: string;
+      } | null;
+    }>;
+  }
   verifyWebhook(rawBody: Buffer, timestamp: string, signature: string) {
     const secret = this.clientSecret;
     if (!secret || !timestamp || !signature)
