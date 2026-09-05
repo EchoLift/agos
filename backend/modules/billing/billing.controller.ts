@@ -7,6 +7,7 @@ import {
   Post,
   RawBodyRequest,
   Req,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import type { Request } from "express";
@@ -52,7 +53,8 @@ export class BillingController {
     @Headers("x-webhook-timestamp") ts: string,
     @Headers("x-webhook-signature") sig: string,
   ) {
-    if (!req.rawBody) throw new Error("Raw body unavailable");
+    if (!req.rawBody?.length)
+      throw new UnauthorizedException("Invalid Cashfree webhook payload.");
     this.cashfree.verifyWebhook(req.rawBody, ts, sig);
     return this.service.webhook(req.body);
   }

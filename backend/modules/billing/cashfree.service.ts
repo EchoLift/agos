@@ -20,9 +20,21 @@ export class CashfreeService {
       ? "https://api.cashfree.com/pg"
       : "https://sandbox.cashfree.com/pg";
   }
+  private get clientId() {
+    return (
+      this.config.get<string>("CASHFREE_CLIENT_ID") ||
+      this.config.get<string>("CASHFREE_APPID")
+    );
+  }
+  private get clientSecret() {
+    return (
+      this.config.get<string>("CASHFREE_CLIENT_SECRET") ||
+      this.config.get<string>("CASHFREE_SECRET_KEY")
+    );
+  }
   private headers(idempotencyKey?: string) {
-    const clientId = this.config.get<string>("CASHFREE_CLIENT_ID");
-    const secret = this.config.get<string>("CASHFREE_CLIENT_SECRET");
+    const clientId = this.clientId;
+    const secret = this.clientSecret;
     if (!clientId || !secret)
       throw new InternalServerErrorException("Cashfree is not configured.");
     return {
@@ -52,7 +64,7 @@ export class CashfreeService {
     };
   }
   verifyWebhook(rawBody: Buffer, timestamp: string, signature: string) {
-    const secret = this.config.get<string>("CASHFREE_CLIENT_SECRET");
+    const secret = this.clientSecret;
     if (!secret || !timestamp || !signature)
       throw new UnauthorizedException("Invalid Cashfree webhook signature.");
     const timestampMs = Number(timestamp);
