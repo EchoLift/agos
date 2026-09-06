@@ -94,7 +94,7 @@ function PlansSection({ plans }: { plans: AdminPricingPlan[] }) {
     <section className="mt-6">
       <button
         onClick={() => setAdding(true)}
-        className="rounded-xl bg-indigo-500 px-4 py-2 font-semibold"
+        className="rounded-xl bg-indigo-500 px-4 py-2 font-semibold text-white"
       >
         Add plan
       </button>
@@ -288,7 +288,7 @@ function PlanForm({
         <button
           disabled={save.isPending || !name || (!plan && !code)}
           onClick={() => save.mutate()}
-          className="rounded-lg bg-indigo-500 px-4 py-2 font-semibold disabled:opacity-50"
+          className="rounded-lg bg-indigo-500 px-4 py-2 font-semibold text-white disabled:opacity-50"
         >
           Save
         </button>
@@ -328,7 +328,7 @@ function DiscountsSection({
     <section className="mt-6">
       <button
         onClick={() => setAdding(true)}
-        className="rounded-xl bg-indigo-500 px-4 py-2 font-semibold"
+        className="rounded-xl bg-indigo-500 px-4 py-2 font-semibold text-white"
       >
         Add discount
       </button>
@@ -450,62 +450,87 @@ function DiscountForm({
         {discount ? "Edit discount" : "Add discount"}
       </h2>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <input
-          className={inputClass}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Name"
-        />
-        <select
-          className={inputClass}
-          value={type}
-          onChange={(e) => setType(e.target.value as typeof type)}
-        >
-          <option value="PERCENTAGE">Percentage</option>
-          <option value="FIXED_AMOUNT">Fixed amount</option>
-        </select>
-        <input
-          className={inputClass}
-          type="number"
-          min="0.01"
-          max={type === "PERCENTAGE" ? 100 : undefined}
-          step="0.01"
-          value={value}
-          onChange={(e) => setValue(Number(e.target.value))}
-          placeholder={type === "PERCENTAGE" ? "Percent" : "INR amount"}
-        />
-        <input
-          className={inputClass}
-          type="datetime-local"
-          value={starts}
-          onChange={(e) => setStarts(e.target.value)}
-        />
-        <input
-          className={inputClass}
-          type="datetime-local"
-          value={ends}
-          onChange={(e) => setEnds(e.target.value)}
-        />
-        <input
-          className={inputClass}
-          type="number"
-          min="1"
-          value={globalMax ?? ""}
-          onChange={(e) =>
-            setGlobalMax(e.target.value ? Number(e.target.value) : null)
-          }
-          placeholder="Global max (optional)"
-        />
-        <input
-          className={inputClass}
-          type="number"
-          min="1"
-          value={agencyMax ?? ""}
-          onChange={(e) =>
-            setAgencyMax(e.target.value ? Number(e.target.value) : null)
-          }
-          placeholder="Per-agency max (optional)"
-        />
+        <label className="grid gap-1.5 text-sm text-zinc-300">
+          Discount name
+          <input
+            className={inputClass}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="For example, Diwali Offer"
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm text-zinc-300">
+          Discount type
+          <select
+            className={inputClass}
+            value={type}
+            onChange={(e) => setType(e.target.value as typeof type)}
+          >
+            <option value="PERCENTAGE">Percentage</option>
+            <option value="FIXED_AMOUNT">Fixed amount</option>
+          </select>
+        </label>
+        <label className="grid gap-1.5 text-sm text-zinc-300">
+          {type === "PERCENTAGE"
+            ? "Discount percentage"
+            : "Discount amount (INR)"}
+          <input
+            className={inputClass}
+            type="number"
+            min="0.01"
+            max={type === "PERCENTAGE" ? 100 : undefined}
+            step="0.01"
+            value={value}
+            onChange={(e) => setValue(Number(e.target.value))}
+            placeholder={
+              type === "PERCENTAGE" ? "For example, 20" : "For example, 1000"
+            }
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm text-zinc-300">
+          Starts at (optional)
+          <input
+            className={inputClass}
+            type="datetime-local"
+            value={starts}
+            onChange={(e) => setStarts(e.target.value)}
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm text-zinc-300">
+          Ends at (optional)
+          <input
+            className={inputClass}
+            type="datetime-local"
+            value={ends}
+            onChange={(e) => setEnds(e.target.value)}
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm text-zinc-300">
+          Global redemption limit (optional)
+          <input
+            className={inputClass}
+            type="number"
+            min="1"
+            value={globalMax ?? ""}
+            onChange={(e) =>
+              setGlobalMax(e.target.value ? Number(e.target.value) : null)
+            }
+            placeholder="Leave blank for no limit"
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm text-zinc-300">
+          Per-agency redemption limit (optional)
+          <input
+            className={inputClass}
+            type="number"
+            min="1"
+            value={agencyMax ?? ""}
+            onChange={(e) =>
+              setAgencyMax(e.target.value ? Number(e.target.value) : null)
+            }
+            placeholder="Leave blank for no limit"
+          />
+        </label>
       </div>
       <fieldset className="mt-4">
         <legend className="text-sm text-zinc-400">Applies to</legend>
@@ -541,7 +566,7 @@ function DiscountForm({
         <button
           disabled={save.isPending || !name || !planIds.length || value <= 0}
           onClick={() => save.mutate()}
-          className="rounded-lg bg-indigo-500 px-4 py-2 font-semibold disabled:opacity-50"
+          className="rounded-lg bg-indigo-500 px-4 py-2 font-semibold text-white disabled:opacity-50"
         >
           Save
         </button>
