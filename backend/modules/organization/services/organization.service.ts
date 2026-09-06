@@ -26,10 +26,7 @@ import { EventBusService } from "@packages/events/event-bus.service";
 import { DomainEvents } from "@packages/events/domain-event";
 import * as crypto from "crypto";
 import { EntitlementService } from "@modules/entitlement/entitlement.service";
-import {
-  BILLING_PERIODS,
-  TRIAL_TEAM_LIMIT,
-} from "@modules/billing/billing.constants";
+import { TRIAL_TEAM_LIMIT } from "@modules/billing/billing.constants";
 
 const INVITATION_RESEND_COOLDOWN_MS = 48 * 60 * 60 * 1000;
 type ClientAccessSummary = {
@@ -544,12 +541,21 @@ export class OrganizationService implements OnModuleInit {
     const subscription = await this.prisma.agencySubscription.findUnique({
       where: { agencyId },
     });
+    const legacyPlan =
+      subscription?.status !== "TRIAL" &&
+      !subscription?.teamLimitSnapshotSet &&
+      subscription?.plan
+        ? await this.prisma.pricingPlan.findUnique({
+            where: { code: subscription.plan },
+            select: { teamLimit: true },
+          })
+        : null;
     const limit =
       subscription?.status === "TRIAL"
         ? TRIAL_TEAM_LIMIT
-        : subscription?.plan
-          ? ((BILLING_PERIODS as any)[subscription.plan]?.teamLimit ?? null)
-          : null;
+        : subscription?.teamLimitSnapshotSet
+          ? subscription.teamLimit
+          : (legacyPlan?.teamLimit ?? null);
     if (limit === null) return;
     const active = await this.prisma.membership.count({
       where: { agencyId, status: "ACTIVE", deletedAt: null },

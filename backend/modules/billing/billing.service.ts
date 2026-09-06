@@ -4,20 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import {
-  BillingPeriod,
-  PaymentOrderStatus,
-  Prisma,
-  SubscriptionStatus,
-} from "@prisma/client";
+import { PaymentOrderStatus, Prisma, SubscriptionStatus } from "@prisma/client";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "@packages/database/prisma.service";
 import { CryptoService } from "@modules/auth/services/crypto.service";
-import {
-  BILLING_PERIODS,
-  BILLING_ROLE_KEYS,
-  TRIAL_TEAM_LIMIT,
-} from "./billing.constants";
+import { BILLING_ROLE_KEYS, TRIAL_TEAM_LIMIT } from "./billing.constants";
 import { CashfreeService } from "./cashfree.service";
 import * as crypto from "node:crypto";
 
@@ -86,7 +77,12 @@ export class BillingService {
               id: true,
               agencyId: true,
               period: true,
+              planCodeSnapshot: true,
+              planNameSnapshot: true,
               amountMinor: true,
+              baseAmountMinor: true,
+              discountAmountMinor: true,
+              discountNameSnapshot: true,
               currency: true,
               status: true,
               cashfreeOrderId: true,
@@ -116,7 +112,9 @@ export class BillingService {
       ),
       subscription: membership.agency.subscription,
       activeMembers: counts.get(membership.agencyId) ?? 0,
-      teamLimit: this.teamLimit(membership.agency.subscription?.plan),
+      teamLimit: membership.agency.subscription?.teamLimitSnapshotSet
+        ? membership.agency.subscription.teamLimit
+        : this.teamLimit(membership.agency.subscription?.plan),
       renewalAvailableAt: this.renewalAvailableAt(
         membership.agency.subscription,
       ),
@@ -129,66 +127,108 @@ export class BillingService {
       ),
     }));
   }
-  plans() {
-    return Object.entries(BILLING_PERIODS).map(([period, p]) => ({
-      period,
-      ...p,
-      currency: "INR",
-    }));
+  async plans(userId?: string, agencyId?: string) {
+    if (agencyId && userId) await this.billingMembership(agencyId, userId);
+    const plans = await this.prisma.pricingPlan.findMany({
+      where: { isActive: true, archivedAt: null },
+      orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+      include: {
+        discounts: {
+          include: { discount: true },
+        },
+      },
+    });
+    return Promise.all(
+      plans.map(async (plan) => {
+        const discount = await this.bestDiscount(
+          this.prisma,
+          plan,
+          agencyId,
+          false,
+        );
+        return this.publicPlan(plan, discount);
+      }),
+    );
   }
-  async createOrder(agencyId: string, userId: string, period: BillingPeriod) {
+  async createOrder(agencyId: string, userId: string, planId: string) {
     const membership = await this.billingMembership(agencyId, userId);
-    const price = BILLING_PERIODS[period];
-    const subscription = await this.prisma.agencySubscription.findUnique({
-      where: { agencyId },
-    });
     const now = new Date();
-    const available = this.renewalAvailableAt(subscription);
-    if (available && available > now)
-      throw new BadRequestException({
-        message: "Renewal is not available yet.",
-        renewalAvailableAt: available,
-      });
-    const count = await this.prisma.membership.count({
-      where: { agencyId, status: "ACTIVE", deletedAt: null },
-    });
-    if (price.teamLimit !== null && count > price.teamLimit)
-      throw new BadRequestException({
-        message:
-          "Selected billing period does not support the current team size.",
-        currentActiveMembers: count,
-        selectedPlanLimit: price.teamLimit,
-        membersToRemove: count - price.teamLimit,
-      });
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { authUser: { select: { emailEncrypted: true } } },
     });
     if (!user) throw new NotFoundException();
     const orderId = `agencie-${crypto.randomUUID()}`;
-    const startsAt = this.activationBase(subscription, now);
-    const endsAt = this.addMonths(startsAt, price.months);
-    const internal = await this.prisma.agencyPaymentOrder.create({
-      data: {
-        agencyId,
-        payerUserId: userId,
-        payerMembershipId: membership.id,
-        period,
-        durationMonths: price.months,
-        amountMinor: price.amountMinor,
-        currency: "INR",
-        teamLimitSnapshot: price.teamLimit,
-        entitlementStartsAt: startsAt,
-        entitlementEndsAt: endsAt,
-        cashfreeOrderId: orderId,
+    const internal = await this.prisma.$transaction(
+      async (tx) => {
+        const plan = await tx.pricingPlan.findFirst({
+          where: { id: planId, isActive: true, archivedAt: null },
+          include: { discounts: { include: { discount: true } } },
+        });
+        if (!plan)
+          throw new BadRequestException(
+            "Selected pricing plan is unavailable.",
+          );
+        const subscription = await tx.agencySubscription.findUnique({
+          where: { agencyId },
+        });
+        const available = this.renewalAvailableAt(subscription);
+        if (available && available > now)
+          throw new BadRequestException({
+            message: "Renewal is not available yet.",
+            renewalAvailableAt: available,
+          });
+        const count = await tx.membership.count({
+          where: { agencyId, status: "ACTIVE", deletedAt: null },
+        });
+        if (plan.teamLimit !== null && count > plan.teamLimit)
+          throw new BadRequestException({
+            message:
+              "Selected billing plan does not support the current team size.",
+            currentActiveMembers: count,
+            selectedPlanLimit: plan.teamLimit,
+            membersToRemove: count - plan.teamLimit,
+          });
+        const discount = await this.bestDiscount(tx, plan, agencyId, true);
+        const pricing = this.calculatePrice(plan.priceAmountMinor, discount);
+        const startsAt = this.activationBase(subscription, now);
+        const endsAt = this.addMonths(startsAt, plan.durationMonths);
+        const legacyPeriods = new Set([
+          "THREE_MONTHS",
+          "SIX_MONTHS",
+          "TWELVE_MONTHS",
+        ]);
+        return tx.agencyPaymentOrder.create({
+          data: {
+            agencyId,
+            payerUserId: userId,
+            payerMembershipId: membership.id,
+            period: legacyPeriods.has(plan.code) ? (plan.code as any) : null,
+            pricingPlanId: plan.id,
+            planCodeSnapshot: plan.code,
+            planNameSnapshot: plan.name,
+            durationMonths: plan.durationMonths,
+            amountMinor: pricing.finalAmountMinor,
+            baseAmountMinor: plan.priceAmountMinor,
+            discountAmountMinor: pricing.discountAmountMinor,
+            discountId: discount?.id ?? null,
+            discountNameSnapshot: discount?.name ?? null,
+            currency: plan.currency,
+            teamLimitSnapshot: plan.teamLimit,
+            entitlementStartsAt: startsAt,
+            entitlementEndsAt: endsAt,
+            cashfreeOrderId: orderId,
+          },
+        });
       },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
     try {
       const cf = await this.cashfree.createOrder(
         {
           order_id: orderId,
-          order_amount: price.amountMinor / 100,
-          order_currency: "INR",
+          order_amount: internal.amountMinor / 100,
+          order_currency: internal.currency,
           customer_details: {
             customer_id: userId,
             customer_phone: user.mobileNumberEncrypted
@@ -202,7 +242,10 @@ export class BillingService {
           order_meta: {
             return_url: `${this.config.get("FRONTEND_URL") || "http://localhost:3000"}/billing/return?orderId=${internal.id}`,
           },
-          order_note: `AGENCIE ${period}`,
+          order_expiry_time: new Date(
+            Date.now() + 30 * 60 * 1000,
+          ).toISOString(),
+          order_note: `AGENCIE ${internal.planCodeSnapshot}`,
         },
         internal.id,
       );
@@ -229,6 +272,108 @@ export class BillingService {
       });
       throw e;
     }
+  }
+
+  private publicPlan(plan: any, discount: any) {
+    const pricing = this.calculatePrice(plan.priceAmountMinor, discount);
+    return {
+      id: plan.id,
+      code: plan.code,
+      name: plan.name,
+      durationMonths: plan.durationMonths,
+      priceAmountMinor: plan.priceAmountMinor,
+      currency: plan.currency,
+      teamLimit: plan.teamLimit,
+      displayOrder: plan.displayOrder,
+      discount: discount
+        ? {
+            name: discount.name,
+            amountMinor: pricing.discountAmountMinor,
+          }
+        : null,
+      finalAmountMinor: pricing.finalAmountMinor,
+    };
+  }
+
+  private calculatePrice(baseAmountMinor: number, discount?: any) {
+    if (!discount)
+      return { discountAmountMinor: 0, finalAmountMinor: baseAmountMinor };
+    const amount =
+      discount.type === "PERCENTAGE"
+        ? Number(
+            (BigInt(baseAmountMinor) * BigInt(discount.value) + 5000n) / 10000n,
+          )
+        : discount.value;
+    const discountAmountMinor = Math.min(baseAmountMinor, Math.max(0, amount));
+    return {
+      discountAmountMinor,
+      finalAmountMinor: baseAmountMinor - discountAmountMinor,
+    };
+  }
+
+  private async bestDiscount(
+    db: any,
+    plan: any,
+    agencyId?: string,
+    reserve = false,
+  ) {
+    const now = new Date();
+    const candidates = plan.discounts
+      .map((item: any) => item.discount)
+      .filter(
+        (discount: any) =>
+          discount.isActive &&
+          (!discount.startsAt || discount.startsAt <= now) &&
+          (!discount.endsAt || discount.endsAt > now),
+      );
+    const eligible: any[] = [];
+    for (const discount of candidates) {
+      // Cashfree orders expire after 30 minutes. Pending orders reserve scarce
+      // promotions only for that window, so abandoned checkouts do not consume
+      // redemption capacity permanently.
+      const redemptionWhere = reserve
+        ? {
+            OR: [
+              { status: "PAID" },
+              {
+                status: { in: ["CREATING", "PENDING"] },
+                createdAt: { gt: new Date(now.getTime() - 30 * 60 * 1000) },
+              },
+            ],
+          }
+        : { status: "PAID" };
+      const [globalCount, agencyCount] = await Promise.all([
+        discount.maxRedemptions
+          ? db.agencyPaymentOrder.count({
+              where: { discountId: discount.id, ...redemptionWhere },
+            })
+          : 0,
+        discount.maxRedemptionsPerAgency && agencyId
+          ? db.agencyPaymentOrder.count({
+              where: { discountId: discount.id, agencyId, ...redemptionWhere },
+            })
+          : 0,
+      ]);
+      if (
+        (discount.maxRedemptions && globalCount >= discount.maxRedemptions) ||
+        (discount.maxRedemptionsPerAgency &&
+          agencyId &&
+          agencyCount >= discount.maxRedemptionsPerAgency)
+      )
+        continue;
+      eligible.push(discount);
+    }
+    return eligible.sort((a, b) => {
+      const aFinal = this.calculatePrice(
+        plan.priceAmountMinor,
+        a,
+      ).finalAmountMinor;
+      const bFinal = this.calculatePrice(
+        plan.priceAmountMinor,
+        b,
+      ).finalAmountMinor;
+      return aFinal - bFinal || a.id.localeCompare(b.id);
+    })[0];
   }
   async order(userId: string, id: string) {
     let o = await this.prisma.agencyPaymentOrder.findUnique({
@@ -348,20 +493,33 @@ export class BillingService {
             entitlementEndsAt: end,
           },
         });
+        if (o.discountId) {
+          await tx.pricingDiscountRedemption.create({
+            data: {
+              discountId: o.discountId,
+              agencyId: o.agencyId,
+              paymentOrderId: o.id,
+            },
+          });
+        }
         await tx.agencySubscription.upsert({
           where: { agencyId: o.agencyId },
           create: {
             agencyId: o.agencyId,
             status: "ACTIVE",
-            plan: o.period,
+            plan: o.planCodeSnapshot ?? o.period ?? "PAID",
             startsAt: start,
             endsAt: end,
+            teamLimit: o.teamLimitSnapshot,
+            teamLimitSnapshotSet: true,
           },
           update: {
             status: "ACTIVE",
-            plan: o.period,
+            plan: o.planCodeSnapshot ?? o.period ?? "PAID",
             startsAt: sub?.startsAt ?? now,
             endsAt: end,
+            teamLimit: o.teamLimitSnapshot,
+            teamLimitSnapshotSet: true,
             version: { increment: 1 },
           },
         });
@@ -377,8 +535,12 @@ export class BillingService {
             entityId: o.id,
             metadataJson: {
               source: "CASHFREE",
-              period: o.period,
+              planCode: o.planCodeSnapshot ?? o.period,
+              planName: o.planNameSnapshot,
               amountMinor: o.amountMinor,
+              baseAmountMinor: o.baseAmountMinor,
+              discountAmountMinor: o.discountAmountMinor,
+              discountId: o.discountId,
               currency: o.currency,
               paymentOrderId: o.id,
               previousStatus: sub?.status ?? null,
@@ -395,7 +557,7 @@ export class BillingService {
             payload: {
               agencyId: o.agencyId,
               paymentOrderId: o.id,
-              period: o.period,
+              planCode: o.planCodeSnapshot ?? o.period,
               endsAt: end.toISOString(),
             },
           },
@@ -407,8 +569,9 @@ export class BillingService {
   }
   private teamLimit(plan?: string | null) {
     if (plan === "TRIAL") return TRIAL_TEAM_LIMIT;
-    if (!plan) return null;
-    return (BILLING_PERIODS as any)[plan]?.teamLimit ?? null;
+    if (plan === "THREE_MONTHS") return 50;
+    if (plan === "SIX_MONTHS") return 120;
+    return null;
   }
   private renewalAvailableAt(s: any) {
     if (s?.status !== SubscriptionStatus.ACTIVE || !s.endsAt) return null;

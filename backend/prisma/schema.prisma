@@ -88,6 +88,7 @@ model Agency {
   reportNotificationSchedules ClientReportNotificationSchedule[]
   subscription                AgencySubscription?
   paymentOrders               AgencyPaymentOrder[]
+  discountRedemptions         PricingDiscountRedemption[]
 
   @@map("agencies")
 }
@@ -129,52 +130,132 @@ model User {
 }
 
 model AgencySubscription {
-  id          String             @id @default(uuid())
-  agencyId    String             @unique
-  status      SubscriptionStatus
-  plan        String
-  trialEndsAt DateTime?
-  startsAt    DateTime?
-  endsAt      DateTime?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  version     Int                @default(1)
-  agency      Agency             @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  id                   String             @id @default(uuid())
+  agencyId             String             @unique
+  status               SubscriptionStatus
+  plan                 String
+  trialEndsAt          DateTime?
+  startsAt             DateTime?
+  endsAt               DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  version              Int                @default(1)
+  teamLimit            Int?
+  teamLimitSnapshotSet Boolean            @default(false)
+  agency               Agency             @relation(fields: [agencyId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@map("agency_subscriptions")
 }
 
 model AgencyPaymentOrder {
-  id                    String             @id @default(uuid())
+  id                    String                     @id @default(uuid())
   agencyId              String
   payerUserId           String
   payerMembershipId     String
-  period                BillingPeriod
+  period                BillingPeriod?
+  pricingPlanId         String?
+  planCodeSnapshot      String?
+  planNameSnapshot      String?
   durationMonths        Int
   amountMinor           Int
-  currency              String             @default("INR")
+  baseAmountMinor       Int?
+  discountAmountMinor   Int                        @default(0)
+  discountId            String?
+  discountNameSnapshot  String?
+  currency              String                     @default("INR")
   teamLimitSnapshot     Int?
   entitlementStartsAt   DateTime?
   entitlementEndsAt     DateTime?
-  cashfreeOrderId       String             @unique
+  cashfreeOrderId       String                     @unique
   cashfreeCfOrderId     String?
-  cashfreePaymentId     String?            @unique
+  cashfreePaymentId     String?                    @unique
   paymentSessionId      String?
-  status                PaymentOrderStatus @default(CREATING)
+  status                PaymentOrderStatus         @default(CREATING)
   providerFailureCode   String?
   providerFailureReason String?
   paidAt                DateTime?
   processedAt           DateTime?
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
-  agency                Agency             @relation(fields: [agencyId], references: [id], onDelete: Restrict)
-  payer                 User               @relation(fields: [payerUserId], references: [id], onDelete: Restrict)
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  agency                Agency                     @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  payer                 User                       @relation(fields: [payerUserId], references: [id], onDelete: Restrict)
+  pricingPlan           PricingPlan?               @relation(fields: [pricingPlanId], references: [id], onDelete: Restrict)
+  discount              PricingDiscount?           @relation(fields: [discountId], references: [id], onDelete: SetNull)
+  discountRedemption    PricingDiscountRedemption?
 
   @@index([agencyId, createdAt])
   @@index([payerUserId, createdAt])
   @@index([status])
+  @@index([pricingPlanId, createdAt])
+  @@index([discountId, status])
   @@map("agency_payment_orders")
+}
+
+model PricingPlan {
+  id               String                @id @default(uuid())
+  code             String                @unique
+  name             String
+  durationMonths   Int
+  priceAmountMinor Int
+  currency         String                @default("INR")
+  teamLimit        Int?
+  isActive         Boolean               @default(true)
+  displayOrder     Int                   @default(0)
+  archivedAt       DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  paymentOrders    AgencyPaymentOrder[]
+  discounts        PricingDiscountPlan[]
+
+  @@index([isActive, displayOrder])
+  @@map("pricing_plans")
+}
+
+model PricingDiscount {
+  id                      String                      @id @default(uuid())
+  name                    String
+  type                    PricingDiscountType
+  value                   Int
+  startsAt                DateTime?
+  endsAt                  DateTime?
+  isActive                Boolean                     @default(false)
+  maxRedemptions          Int?
+  maxRedemptionsPerAgency Int?
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
+  plans                   PricingDiscountPlan[]
+  paymentOrders           AgencyPaymentOrder[]
+  redemptions             PricingDiscountRedemption[]
+
+  @@index([isActive, startsAt, endsAt])
+  @@map("pricing_discounts")
+}
+
+model PricingDiscountPlan {
+  discountId String
+  planId     String
+  discount   PricingDiscount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  plan       PricingPlan     @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@id([discountId, planId])
+  @@index([planId])
+  @@map("pricing_discount_plans")
+}
+
+model PricingDiscountRedemption {
+  id             String             @id @default(uuid())
+  discountId     String
+  agencyId       String
+  paymentOrderId String             @unique
+  redeemedAt     DateTime           @default(now())
+  discount       PricingDiscount    @relation(fields: [discountId], references: [id], onDelete: Restrict)
+  agency         Agency             @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  paymentOrder   AgencyPaymentOrder @relation(fields: [paymentOrderId], references: [id], onDelete: Restrict)
+
+  @@index([discountId, redeemedAt])
+  @@index([discountId, agencyId, redeemedAt])
+  @@map("pricing_discount_redemptions")
 }
 
 model Membership {
@@ -974,7 +1055,7 @@ model NotificationDelivery {
 
 model AuditEvent {
   id            String   @id @default(uuid())
-  agencyId      String
+  agencyId      String?
   actorId       String?
   requestId     String?
   correlationId String?
@@ -983,7 +1064,7 @@ model AuditEvent {
   entityId      String
   metadataJson  Json
   createdAt     DateTime @default(now())
-  agency        Agency   @relation(fields: [agencyId], references: [id])
+  agency        Agency?  @relation(fields: [agencyId], references: [id])
 
   @@index([agencyId, entityType, entityId])
   @@index([agencyId, eventType])
@@ -1070,6 +1151,11 @@ enum PaymentOrderStatus {
   FAILED
   CANCELLED
   EXPIRED
+}
+
+enum PricingDiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
 }
 
 enum MembershipStatus {

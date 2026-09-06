@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from "@nestjs/common";
@@ -15,6 +16,14 @@ import { IdentityContext } from "@packages/security/interfaces/identity-context.
 import { PlatformAdminGuard } from "./platform-admin.guard";
 import { PlatformAdminService } from "./platform-admin.service";
 import { UpdateEntitlementDto } from "./dto/update-entitlement.dto";
+import {
+  CreatePricingPlanDto,
+  UpdatePricingPlanDto,
+} from "./dto/pricing-plan.dto";
+import {
+  CreatePricingDiscountDto,
+  UpdatePricingDiscountDto,
+} from "./dto/pricing-discount.dto";
 
 @ApiTags("Platform Admin")
 @ApiBearerAuth()
@@ -29,6 +38,50 @@ export class PlatformAdminController {
   @ApiOperation({ summary: "Get platform adoption overview" })
   overview() {
     return this.service.getOverview();
+  }
+
+  @Get("pricing/plans")
+  pricingPlans() {
+    return this.service.listPricingPlans();
+  }
+
+  @Post("pricing/plans")
+  createPricingPlan(
+    @Body() dto: CreatePricingPlanDto,
+    @CurrentUser() actor: IdentityContext,
+  ) {
+    return this.service.createPricingPlan(dto, actor.userId);
+  }
+
+  @Patch("pricing/plans/:planId")
+  updatePricingPlan(
+    @Param("planId") planId: string,
+    @Body() dto: UpdatePricingPlanDto,
+    @CurrentUser() actor: IdentityContext,
+  ) {
+    return this.service.updatePricingPlan(planId, dto, actor.userId);
+  }
+
+  @Get("pricing/discounts")
+  pricingDiscounts() {
+    return this.service.listPricingDiscounts();
+  }
+
+  @Post("pricing/discounts")
+  createPricingDiscount(
+    @Body() dto: CreatePricingDiscountDto,
+    @CurrentUser() actor: IdentityContext,
+  ) {
+    return this.service.createPricingDiscount(dto, actor.userId);
+  }
+
+  @Patch("pricing/discounts/:discountId")
+  updatePricingDiscount(
+    @Param("discountId") discountId: string,
+    @Body() dto: UpdatePricingDiscountDto,
+    @CurrentUser() actor: IdentityContext,
+  ) {
+    return this.service.updatePricingDiscount(discountId, dto, actor.userId);
   }
 
   @Get("agencies")

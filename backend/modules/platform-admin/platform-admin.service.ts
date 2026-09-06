@@ -6,6 +6,14 @@ import {
 import { Prisma, SubscriptionStatus } from "@prisma/client";
 import { PrismaService } from "@packages/database/prisma.service";
 import { UpdateEntitlementDto } from "./dto/update-entitlement.dto";
+import {
+  CreatePricingPlanDto,
+  UpdatePricingPlanDto,
+} from "./dto/pricing-plan.dto";
+import {
+  CreatePricingDiscountDto,
+  UpdatePricingDiscountDto,
+} from "./dto/pricing-discount.dto";
 
 const ACTIVITY_EVENTS = [
   "CampaignCreated",
@@ -21,6 +29,270 @@ const ACTIVITY_EVENTS = [
 @Injectable()
 export class PlatformAdminService {
   constructor(private readonly prisma: PrismaService) {}
+
+  listPricingPlans() {
+    return this.prisma.pricingPlan.findMany({
+      orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+      include: {
+        _count: { select: { paymentOrders: true } },
+        discounts: {
+          include: { discount: { select: { id: true, name: true } } },
+        },
+      },
+    });
+  }
+
+  async createPricingPlan(dto: CreatePricingPlanDto, actorUserId: string) {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const plan = await tx.pricingPlan.create({
+          data: {
+            code: dto.code.trim().toUpperCase(),
+            name: dto.name.trim(),
+            durationMonths: dto.durationMonths,
+            priceAmountMinor: dto.priceAmountMinor,
+            currency: "INR",
+            teamLimit: dto.teamLimit ?? null,
+            displayOrder: dto.displayOrder,
+            isActive: dto.isActive,
+          },
+        });
+        await this.catalogAudit(
+          tx,
+          actorUserId,
+          "PRICING_PLAN_CREATED",
+          "PricingPlan",
+          plan.id,
+          null,
+          plan,
+        );
+        return plan;
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      )
+        throw new BadRequestException("Pricing plan code already exists.");
+      throw error;
+    }
+  }
+
+  async updatePricingPlan(
+    id: string,
+    dto: UpdatePricingPlanDto,
+    actorUserId: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const previous = await tx.pricingPlan.findUnique({ where: { id } });
+      if (!previous) throw new NotFoundException("Pricing plan not found.");
+      const plan = await tx.pricingPlan.update({
+        where: { id },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+          ...(dto.durationMonths !== undefined
+            ? { durationMonths: dto.durationMonths }
+            : {}),
+          ...(dto.priceAmountMinor !== undefined
+            ? { priceAmountMinor: dto.priceAmountMinor }
+            : {}),
+          ...(dto.teamLimit !== undefined ? { teamLimit: dto.teamLimit } : {}),
+          ...(dto.displayOrder !== undefined
+            ? { displayOrder: dto.displayOrder }
+            : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        },
+      });
+      const eventType =
+        dto.isActive === false && previous.isActive
+          ? "PRICING_PLAN_DISABLED"
+          : dto.isActive === true && !previous.isActive
+            ? "PRICING_PLAN_ENABLED"
+            : "PRICING_PLAN_UPDATED";
+      await this.catalogAudit(
+        tx,
+        actorUserId,
+        eventType,
+        "PricingPlan",
+        id,
+        previous,
+        plan,
+      );
+      return plan;
+    });
+  }
+
+  listPricingDiscounts() {
+    return this.prisma.pricingDiscount.findMany({
+      orderBy: [{ createdAt: "desc" }],
+      include: {
+        plans: { include: { plan: true } },
+        _count: { select: { redemptions: true } },
+      },
+    });
+  }
+
+  async createPricingDiscount(
+    dto: CreatePricingDiscountDto,
+    actorUserId: string,
+  ) {
+    this.validateDiscount(dto);
+    return this.prisma.$transaction(async (tx) => {
+      await this.ensurePlans(tx, dto.planIds);
+      const discount = await tx.pricingDiscount.create({
+        data: {
+          name: dto.name.trim(),
+          type: dto.type,
+          value: dto.value,
+          startsAt: dto.startsAt ? new Date(dto.startsAt) : null,
+          endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
+          isActive: dto.isActive,
+          maxRedemptions: dto.maxRedemptions ?? null,
+          maxRedemptionsPerAgency: dto.maxRedemptionsPerAgency ?? null,
+          plans: { create: dto.planIds.map((planId) => ({ planId })) },
+        },
+        include: { plans: { include: { plan: true } } },
+      });
+      await this.catalogAudit(
+        tx,
+        actorUserId,
+        "DISCOUNT_CREATED",
+        "PricingDiscount",
+        discount.id,
+        null,
+        discount,
+      );
+      return discount;
+    });
+  }
+
+  async updatePricingDiscount(
+    id: string,
+    dto: UpdatePricingDiscountDto,
+    actorUserId: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const previous = await tx.pricingDiscount.findUnique({
+        where: { id },
+        include: { plans: true },
+      });
+      if (!previous) throw new NotFoundException("Pricing discount not found.");
+      this.validateDiscount({
+        ...dto,
+        type: dto.type ?? previous.type,
+        value: dto.value ?? previous.value,
+        startsAt:
+          dto.startsAt === undefined
+            ? (previous.startsAt?.toISOString() ?? null)
+            : dto.startsAt,
+        endsAt:
+          dto.endsAt === undefined
+            ? (previous.endsAt?.toISOString() ?? null)
+            : dto.endsAt,
+      });
+      if (dto.planIds) await this.ensurePlans(tx, dto.planIds);
+      const discount = await tx.pricingDiscount.update({
+        where: { id },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+          ...(dto.type !== undefined ? { type: dto.type } : {}),
+          ...(dto.value !== undefined ? { value: dto.value } : {}),
+          ...(dto.startsAt !== undefined
+            ? { startsAt: dto.startsAt ? new Date(dto.startsAt) : null }
+            : {}),
+          ...(dto.endsAt !== undefined
+            ? { endsAt: dto.endsAt ? new Date(dto.endsAt) : null }
+            : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+          ...(dto.maxRedemptions !== undefined
+            ? { maxRedemptions: dto.maxRedemptions }
+            : {}),
+          ...(dto.maxRedemptionsPerAgency !== undefined
+            ? { maxRedemptionsPerAgency: dto.maxRedemptionsPerAgency }
+            : {}),
+          ...(dto.planIds
+            ? {
+                plans: {
+                  deleteMany: {},
+                  create: dto.planIds.map((planId) => ({ planId })),
+                },
+              }
+            : {}),
+        },
+        include: { plans: { include: { plan: true } } },
+      });
+      const eventType =
+        dto.isActive === false && previous.isActive
+          ? "DISCOUNT_DISABLED"
+          : dto.isActive === true && !previous.isActive
+            ? "DISCOUNT_ENABLED"
+            : "DISCOUNT_UPDATED";
+      await this.catalogAudit(
+        tx,
+        actorUserId,
+        eventType,
+        "PricingDiscount",
+        id,
+        previous,
+        discount,
+      );
+      return discount;
+    });
+  }
+
+  private validateDiscount(
+    dto: CreatePricingDiscountDto | UpdatePricingDiscountDto,
+  ) {
+    if (
+      dto.type === "PERCENTAGE" &&
+      dto.value !== undefined &&
+      dto.value > 10000
+    )
+      throw new BadRequestException("Percentage discount cannot exceed 100%. ");
+    const startsAt = dto.startsAt ? new Date(dto.startsAt) : null;
+    const endsAt = dto.endsAt ? new Date(dto.endsAt) : null;
+    if (startsAt && endsAt && endsAt <= startsAt)
+      throw new BadRequestException("Discount end must be after its start.");
+  }
+
+  private async ensurePlans(tx: any, planIds: string[]) {
+    const unique = [...new Set(planIds)];
+    const count = await tx.pricingPlan.count({ where: { id: { in: unique } } });
+    if (count !== unique.length)
+      throw new BadRequestException("One or more pricing plans do not exist.");
+  }
+
+  private async catalogAudit(
+    tx: any,
+    actorId: string,
+    eventType: string,
+    entityType: string,
+    entityId: string,
+    previous: any,
+    resulting: any,
+  ) {
+    await Promise.all([
+      tx.auditEvent.create({
+        data: {
+          agencyId: null,
+          actorId,
+          eventType,
+          entityType,
+          entityId,
+          metadataJson: { previous, resulting },
+        },
+      }),
+      tx.outboxEvent.create({
+        data: {
+          agencyId: null,
+          aggregateId: entityId,
+          aggregateType: entityType,
+          eventType,
+          payload: { actorId, previous, resulting },
+        },
+      }),
+    ]);
+  }
 
   async getOverview() {
     const now = new Date();
@@ -262,6 +534,8 @@ export class PlatformAdminService {
         update: {
           status: dto.status,
           plan: dto.plan.trim(),
+          teamLimit: null,
+          teamLimitSnapshotSet: false,
           trialEndsAt,
           startsAt:
             startsAt ??
@@ -275,6 +549,8 @@ export class PlatformAdminService {
           agencyId,
           status: dto.status,
           plan: dto.plan.trim(),
+          teamLimit: null,
+          teamLimitSnapshotSet: false,
           trialEndsAt,
           startsAt:
             startsAt ?? (dto.status === SubscriptionStatus.ACTIVE ? now : null),

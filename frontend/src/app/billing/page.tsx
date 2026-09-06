@@ -8,7 +8,6 @@ import {
   createBillingOrder,
   getBillingAgencies,
   getBillingPlans,
-  type BillingPeriod,
 } from "@/lib/api/billing";
 import { getWorkspaceUrl } from "@/lib/workspace-url";
 import { useMembershipsQuery } from "@/lib/query";
@@ -31,15 +30,17 @@ export default function BillingPage() {
     queryKey: ["billing", "agencies"],
     queryFn: getBillingAgencies,
   });
-  const plans = useQuery({
-    queryKey: ["billing", "plans"],
-    queryFn: getBillingPlans,
-  });
   const [agencyId, setAgencyId] = useState(
     () => searchParams.get("agencyId") ?? "",
   );
-  const [period, setPeriod] = useState<BillingPeriod | null>(null);
+  const plans = useQuery({
+    queryKey: ["billing", "plans", agencyId],
+    queryFn: () => getBillingPlans(agencyId),
+    enabled: Boolean(agencyId),
+  });
+  const [planId, setPlanId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   useEffect(() => {
     const script = document.createElement("script");
@@ -59,16 +60,21 @@ export default function BillingPage() {
   );
 
   async function pay() {
-    if (!selected || !period || renewalLocked) return;
+    if (!selected || !planId || renewalLocked) return;
     setBusy(true);
+    setPaymentError(null);
     try {
-      const order = await createBillingOrder(agencyId, period);
-      await window
-        .Cashfree?.({ mode: order.environment })
-        .checkout({
-          paymentSessionId: order.paymentSessionId,
-          redirectTarget: "_self",
-        });
+      const order = await createBillingOrder(agencyId, planId);
+      await window.Cashfree?.({ mode: order.environment }).checkout({
+        paymentSessionId: order.paymentSessionId,
+        redirectTarget: "_self",
+      });
+    } catch (error) {
+      setPaymentError(
+        error instanceof Error ? error.message : "Unable to start payment.",
+      );
+      setPlanId(null);
+      await plans.refetch();
     } finally {
       setBusy(false);
     }
@@ -94,7 +100,8 @@ export default function BillingPage() {
           value={agencyId}
           onChange={(event) => {
             setAgencyId(event.target.value);
-            setPeriod(null);
+            setPlanId(null);
+            setPaymentError(null);
           }}
         >
           <option value="">Select an agency</option>
@@ -126,15 +133,32 @@ export default function BillingPage() {
             <div className="mt-6 grid gap-4 md:grid-cols-3">
               {plans.data?.map((plan) => (
                 <button
-                  key={plan.period}
+                  key={plan.id}
                   disabled={renewalLocked}
-                  onClick={() => setPeriod(plan.period)}
-                  className={`rounded-2xl border p-5 text-left disabled:cursor-not-allowed disabled:opacity-50 ${period === plan.period ? "border-indigo-400 bg-indigo-500/10" : "border-zinc-800 bg-zinc-950"}`}
+                  onClick={() => setPlanId(plan.id)}
+                  className={`rounded-2xl border p-5 text-left disabled:cursor-not-allowed disabled:opacity-50 ${planId === plan.id ? "border-indigo-400 bg-indigo-500/10" : "border-zinc-800 bg-zinc-950"}`}
                 >
-                  <strong>{plan.months} Months</strong>
-                  <p className="mt-2 text-2xl">
-                    ₹{(plan.amountMinor / 100).toLocaleString("en-IN")}
-                  </p>
+                  <strong>{plan.name}</strong>
+                  {plan.discount ? (
+                    <>
+                      <p className="mt-2 text-sm text-zinc-500 line-through">
+                        ₹{(plan.priceAmountMinor / 100).toLocaleString("en-IN")}
+                      </p>
+                      <p className="text-2xl">
+                        ₹{(plan.finalAmountMinor / 100).toLocaleString("en-IN")}
+                      </p>
+                      <p className="mt-1 text-xs text-emerald-300">
+                        {plan.discount.name} · Save ₹
+                        {(plan.discount.amountMinor / 100).toLocaleString(
+                          "en-IN",
+                        )}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-2xl">
+                      ₹{(plan.priceAmountMinor / 100).toLocaleString("en-IN")}
+                    </p>
+                  )}
                   <p className="mt-2 text-sm text-zinc-400">
                     {plan.teamLimit
                       ? `Up to ${plan.teamLimit} team members`
@@ -146,12 +170,15 @@ export default function BillingPage() {
               ))}
             </div>
             <button
-              disabled={!period || busy || renewalLocked}
+              disabled={!planId || busy || renewalLocked}
               onClick={pay}
               className="mt-6 rounded-xl bg-indigo-500 px-6 py-3 font-semibold disabled:opacity-50"
             >
               {busy ? "Creating secure order…" : "Review and Pay"}
             </button>
+            {paymentError ? (
+              <p className="mt-3 text-sm text-red-300">{paymentError}</p>
+            ) : null}
             <section className="mt-10">
               <h2 className="text-xl font-semibold">Payment history</h2>
               {selected.paymentHistory.length ? (
@@ -161,8 +188,15 @@ export default function BillingPage() {
                       key={payment.id}
                       className="flex flex-wrap justify-between gap-2 border-b border-zinc-800 p-4 last:border-b-0"
                     >
-                      <span>{payment.period.replaceAll("_", " ")}</span>
-                      <span>₹{(payment.amountMinor / 100).toLocaleString("en-IN")}</span>
+                      <span>
+                        {payment.planNameSnapshot ??
+                          payment.planCodeSnapshot ??
+                          payment.period?.replaceAll("_", " ") ??
+                          "Paid plan"}
+                      </span>
+                      <span>
+                        ₹{(payment.amountMinor / 100).toLocaleString("en-IN")}
+                      </span>
                       <span className="text-zinc-400">{payment.status}</span>
                     </div>
                   ))}

@@ -5,6 +5,7 @@ import {
   Headers,
   Param,
   Post,
+  Query,
   RawBodyRequest,
   Req,
   UnauthorizedException,
@@ -32,15 +33,18 @@ export class BillingController {
   @Get("agencies") @SkipTenant() agencies(@CurrentUser() u: IdentityContext) {
     return this.service.listEligible(u.userId);
   }
-  @Get("plans") @SkipTenant() plans() {
-    return this.service.plans();
+  @Get("plans") @SkipTenant() plans(
+    @CurrentUser() u: IdentityContext,
+    @Query("agencyId") agencyId?: string,
+  ) {
+    return this.service.plans(u.userId, agencyId);
   }
   @Post("agencies/:agencyId/orders") create(
     @Param("agencyId") id: string,
     @Body() dto: CreatePaymentOrderDto,
     @CurrentUser() u: IdentityContext,
   ) {
-    return this.service.createOrder(id, u.userId, dto.period);
+    return this.service.createOrder(id, u.userId, dto.planId);
   }
   @Get("orders/:orderId") @SkipTenant() order(
     @Param("orderId") id: string,
