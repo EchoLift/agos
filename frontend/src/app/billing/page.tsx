@@ -11,6 +11,7 @@ import {
   type BillingPeriod,
 } from "@/lib/api/billing";
 import { getWorkspaceUrl } from "@/lib/workspace-url";
+import { useMembershipsQuery } from "@/lib/query";
 
 declare global {
   interface Window {
@@ -25,6 +26,7 @@ declare global {
 
 export default function BillingPage() {
   const searchParams = useSearchParams();
+  const memberships = useMembershipsQuery();
   const agencies = useQuery({
     queryKey: ["billing", "agencies"],
     queryFn: getBillingAgencies,
@@ -48,6 +50,7 @@ export default function BillingPage() {
   }, []);
 
   const selected = agencies.data?.find((item) => item.agency.id === agencyId);
+  const dashboardAgency = memberships.data?.currentAgency;
   const renewalAvailableAt = selected?.renewalAvailableAt
     ? new Date(selected.renewalAvailableAt)
     : null;
@@ -74,12 +77,12 @@ export default function BillingPage() {
   return (
     <main className="min-h-screen bg-[#09090b] p-6 text-zinc-100">
       <div className="mx-auto max-w-5xl">
-        {selected ? (
+        {dashboardAgency ? (
           <Link
-            href={getWorkspaceUrl(selected.agency.slug)}
+            href={getWorkspaceUrl(dashboardAgency.slug)}
             className="mb-6 inline-flex min-h-11 items-center rounded-xl border border-zinc-700 px-4 text-sm font-semibold text-zinc-200 transition hover:bg-zinc-900"
           >
-            ← Back to {selected.agency.name}
+            ← Back to dashboard
           </Link>
         ) : null}
         <h1 className="text-3xl font-semibold">Billing & Plans</h1>

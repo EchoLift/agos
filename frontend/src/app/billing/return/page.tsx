@@ -6,11 +6,13 @@ import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { getBillingOrder } from "@/lib/api/billing";
 import { getWorkspaceUrl } from "@/lib/workspace-url";
+import { useMembershipsQuery } from "@/lib/query";
 
 const CONFIRMATION_TIMEOUT_MS = 30_000;
 
 export default function BillingReturnPage() {
   const orderId = useSearchParams().get("orderId") || "";
+  const memberships = useMembershipsQuery();
   const [timedOut, setTimedOut] = useState(false);
   const orderQuery = useQuery({
     queryKey: ["billing", "order", orderId],
@@ -35,8 +37,10 @@ export default function BillingReturnPage() {
   const cancelled = status === "CANCELLED";
   const failed = status === "FAILED" || orderQuery.isError;
   const unresolved = timedOut && !paid && !cancelled && !failed;
-  const workspaceHref = orderQuery.data?.agency.slug
-    ? getWorkspaceUrl(orderQuery.data.agency.slug)
+  const dashboardSlug =
+    orderQuery.data?.agency.slug ?? memberships.data?.currentAgency?.slug;
+  const workspaceHref = dashboardSlug
+    ? getWorkspaceUrl(dashboardSlug)
     : null;
 
   const title = paid
@@ -69,8 +73,9 @@ export default function BillingReturnPage() {
         <h1 className="text-2xl font-semibold">{title}</h1>
         <p className="mt-3 text-zinc-400">{message}</p>
 
-        {(paid || cancelled || failed || unresolved) && (
-          <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-6 flex flex-wrap gap-3">
+          {(paid || cancelled || failed || unresolved) && (
+            <>
             {unresolved && (
               <button
                 type="button"
@@ -87,16 +92,17 @@ export default function BillingReturnPage() {
             >
               Return to Billing
             </Link>
-            {workspaceHref ? (
-              <Link
-                href={workspaceHref}
-                className="rounded-full bg-indigo-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400"
-              >
-                Go to dashboard
-              </Link>
-            ) : null}
-          </div>
-        )}
+            </>
+          )}
+          {workspaceHref ? (
+            <Link
+              href={workspaceHref}
+              className="rounded-full bg-indigo-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400"
+            >
+              Go to dashboard
+            </Link>
+          ) : null}
+        </div>
       </div>
     </main>
   );
