@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   createBillingOrder,
   getBillingAgencies,
   getBillingPlans,
   type BillingPeriod,
 } from "@/lib/api/billing";
+import { getWorkspaceUrl } from "@/lib/workspace-url";
 
 declare global {
   interface Window {
@@ -72,6 +74,14 @@ export default function BillingPage() {
   return (
     <main className="min-h-screen bg-[#09090b] p-6 text-zinc-100">
       <div className="mx-auto max-w-5xl">
+        {selected ? (
+          <Link
+            href={getWorkspaceUrl(selected.agency.slug)}
+            className="mb-6 inline-flex min-h-11 items-center rounded-xl border border-zinc-700 px-4 text-sm font-semibold text-zinc-200 transition hover:bg-zinc-900"
+          >
+            ← Back to {selected.agency.name}
+          </Link>
+        ) : null}
         <h1 className="text-3xl font-semibold">Billing & Plans</h1>
         <p className="mt-2 text-zinc-400">
           Choose the agency you want to activate or extend.

@@ -5,4 +5,4 @@ export type BillingAgency={agency:{id:string;name:string;slug:string};role:"OWNE
 export const getBillingAgencies=()=>apiClient<BillingAgency[]>("/billing/agencies");
 export const getBillingPlans=()=>apiClient<Array<{period:BillingPeriod;months:number;amountMinor:number;teamLimit:number|null;currency:string}>>("/billing/plans");
 export const createBillingOrder=(agencyId:string,period:BillingPeriod)=>apiClient<{orderId:string;paymentSessionId:string;environment:"sandbox"|"production"}>(`/billing/agencies/${agencyId}/orders`,{method:"POST",agencyId,body:JSON.stringify({period})});
-export const getBillingOrder=(id:string)=>apiClient<{id:string;status:string;agency:{displayName:string;name:string}}>(`/billing/orders/${id}`);
+export const getBillingOrder=(id:string)=>apiClient<{id:string;status:string;agency:{displayName:string|null;name:string;slug:string}}>(`/billing/orders/${id}`);

@@ -224,7 +224,9 @@ export class BillingService {
   async order(userId: string, id: string) {
     let o = await this.prisma.agencyPaymentOrder.findUnique({
       where: { id },
-      include: { agency: { select: { displayName: true, name: true } } },
+      include: {
+        agency: { select: { displayName: true, name: true, slug: true } },
+      },
     });
     if (!o) throw new NotFoundException();
     await this.billingMembership(o.agencyId, userId);
@@ -264,7 +266,9 @@ export class BillingService {
               processedAt: new Date(),
             },
             include: {
-              agency: { select: { displayName: true, name: true } },
+              agency: {
+                select: { displayName: true, name: true, slug: true },
+              },
             },
           });
         }

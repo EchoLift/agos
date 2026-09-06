@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { getBillingOrder } from "@/lib/api/billing";
+import { getWorkspaceUrl } from "@/lib/workspace-url";
 
 const CONFIRMATION_TIMEOUT_MS = 30_000;
 
@@ -34,6 +35,9 @@ export default function BillingReturnPage() {
   const cancelled = status === "CANCELLED";
   const failed = status === "FAILED" || orderQuery.isError;
   const unresolved = timedOut && !paid && !cancelled && !failed;
+  const workspaceHref = orderQuery.data?.agency.slug
+    ? getWorkspaceUrl(orderQuery.data.agency.slug)
+    : null;
 
   const title = paid
     ? "Payment successful"
@@ -83,6 +87,14 @@ export default function BillingReturnPage() {
             >
               Return to Billing
             </Link>
+            {workspaceHref ? (
+              <Link
+                href={workspaceHref}
+                className="rounded-full bg-indigo-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-400"
+              >
+                Go to dashboard
+              </Link>
+            ) : null}
           </div>
         )}
       </div>

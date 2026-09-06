@@ -311,7 +311,9 @@ export default function WorkspaceHeader({
                     ) : null}
                     {canBillAnyAgency ? (
                       <MenuLink
-                        href={getCentralAppHref("/billing")}
+                        href={getCentralAppHref(
+                          `/billing?agencyId=${encodeURIComponent(agency?.id ?? "")}`,
+                        )}
                         label="Billing & Plans"
                         onClick={() => setIsMenuOpen(false)}
                       />
