@@ -210,53 +210,71 @@ function PlanForm({
     <div className="mt-5 rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
       <h2 className="font-semibold">{plan ? "Edit plan" : "Add plan"}</h2>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <input
-          className={inputClass}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Name"
-        />
-        <input
-          className={inputClass}
-          disabled={Boolean(plan)}
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          placeholder="STABLE_CODE"
-        />
-        <input
-          className={inputClass}
-          type="number"
-          min="1"
-          value={months}
-          onChange={(e) => setMonths(Number(e.target.value))}
-          placeholder="Duration months"
-        />
-        <input
-          className={inputClass}
-          type="number"
-          min="0.01"
-          step="0.01"
-          value={price}
-          onChange={(e) => setPrice(Number(e.target.value))}
-          placeholder="Price INR"
-        />
-        <input
-          className={inputClass}
-          type="number"
-          min="1"
-          value={limit ?? ""}
-          onChange={(e) =>
-            setLimit(e.target.value ? Number(e.target.value) : null)
-          }
-          placeholder="Team limit (blank = unlimited)"
-        />
-        <input
-          className={inputClass}
-          type="number"
-          value={order}
-          onChange={(e) => setOrder(Number(e.target.value))}
-          placeholder="Display order"
-        />
+        <label className="grid gap-1.5 text-sm text-zinc-300">
+          Plan name
+          <input
+            className={inputClass}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="For example, 3 Months"
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm text-zinc-300">
+          Stable code
+          <input
+            className={inputClass}
+            disabled={Boolean(plan)}
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="For example, THREE_MONTHS"
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm text-zinc-300">
+          Duration in months
+          <input
+            className={inputClass}
+            type="number"
+            min="1"
+            value={months}
+            onChange={(e) => setMonths(Number(e.target.value))}
+            placeholder="For example, 3"
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm text-zinc-300">
+          Price (INR)
+          <input
+            className={inputClass}
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={price}
+            onChange={(e) => setPrice(Number(e.target.value))}
+            placeholder="For example, 3499"
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm text-zinc-300">
+          Team capacity
+          <input
+            className={inputClass}
+            type="number"
+            min="1"
+            value={limit ?? ""}
+            onChange={(e) =>
+              setLimit(e.target.value ? Number(e.target.value) : null)
+            }
+            placeholder="Leave blank for unlimited"
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm text-zinc-300">
+          Display order
+          <input
+            className={inputClass}
+            type="number"
+            value={order}
+            onChange={(e) => setOrder(Number(e.target.value))}
+            placeholder="For example, 10"
+          />
+        </label>
       </div>
       <label className="mt-4 flex gap-2 text-sm">
         <input
