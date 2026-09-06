@@ -233,13 +233,17 @@ export class BillingService {
         const payments = await this.cashfree.getOrderPayments(
           o.cashfreeOrderId,
         );
-        const latest = [...payments]
-          .filter((payment) => payment.payment_time)
-          .sort(
-            (a, b) =>
-              new Date(b.payment_time!).getTime() -
-              new Date(a.payment_time!).getTime(),
-          )[0];
+        const latest = [...payments].sort((a, b) => {
+          const timestamp = (payment: (typeof payments)[number]) => {
+            const value =
+              payment.payment_completion_time ?? payment.payment_time;
+            const parsed = value ? new Date(value).getTime() : 0;
+            return Number.isFinite(parsed) ? parsed : 0;
+          };
+          const timeDifference = timestamp(b) - timestamp(a);
+          if (timeDifference) return timeDifference;
+          return Number(b.cf_payment_id ?? 0) - Number(a.cf_payment_id ?? 0);
+        })[0];
         const status =
           latest?.payment_status === "FAILED"
             ? PaymentOrderStatus.FAILED

@@ -75,8 +75,10 @@ export class CashfreeService {
         providerCode: data?.code,
       });
     return data as Array<{
+      cf_payment_id?: string | number;
       payment_status: string;
       payment_time?: string;
+      payment_completion_time?: string;
       payment_message?: string;
       error_details?: {
         error_code?: string;
