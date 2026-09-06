@@ -94,7 +94,7 @@ function PlansSection({ plans }: { plans: AdminPricingPlan[] }) {
     <section className="mt-6">
       <button
         onClick={() => setAdding(true)}
-        className="rounded-xl bg-indigo-500 px-4 py-2 font-semibold text-white"
+        className="rounded-xl bg-indigo-500 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#09090b]"
       >
         Add plan
       </button>
@@ -288,7 +288,7 @@ function PlanForm({
         <button
           disabled={save.isPending || !name || (!plan && !code)}
           onClick={() => save.mutate()}
-          className="rounded-lg bg-indigo-500 px-4 py-2 font-semibold text-white disabled:opacity-50"
+          className="rounded-lg bg-indigo-500 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Save
         </button>
@@ -328,7 +328,7 @@ function DiscountsSection({
     <section className="mt-6">
       <button
         onClick={() => setAdding(true)}
-        className="rounded-xl bg-indigo-500 px-4 py-2 font-semibold text-white"
+        className="rounded-xl bg-indigo-500 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#09090b]"
       >
         Add discount
       </button>
@@ -566,7 +566,7 @@ function DiscountForm({
         <button
           disabled={save.isPending || !name || !planIds.length || value <= 0}
           onClick={() => save.mutate()}
-          className="rounded-lg bg-indigo-500 px-4 py-2 font-semibold text-white disabled:opacity-50"
+          className="rounded-lg bg-indigo-500 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Save
         </button>

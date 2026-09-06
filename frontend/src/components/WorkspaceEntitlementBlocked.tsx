@@ -57,7 +57,7 @@ export default function WorkspaceEntitlementBlocked({
           {hasBillingRole(agency) ? (
             <Link
               href={getCentralAppHref(`/billing?agencyId=${agency.id}`)}
-              className="rounded-xl bg-indigo-500 px-4 py-2.5 text-sm font-semibold"
+              className="rounded-xl bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:bg-indigo-500 dark:hover:bg-indigo-400"
             >
               Billing & Plans
             </Link>

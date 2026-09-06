@@ -172,7 +172,7 @@ export default function BillingPage() {
             <button
               disabled={!planId || busy || renewalLocked}
               onClick={pay}
-              className="mt-6 rounded-xl bg-indigo-500 px-6 py-3 font-semibold disabled:opacity-50"
+              className="mt-6 rounded-xl bg-indigo-500 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
             >
               {busy ? "Creating secure order…" : "Review and Pay"}
             </button>
@@ -207,6 +207,26 @@ export default function BillingPage() {
             </section>
           </>
         )}
+        <section className="mt-10 rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+          <h2 className="text-lg font-semibold">Need billing support?</h2>
+          <p className="mt-2 text-sm leading-6 text-zinc-400">
+            Email us at{" "}
+            <a
+              href="mailto:echoliftagency@gmail.com"
+              className="font-medium text-indigo-300 underline underline-offset-4 hover:text-indigo-200"
+            >
+              echoliftagency@gmail.com
+            </a>
+            . Include your agency name and payment order reference for faster
+            assistance. We aim to respond within two business days.
+          </p>
+          <Link
+            href="/contact"
+            className="mt-4 inline-flex min-h-10 items-center rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-zinc-200 hover:bg-zinc-900"
+          >
+            View contact details
+          </Link>
+        </section>
       </div>
     </main>
   );
