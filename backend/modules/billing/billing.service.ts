@@ -89,6 +89,7 @@ export class BillingService {
               amountMinor: true,
               currency: true,
               status: true,
+              cashfreeOrderId: true,
               paidAt: true,
               entitlementEndsAt: true,
               createdAt: true,
@@ -98,6 +99,10 @@ export class BillingService {
       : [[], []];
     const counts = new Map(
       memberCounts.map((row) => [row.agencyId, row._count._all]),
+    );
+
+    const reconciledPaymentOrders = await Promise.all(
+      paymentOrders.map((order) => this.reconcilePendingOrder(order)),
     );
 
     return eligible.map((membership) => ({
@@ -115,8 +120,12 @@ export class BillingService {
       renewalAvailableAt: this.renewalAvailableAt(
         membership.agency.subscription,
       ),
-      paymentHistory: paymentOrders.filter(
-        (order) => order.agencyId === membership.agencyId,
+      paymentHistory: reconciledPaymentOrders.filter(
+        (order) =>
+          order.agencyId === membership.agencyId &&
+          ![PaymentOrderStatus.CREATING, PaymentOrderStatus.PENDING].includes(
+            order.status,
+          ),
       ),
     }));
   }
@@ -230,53 +239,52 @@ export class BillingService {
     });
     if (!o) throw new NotFoundException();
     await this.billingMembership(o.agencyId, userId);
-    if (o.status === PaymentOrderStatus.PENDING) {
-      try {
-        const payments = await this.cashfree.getOrderPayments(
-          o.cashfreeOrderId,
-        );
-        const latest = [...payments].sort((a, b) => {
-          const timestamp = (payment: (typeof payments)[number]) => {
-            const value =
-              payment.payment_completion_time ?? payment.payment_time;
-            const parsed = value ? new Date(value).getTime() : 0;
-            return Number.isFinite(parsed) ? parsed : 0;
-          };
-          const timeDifference = timestamp(b) - timestamp(a);
-          if (timeDifference) return timeDifference;
-          return Number(b.cf_payment_id ?? 0) - Number(a.cf_payment_id ?? 0);
-        })[0];
-        const status =
-          latest?.payment_status === "FAILED"
-            ? PaymentOrderStatus.FAILED
-            : ["USER_DROPPED", "CANCELLED", "VOID"].includes(
-                  latest?.payment_status,
-                )
-              ? PaymentOrderStatus.CANCELLED
-              : null;
-        if (status) {
-          o = await this.prisma.agencyPaymentOrder.update({
-            where: { id: o.id },
-            data: {
-              status,
-              providerFailureCode: latest?.error_details?.error_code,
-              providerFailureReason:
-                latest?.error_details?.error_description ??
-                latest?.payment_message,
-              processedAt: new Date(),
-            },
-            include: {
-              agency: {
-                select: { displayName: true, name: true, slug: true },
-              },
-            },
-          });
-        }
-      } catch {
-        // Webhooks remain authoritative; keep polling if provider lookup fails.
-      }
-    }
+    o = await this.reconcilePendingOrder(o, {
+      agency: { select: { displayName: true, name: true, slug: true } },
+    });
     return { ...o, paymentSessionId: undefined };
+  }
+
+  private async reconcilePendingOrder(order: any, include?: any) {
+    if (order.status !== PaymentOrderStatus.PENDING) return order;
+    try {
+      const payments = await this.cashfree.getOrderPayments(
+        order.cashfreeOrderId,
+      );
+      const latest = [...payments].sort((a, b) => {
+        const timestamp = (payment: (typeof payments)[number]) => {
+          const value = payment.payment_completion_time ?? payment.payment_time;
+          const parsed = value ? new Date(value).getTime() : 0;
+          return Number.isFinite(parsed) ? parsed : 0;
+        };
+        const timeDifference = timestamp(b) - timestamp(a);
+        if (timeDifference) return timeDifference;
+        return Number(b.cf_payment_id ?? 0) - Number(a.cf_payment_id ?? 0);
+      })[0];
+      const status =
+        latest?.payment_status === "FAILED"
+          ? PaymentOrderStatus.FAILED
+          : ["USER_DROPPED", "CANCELLED", "VOID"].includes(
+                latest?.payment_status,
+              )
+            ? PaymentOrderStatus.CANCELLED
+            : null;
+      if (!status) return order;
+      return await this.prisma.agencyPaymentOrder.update({
+        where: { id: order.id },
+        data: {
+          status,
+          providerFailureCode: latest?.error_details?.error_code,
+          providerFailureReason:
+            latest?.error_details?.error_description ?? latest?.payment_message,
+          processedAt: new Date(),
+        },
+        ...(include ? { include } : {}),
+      });
+    } catch {
+      // Webhooks remain authoritative; a later read can safely retry.
+      return order;
+    }
   }
   async webhook(payload: any) {
     const orderId = payload?.data?.order?.order_id;
